@@ -59,7 +59,9 @@ export default function ApprovalsPage() {
     `/approvals/expenses?${expParams}`, [expParams]
   )
 
-  const currentItems = tab === 'timesheets' ? (tsData?.data ?? []) : (expData?.data ?? [])
+  const currentItems = tab === 'timesheets'
+    ? (Array.isArray(tsData?.data) ? tsData!.data : [])
+    : (Array.isArray(expData?.data) ? expData!.data : [])
   const currentLoading = tab === 'timesheets' ? tsLoading : expLoading
   const currentPagination = tab === 'timesheets' ? tsData?.pagination : expData?.pagination
 
@@ -245,7 +247,7 @@ export default function ApprovalsPage() {
               </tr>
             )}
 
-            {!currentLoading && tab === 'timesheets' && (tsData?.data ?? []).map(ts => (
+            {!currentLoading && tab === 'timesheets' && (Array.isArray(tsData?.data) ? tsData!.data : []).map(ts => (
               <tr
                 key={ts.id}
                 onClick={() => toggleOne(ts.id)}
@@ -284,7 +286,7 @@ export default function ApprovalsPage() {
               </tr>
             ))}
 
-            {!currentLoading && tab === 'expenses' && (expData?.data ?? []).map(exp => (
+            {!currentLoading && tab === 'expenses' && (Array.isArray(expData?.data) ? expData!.data : []).map(exp => (
               <tr
                 key={exp.id}
                 onClick={() => toggleOne(exp.id)}

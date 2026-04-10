@@ -97,8 +97,8 @@ export default function ExpensesPage() {
         api.get<{ data: Category[] }>('/expense-categories?per_page=200'),
         api.get<PaginatedResponse<SelectOption>>('/projects?per_page=200&status=started'),
       ])
-      setCategories(c.data ?? [])
-      setProjects(p.items ?? [])
+      setCategories(Array.isArray(c?.data) ? c.data : [])
+      setProjects(Array.isArray(p?.items) ? p.items : [])
     } catch { /* silencioso */ }
   }, [])
 

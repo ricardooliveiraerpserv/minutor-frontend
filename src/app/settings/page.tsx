@@ -604,7 +604,7 @@ function RolesTab() {
                 <div key={group.group}>
                   <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide mb-2">{group.group}</p>
                   <div className="space-y-1">
-                    {group.permissions.map(p => (
+                    {(group.permissions ?? []).map(p => (
                       <label key={p.id} className="flex items-center gap-2 cursor-pointer group">
                         <div
                           onClick={() => setSelectedPerms(s => s.includes(p.id) ? s.filter(x => x !== p.id) : [...s, p.id])}

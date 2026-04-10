@@ -70,7 +70,7 @@ export default function UsersPage() {
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    api.get<{ data: Role[] }>('/roles').then(r => setRoles(r.data ?? [])).catch(() => {})
+    api.get<{ data: Role[] }>('/roles').then(r => setRoles(Array.isArray(r?.data) ? r.data : [])).catch(() => {})
   }, [])
 
   const load = useCallback(async () => {
@@ -81,7 +81,7 @@ export default function UsersPage() {
       if (filterEnabled) p.set('enabled', filterEnabled)
       if (filterRole) p.set('role', filterRole)
       const r = await api.get<{ data: UserItem[]; meta?: { last_page: number } }>(`/users?${p}`)
-      setUsers(r.data ?? [])
+      setUsers(Array.isArray(r?.data) ? r.data : [])
       setHasNext(!!(r.meta && page < r.meta.last_page))
     } catch { toast.error('Erro ao carregar usuários') }
     finally { setLoading(false) }
