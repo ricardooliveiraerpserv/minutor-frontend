@@ -5,9 +5,11 @@ import { useApiQuery } from '@/hooks/use-query'
 import { Timesheet, PaginatedResponse } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Clock, ChevronLeft, ChevronRight, Globe, Webhook, RefreshCw, FileSpreadsheet, Plus, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react'
-import { useState, useMemo, useCallback } from 'react'
+import { Clock, ChevronLeft, ChevronRight, Globe, Webhook, RefreshCw, FileSpreadsheet, Plus, ChevronsUpDown, ChevronUp, ChevronDown, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import { api } from '@/lib/api'
+import { toast } from 'sonner'
 
 type SortField = 'date' | 'status' | 'user.name' | 'project.name' | 'customer.name' | 'effort_hours'
 type SortDir   = 'asc' | 'desc'
@@ -79,6 +81,66 @@ function OriginBadge({ origin }: { origin?: string }) {
       <Globe size={9} />
       Web
     </span>
+  )
+}
+
+function RowActions({ id, onDeleted }: { id: number; onDeleted: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const handleDelete = async () => {
+    if (!confirm('Excluir este apontamento?')) return
+    setDeleting(true)
+    try {
+      await api.delete(`/timesheets/${id}`)
+      toast.success('Apontamento excluído')
+      onDeleted()
+    } catch {
+      toast.error('Erro ao excluir')
+    } finally {
+      setDeleting(false)
+      setOpen(false)
+    }
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+      >
+        <MoreHorizontal size={13} />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-50 w-36 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg py-1">
+          <Link
+            href={`/timesheets/${id}/edit`}
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          >
+            <Pencil size={11} />
+            Editar
+          </Link>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-50 transition-colors"
+          >
+            <Trash2 size={11} />
+            {deleting ? 'Excluindo...' : 'Excluir'}
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -270,6 +332,7 @@ export default function TimesheetsPage() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+              <th className="w-8 px-2 py-2.5" />
               <SortHeader label="Data"         field="date"          current={sortField} dir={sortDir} onSort={handleSort} />
               <SortHeader label="Status"       field="status"        current={sortField} dir={sortDir} onSort={handleSort} />
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">Origem</th>
@@ -283,6 +346,7 @@ export default function TimesheetsPage() {
           <tbody>
             {loading && Array.from({ length: 8 }).map((_, i) => (
               <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800/60">
+                <td className="px-2 py-2.5 w-8" />
                 <td className="px-3 py-2.5"><Skeleton className="h-3 w-20" /></td>
                 <td className="px-3 py-2.5"><Skeleton className="h-4 w-16 rounded-full" /></td>
                 <td className="px-3 py-2.5 hidden sm:table-cell"><Skeleton className="h-4 w-12 rounded" /></td>
@@ -296,7 +360,7 @@ export default function TimesheetsPage() {
 
             {!loading && error && (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-red-500">
+                <td colSpan={9} className="px-3 py-8 text-center text-red-500">
                   {error}
                 </td>
               </tr>
@@ -304,7 +368,7 @@ export default function TimesheetsPage() {
 
             {!loading && !error && data?.items.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-12 text-center text-zinc-500">
+                <td colSpan={9} className="px-3 py-12 text-center text-zinc-500">
                   <Clock size={24} className="mx-auto mb-2 opacity-30" />
                   Nenhum apontamento encontrado
                 </td>
@@ -314,8 +378,13 @@ export default function TimesheetsPage() {
             {!loading && !error && data?.items.map(ts => (
               <tr
                 key={ts.id}
-                className="border-b border-zinc-100 dark:border-zinc-800/60 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors"
+                className="border-b border-zinc-100 dark:border-zinc-800/60 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors group"
               >
+                <td className="px-2 py-2.5 w-8">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <RowActions id={ts.id} onDeleted={refetch} />
+                  </div>
+                </td>
                 <td className="px-3 py-2.5 text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
                   {formatDate(ts.date)}
                 </td>
