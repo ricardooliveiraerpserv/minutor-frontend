@@ -5,9 +5,40 @@ import { useApiQuery } from '@/hooks/use-query'
 import { Timesheet, PaginatedResponse } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Clock, ChevronLeft, ChevronRight, Globe, Webhook, RefreshCw, FileSpreadsheet, Plus } from 'lucide-react'
+import { Clock, ChevronLeft, ChevronRight, Globe, Webhook, RefreshCw, FileSpreadsheet, Plus, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react'
 import { useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
+
+type SortField = 'date' | 'status' | 'user.name' | 'project.name' | 'customer.name' | 'effort_hours'
+type SortDir   = 'asc' | 'desc'
+
+function SortHeader({
+  label, field, current, dir, onSort, className,
+}: {
+  label: string
+  field: SortField
+  current: SortField | null
+  dir: SortDir
+  onSort: (f: SortField) => void
+  className?: string
+}) {
+  const active = current === field
+  return (
+    <th
+      className={`text-left px-3 py-2.5 text-zinc-500 font-medium cursor-pointer select-none hover:text-zinc-300 transition-colors whitespace-nowrap ${className ?? ''}`}
+      onClick={() => onSort(field)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {active
+          ? dir === 'asc'
+            ? <ChevronUp size={11} className="text-blue-400" />
+            : <ChevronDown size={11} className="text-blue-400" />
+          : <ChevronsUpDown size={11} className="opacity-30" />}
+      </span>
+    </th>
+  )
+}
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   pending:    'secondary',
@@ -62,6 +93,20 @@ export default function TimesheetsPage() {
   const [endDate, setEndDate]             = useState('')
   const [ticket, setTicket]               = useState('')
   const [exporting, setExporting]         = useState(false)
+  const [sortField, setSortField]         = useState<SortField | null>('date')
+  const [sortDir, setSortDir]             = useState<SortDir>('desc')
+
+  const handleSort = useCallback((field: SortField) => {
+    setSortField(prev => {
+      if (prev === field) {
+        setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+        return field
+      }
+      setSortDir('asc')
+      return field
+    })
+    setPage(1)
+  }, [])
 
   const { data: serviceTypes } = useApiQuery<{ items: SelectOption[] } | SelectOption[]>('/service-types')
   const { data: contractTypes } = useApiQuery<{ items: SelectOption[] } | SelectOption[]>('/contract-types')
@@ -82,8 +127,9 @@ export default function TimesheetsPage() {
     if (startDate)      p.set('start_date', startDate)
     if (endDate)        p.set('end_date', endDate)
     if (ticket)         p.set('ticket', ticket)
+    if (sortField)      p.set('order', sortDir === 'desc' ? `-${sortField}` : sortField)
     return p.toString()
-  }, [page, status, serviceTypeId, contractTypeId, startDate, endDate, ticket])
+  }, [page, status, serviceTypeId, contractTypeId, startDate, endDate, ticket, sortField, sortDir])
 
   const { data, loading, error, refetch } = useApiQuery<PaginatedResponse<Timesheet>>(
     `/timesheets?${params}`,
@@ -224,14 +270,14 @@ export default function TimesheetsPage() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium whitespace-nowrap">Data</th>
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
+              <SortHeader label="Data"         field="date"          current={sortField} dir={sortDir} onSort={handleSort} />
+              <SortHeader label="Status"       field="status"        current={sortField} dir={sortDir} onSort={handleSort} />
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">Origem</th>
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden md:table-cell">Colaborador</th>
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Projeto</th>
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden lg:table-cell">Cliente</th>
+              <SortHeader label="Colaborador"  field="user.name"     current={sortField} dir={sortDir} onSort={handleSort} className="hidden md:table-cell" />
+              <SortHeader label="Projeto"      field="project.name"  current={sortField} dir={sortDir} onSort={handleSort} />
+              <SortHeader label="Cliente"      field="customer.name" current={sortField} dir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden xl:table-cell">Tipo Contrato</th>
-              <th className="text-right px-3 py-2.5 text-zinc-500 font-medium">Tempo</th>
+              <SortHeader label="Tempo"        field="effort_hours"  current={sortField} dir={sortDir} onSort={handleSort} className="text-right" />
             </tr>
           </thead>
           <tbody>
