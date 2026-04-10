@@ -5,8 +5,8 @@ import { useApiQuery } from '@/hooks/use-query'
 import { Timesheet, PaginatedResponse } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Clock, ChevronLeft, ChevronRight, Globe, Webhook } from 'lucide-react'
-import { useState, useMemo } from 'react'
+import { Clock, ChevronLeft, ChevronRight, Globe, Webhook, RefreshCw, FileSpreadsheet, Plus } from 'lucide-react'
+import { useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -16,12 +16,13 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
   conflicted: 'outline',
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  pending:    'Pendente',
-  approved:   'Aprovado',
-  rejected:   'Rejeitado',
-  conflicted: 'Conflito',
-}
+const STATUS_OPTIONS = [
+  { value: '',           label: 'Todos os status' },
+  { value: 'pending',    label: 'Pendente' },
+  { value: 'approved',   label: 'Aprovado' },
+  { value: 'rejected',   label: 'Rejeitado' },
+  { value: 'conflicted', label: 'Conflito' },
+]
 
 function formatDate(d: string | null | undefined) {
   if (!d) return '—'
@@ -50,50 +51,173 @@ function OriginBadge({ origin }: { origin?: string }) {
   )
 }
 
+interface SelectOption { id: number; name: string }
+
 export default function TimesheetsPage() {
   const [page, setPage] = useState(1)
-  const [status, setStatus] = useState('')
+  const [status, setStatus]               = useState('')
+  const [serviceTypeId, setServiceTypeId] = useState('')
+  const [contractTypeId, setContractTypeId] = useState('')
+  const [startDate, setStartDate]         = useState('')
+  const [endDate, setEndDate]             = useState('')
+  const [ticket, setTicket]               = useState('')
+  const [exporting, setExporting]         = useState(false)
+
+  const { data: serviceTypes } = useApiQuery<{ items: SelectOption[] } | SelectOption[]>('/service-types')
+  const { data: contractTypes } = useApiQuery<{ items: SelectOption[] } | SelectOption[]>('/contract-types')
+
+  const serviceTypeList: SelectOption[] = Array.isArray(serviceTypes)
+    ? serviceTypes
+    : (serviceTypes as { items?: SelectOption[] })?.items ?? []
+
+  const contractTypeList: SelectOption[] = Array.isArray(contractTypes)
+    ? contractTypes
+    : (contractTypes as { items?: SelectOption[] })?.items ?? []
 
   const params = useMemo(() => {
     const p = new URLSearchParams({ page: String(page), per_page: '20' })
-    if (status) p.set('status', status)
+    if (status)         p.set('status', status)
+    if (serviceTypeId)  p.set('service_type_id', serviceTypeId)
+    if (contractTypeId) p.set('contract_type_id', contractTypeId)
+    if (startDate)      p.set('start_date', startDate)
+    if (endDate)        p.set('end_date', endDate)
+    if (ticket)         p.set('ticket', ticket)
     return p.toString()
-  }, [page, status])
+  }, [page, status, serviceTypeId, contractTypeId, startDate, endDate, ticket])
 
-  const { data, loading, error } = useApiQuery<PaginatedResponse<Timesheet>>(
+  const { data, loading, error, refetch } = useApiQuery<PaginatedResponse<Timesheet>>(
     `/timesheets?${params}`,
     [params]
   )
 
-  const handleStatusChange = (v: string) => {
-    setStatus(v)
-    setPage(1)
+  const resetPage = useCallback(() => setPage(1), [])
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const p = new URLSearchParams()
+      if (status)         p.set('status', status)
+      if (serviceTypeId)  p.set('service_type_id', serviceTypeId)
+      if (contractTypeId) p.set('contract_type_id', contractTypeId)
+      if (startDate)      p.set('start_date', startDate)
+      if (endDate)        p.set('end_date', endDate)
+      if (ticket)         p.set('ticket', ticket)
+
+      const token = localStorage.getItem('minutor_token')
+      const res = await fetch(`/api/v1/timesheets/export?${p.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error('Falha no export')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `apontamentos_${new Date().toISOString().slice(0, 10)}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('Erro ao exportar. Tente novamente.')
+    } finally {
+      setExporting(false)
+    }
   }
 
-  return (
-    <AppLayout title="Apontamentos">
-      {/* Filters */}
-      <div className="flex items-center gap-2 mb-4">
-        {['', 'pending', 'approved', 'rejected', 'conflicted'].map(s => (
-          <button
-            key={s}
-            onClick={() => handleStatusChange(s)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              status === s
-                ? 'bg-zinc-800 text-white'
-                : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-300'
-            }`}
-          >
-            {s === '' ? 'Todos' : STATUS_LABEL[s]}
-          </button>
-        ))}
+  const actions = (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={() => refetch()}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+      >
+        <RefreshCw size={12} />
+        Atualizar
+      </button>
+      <button
+        onClick={handleExport}
+        disabled={exporting}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+      >
+        <FileSpreadsheet size={12} />
+        {exporting ? 'Exportando...' : 'Exportar Excel'}
+      </button>
+      <Link
+        href="/timesheets/new"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+      >
+        <Plus size={12} />
+        Novo Apontamento
+      </Link>
+    </div>
+  )
 
-        {data && (
-          <span className="ml-auto text-xs text-zinc-500">
-            Total: <strong className="text-zinc-300">{data.totalEffortHours ?? '—'}</strong>
-          </span>
-        )}
+  return (
+    <AppLayout title="Apontamentos" actions={actions}>
+      {/* Filters */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+        <select
+          value={serviceTypeId}
+          onChange={e => { setServiceTypeId(e.target.value); resetPage() }}
+          className="px-3 py-2 rounded-md text-xs border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="">Selecione um tipo...</option>
+          {serviceTypeList.map(s => (
+            <option key={s.id} value={String(s.id)}>{s.name}</option>
+          ))}
+        </select>
+
+        <select
+          value={contractTypeId}
+          onChange={e => { setContractTypeId(e.target.value); resetPage() }}
+          className="px-3 py-2 rounded-md text-xs border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="">Selecione um tipo de contrato...</option>
+          {contractTypeList.map(c => (
+            <option key={c.id} value={String(c.id)}>{c.name}</option>
+          ))}
+        </select>
+
+        <select
+          value={status}
+          onChange={e => { setStatus(e.target.value); resetPage() }}
+          className="px-3 py-2 rounded-md text-xs border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          {STATUS_OPTIONS.map(s => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
+
+        <div className="flex items-center gap-1">
+          <input
+            type="date"
+            value={startDate}
+            onChange={e => { setStartDate(e.target.value); resetPage() }}
+            className="flex-1 min-w-0 px-2 py-2 rounded-md text-xs border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <span className="text-zinc-400 text-xs">-</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={e => { setEndDate(e.target.value); resetPage() }}
+            className="flex-1 min-w-0 px-2 py-2 rounded-md text-xs border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
       </div>
+
+      <div className="mb-4">
+        <label className="block text-xs font-medium text-zinc-500 mb-1">Ticket</label>
+        <input
+          type="text"
+          value={ticket}
+          onChange={e => { setTicket(e.target.value); resetPage() }}
+          placeholder="Digite o número do ticket..."
+          className="w-56 px-3 py-2 rounded-md text-xs border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+      </div>
+
+      {data && (
+        <p className="text-xs text-zinc-500 mb-3">
+          Total de horas: <strong className="text-zinc-300">{data.totalEffortHours ?? '—'}</strong>
+        </p>
+      )}
 
       {/* Table */}
       <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-x-auto">
@@ -151,7 +275,7 @@ export default function TimesheetsPage() {
                 </td>
                 <td className="px-3 py-2.5">
                   <Badge variant={STATUS_VARIANT[ts.status] ?? 'secondary'} className="text-[10px] whitespace-nowrap">
-                    {ts.status_display ?? STATUS_LABEL[ts.status] ?? ts.status}
+                    {ts.status_display ?? ts.status}
                   </Badge>
                 </td>
                 <td className="px-3 py-2.5 hidden sm:table-cell">
@@ -198,7 +322,7 @@ export default function TimesheetsPage() {
             <button
               onClick={() => setPage(p => p + 1)}
               disabled={!data?.hasNext}
-              className="p-1.5 rounded-md text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="p-1.5 rounded-md text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronRight size={14} />
             </button>
