@@ -66,6 +66,64 @@ export interface Timesheet {
   created_at: string
 }
 
+export interface ContractType {
+  id: number
+  name: string
+  code: string
+  description?: string
+  active: boolean
+  created_at: string
+}
+
+export interface ServiceType {
+  id: number
+  name: string
+  code: string
+  description?: string
+  active: boolean
+  created_at: string
+}
+
+export interface CustomerFull {
+  id: number
+  name: string
+  company_name?: string
+  cgc?: string
+  active: boolean
+  created_at: string
+}
+
+export interface Role {
+  id: number
+  name: string
+  permissions?: Permission[]
+  created_at: string
+}
+
+export interface Permission {
+  id: string
+  name: string
+  description?: string
+  group?: string
+}
+
+export interface ConsultantGroup {
+  id: number
+  name: string
+  description?: string
+  active: boolean
+  consultants?: { id: number; name: string; email: string }[]
+  consultants_count?: number
+  created_at: string
+}
+
+export interface SystemSettings {
+  timesheet_retroactive_limit_days?: number
+  movidesk_default_customer_id?: number
+  movidesk_default_project_id?: number
+  [key: string]: string | number | null | undefined
+}
+
 export interface Expense {
   id: number
   user_id: number

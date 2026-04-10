@@ -1,13 +1,907 @@
 'use client'
+
 import { AppLayout } from '@/components/layout/app-layout'
-import { Settings } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { api, ApiError } from '@/lib/api'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
+import {
+  Settings, FileType, Wrench, Users, Shield, UserCheck,
+  Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Check, Search
+} from 'lucide-react'
+import type { ContractType, ServiceType, CustomerFull, Role, Permission, ConsultantGroup, SystemSettings } from '@/types'
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+function ActiveBadge({ active }: { active: boolean }) {
+  return (
+    <Badge variant="outline" className={`text-[10px] border ${active
+      ? 'bg-green-500/20 text-green-400 border-green-500/30'
+      : 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'}`}>
+      {active ? 'Ativo' : 'Inativo'}
+    </Badge>
+  )
+}
+
+function TableSkeleton({ cols }: { cols: number }) {
+  return (
+    <>
+      {[...Array(5)].map((_, i) => (
+        <tr key={i} className="border-b border-zinc-800">
+          {[...Array(cols)].map((_, j) => (
+            <td key={j} className="px-3 py-2.5"><Skeleton className="h-4 w-full" /></td>
+          ))}
+        </tr>
+      ))}
+    </>
+  )
+}
+
+function ModalOverlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="relative bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-md shadow-xl">
+        <button onClick={onClose} className="absolute top-3 right-3 text-zinc-500 hover:text-zinc-300">
+          <X size={16} />
+        </button>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// ─── TABS ────────────────────────────────────────────────────────────────────
+
+const TABS = [
+  { id: 'general',    label: 'Geral',               icon: Settings },
+  { id: 'contracts',  label: 'Tipos de Contrato',   icon: FileType },
+  { id: 'services',   label: 'Tipos de Serviço',    icon: Wrench },
+  { id: 'customers',  label: 'Clientes',            icon: Users },
+  { id: 'roles',      label: 'Perfis de Acesso',    icon: Shield },
+  { id: 'groups',     label: 'Grupos de Consultor', icon: UserCheck },
+]
+
+// ─── TAB: GENERAL SETTINGS ───────────────────────────────────────────────────
+
+function GeneralTab() {
+  const [settings, setSettings] = useState<SystemSettings>({})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [customers, setCustomers] = useState<{ id: number; name: string }[]>([])
+  const [projects, setProjects] = useState<{ id: number; name: string }[]>([])
+
+  useEffect(() => {
+    Promise.all([
+      api.get<{ data: SystemSettings }>('/system-settings'),
+      api.get<{ data: { id: number; name: string }[] }>('/customers?per_page=200&active=1'),
+    ]).then(([s, c]) => {
+      setSettings(s.data ?? s as unknown as SystemSettings)
+      setCustomers(c.data ?? (c as unknown as { id: number; name: string }[]))
+    }).catch(() => toast.error('Erro ao carregar configurações'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (!settings.movidesk_default_customer_id) { setProjects([]); return }
+    api.get<{ data: { id: number; name: string }[] }>(
+      `/projects?customer_id=${settings.movidesk_default_customer_id}&per_page=200`
+    ).then(r => setProjects(r.data ?? (r as unknown as { id: number; name: string }[])))
+      .catch(() => setProjects([]))
+  }, [settings.movidesk_default_customer_id])
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await api.put('/system-settings', settings)
+      toast.success('Configurações salvas')
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Erro ao salvar')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return <div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+
+  return (
+    <div className="space-y-8 max-w-lg">
+      <section>
+        <h3 className="text-sm font-medium text-zinc-300 mb-4 pb-2 border-b border-zinc-800">Apontamento de Horas</h3>
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs text-zinc-400">Limite de dias para lançamento retroativo</Label>
+            <Input
+              type="number" min={0} max={365}
+              value={settings.timesheet_retroactive_limit_days ?? ''}
+              onChange={e => setSettings(s => ({ ...s, timesheet_retroactive_limit_days: Number(e.target.value) }))}
+              className="mt-1.5 bg-zinc-800 border-zinc-700 text-white h-9 w-40"
+            />
+            <p className="text-[11px] text-zinc-500 mt-1">0 = sem limite. Máximo 365 dias.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h3 className="text-sm font-medium text-zinc-300 mb-4 pb-2 border-b border-zinc-800">Integração Movidesk</h3>
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs text-zinc-400">Cliente padrão</Label>
+            <select
+              value={settings.movidesk_default_customer_id ?? ''}
+              onChange={e => setSettings(s => ({ ...s, movidesk_default_customer_id: Number(e.target.value) || undefined, movidesk_default_project_id: undefined }))}
+              className="mt-1.5 w-full bg-zinc-800 border border-zinc-700 text-white text-xs rounded-md h-9 px-3"
+            >
+              <option value="">Nenhum</option>
+              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <Label className="text-xs text-zinc-400">Projeto padrão</Label>
+            <select
+              value={settings.movidesk_default_project_id ?? ''}
+              onChange={e => setSettings(s => ({ ...s, movidesk_default_project_id: Number(e.target.value) || undefined }))}
+              disabled={!settings.movidesk_default_customer_id}
+              className="mt-1.5 w-full bg-zinc-800 border border-zinc-700 text-white text-xs rounded-md h-9 px-3 disabled:opacity-40"
+            >
+              <option value="">Nenhum</option>
+              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <Button onClick={save} disabled={saving} className="bg-blue-600 hover:bg-blue-500 text-white h-9 text-xs">
+        {saving ? 'Salvando...' : 'Salvar configurações'}
+      </Button>
+    </div>
+  )
+}
+
+// ─── TAB: CRUD GENÉRICO (ContractType / ServiceType) ─────────────────────────
+
+interface CrudItem { id: number; name: string; code: string; description?: string; active: boolean; created_at: string }
+
+function CrudTab({ endpoint, label }: { endpoint: string; label: string }) {
+  const [items, setItems] = useState<CrudItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [filterActive, setFilterActive] = useState('')
+  const [page, setPage] = useState(1)
+  const [hasNext, setHasNext] = useState(false)
+  const [modal, setModal] = useState<{ open: boolean; item?: CrudItem }>({ open: false })
+  const [form, setForm] = useState({ name: '', code: '', description: '', active: true })
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState<number | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const p = new URLSearchParams({ page: String(page), per_page: '15' })
+      if (search) p.set('search', search)
+      if (filterActive) p.set('active', filterActive)
+      const r = await api.get<{ data: CrudItem[]; meta?: { last_page: number } }>(`/${endpoint}?${p}`)
+      setItems(r.data ?? [])
+      setHasNext(!!(r.meta && page < r.meta.last_page))
+    } catch { toast.error(`Erro ao carregar ${label}`) }
+    finally { setLoading(false) }
+  }, [endpoint, label, page, search, filterActive])
+
+  useEffect(() => { load() }, [load])
+
+  const openCreate = () => { setForm({ name: '', code: '', description: '', active: true }); setModal({ open: true }) }
+  const openEdit = (item: CrudItem) => { setForm({ name: item.name, code: item.code, description: item.description ?? '', active: item.active }); setModal({ open: true, item }) }
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      if (modal.item) await api.put(`/${endpoint}/${modal.item.id}`, form)
+      else await api.post(`/${endpoint}`, form)
+      toast.success(modal.item ? `${label} atualizado` : `${label} criado`)
+      setModal({ open: false })
+      load()
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao salvar') }
+    finally { setSaving(false) }
+  }
+
+  const remove = async (id: number) => {
+    if (!confirm('Confirmar exclusão?')) return
+    setDeleting(id)
+    try {
+      await api.delete(`/${endpoint}/${id}`)
+      toast.success(`${label} excluído`)
+      load()
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao excluir') }
+    finally { setDeleting(null) }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <div className="relative flex-1 min-w-48">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+            placeholder="Buscar..." className="pl-8 bg-zinc-800 border-zinc-700 text-white h-8 text-xs" />
+        </div>
+        <select value={filterActive} onChange={e => { setFilterActive(e.target.value); setPage(1) }}
+          className="bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs rounded-md h-8 px-2">
+          <option value="">Todos</option>
+          <option value="1">Ativos</option>
+          <option value="0">Inativos</option>
+        </select>
+        <Button onClick={openCreate} className="bg-blue-600 hover:bg-blue-500 text-white h-8 text-xs gap-1.5">
+          <Plus size={13} /> Novo
+        </Button>
+      </div>
+
+      <div className="rounded-lg border border-zinc-800 overflow-hidden">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-zinc-800 bg-zinc-900">
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">Código</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
+              <th className="px-3 py-2.5 w-16"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? <TableSkeleton cols={4} /> : items.length === 0 ? (
+              <tr><td colSpan={4} className="px-3 py-8 text-center text-zinc-500">Nenhum registro</td></tr>
+            ) : items.map(item => (
+              <tr key={item.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
+                <td className="px-3 py-2.5 text-zinc-200">{item.name}</td>
+                <td className="px-3 py-2.5 text-zinc-400 font-mono hidden sm:table-cell">{item.code}</td>
+                <td className="px-3 py-2.5"><ActiveBadge active={item.active} /></td>
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center gap-1 justify-end">
+                    <button onClick={() => openEdit(item)} className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors"><Pencil size={12} /></button>
+                    <button onClick={() => remove(item.id)} disabled={deleting === item.id} className="p-1 text-zinc-500 hover:text-red-400 transition-colors"><Trash2 size={12} /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {(page > 1 || hasNext) && (
+        <div className="flex items-center justify-end gap-2 mt-3">
+          <button onClick={() => setPage(p => p - 1)} disabled={page === 1} className="p-1 text-zinc-500 hover:text-zinc-200 disabled:opacity-30"><ChevronLeft size={14} /></button>
+          <span className="text-xs text-zinc-500">Página {page}</span>
+          <button onClick={() => setPage(p => p + 1)} disabled={!hasNext} className="p-1 text-zinc-500 hover:text-zinc-200 disabled:opacity-30"><ChevronRight size={14} /></button>
+        </div>
+      )}
+
+      {modal.open && (
+        <ModalOverlay onClose={() => setModal({ open: false })}>
+          <div className="p-5">
+            <h3 className="text-sm font-semibold text-white mb-4">{modal.item ? `Editar ${label}` : `Novo ${label}`}</h3>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs text-zinc-400">Nome *</Label>
+                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
+              </div>
+              <div>
+                <Label className="text-xs text-zinc-400">Código *</Label>
+                <Input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') }))}
+                  className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs font-mono" />
+                <p className="text-[11px] text-zinc-500 mt-1">Apenas letras minúsculas, números, _ e -</p>
+              </div>
+              <div>
+                <Label className="text-xs text-zinc-400">Descrição</Label>
+                <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setForm(f => ({ ...f, active: !f.active }))}
+                  className={`w-8 h-4 rounded-full transition-colors relative ${form.active ? 'bg-blue-600' : 'bg-zinc-700'}`}
+                >
+                  <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${form.active ? 'left-4' : 'left-0.5'}`} />
+                </button>
+                <Label className="text-xs text-zinc-400">Ativo</Label>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5 justify-end">
+              <Button variant="outline" onClick={() => setModal({ open: false })} className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
+              <Button onClick={save} disabled={saving || !form.name || !form.code} className="h-8 text-xs bg-blue-600 hover:bg-blue-500 text-white">
+                {saving ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+    </div>
+  )
+}
+
+// ─── TAB: CLIENTES ───────────────────────────────────────────────────────────
+
+function CustomersTab() {
+  const [items, setItems] = useState<CustomerFull[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [hasNext, setHasNext] = useState(false)
+  const [modal, setModal] = useState<{ open: boolean; item?: CustomerFull }>({ open: false })
+  const [form, setForm] = useState({ name: '', company_name: '', cgc: '', active: true })
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState<number | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const p = new URLSearchParams({ page: String(page), per_page: '15' })
+      if (search) p.set('search', search)
+      const r = await api.get<{ data: CustomerFull[]; meta?: { last_page: number } }>(`/customers?${p}`)
+      setItems(r.data ?? [])
+      setHasNext(!!(r.meta && page < r.meta.last_page))
+    } catch { toast.error('Erro ao carregar clientes') }
+    finally { setLoading(false) }
+  }, [page, search])
+
+  useEffect(() => { load() }, [load])
+
+  const openCreate = () => { setForm({ name: '', company_name: '', cgc: '', active: true }); setModal({ open: true }) }
+  const openEdit = (item: CustomerFull) => { setForm({ name: item.name, company_name: item.company_name ?? '', cgc: item.cgc ?? '', active: item.active }); setModal({ open: true, item }) }
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      if (modal.item) await api.put(`/customers/${modal.item.id}`, form)
+      else await api.post('/customers', form)
+      toast.success(modal.item ? 'Cliente atualizado' : 'Cliente criado')
+      setModal({ open: false })
+      load()
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao salvar') }
+    finally { setSaving(false) }
+  }
+
+  const remove = async (id: number) => {
+    if (!confirm('Confirmar exclusão?')) return
+    setDeleting(id)
+    try {
+      await api.delete(`/customers/${id}`)
+      toast.success('Cliente excluído')
+      load()
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao excluir') }
+    finally { setDeleting(null) }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <div className="relative flex-1 min-w-48">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+            placeholder="Buscar cliente..." className="pl-8 bg-zinc-800 border-zinc-700 text-white h-8 text-xs" />
+        </div>
+        <Button onClick={openCreate} className="bg-blue-600 hover:bg-blue-500 text-white h-8 text-xs gap-1.5">
+          <Plus size={13} /> Novo
+        </Button>
+      </div>
+
+      <div className="rounded-lg border border-zinc-800 overflow-hidden">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-zinc-800 bg-zinc-900">
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden md:table-cell">Razão Social</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">CPF/CNPJ</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
+              <th className="px-3 py-2.5 w-16"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? <TableSkeleton cols={5} /> : items.length === 0 ? (
+              <tr><td colSpan={5} className="px-3 py-8 text-center text-zinc-500">Nenhum cliente</td></tr>
+            ) : items.map(item => (
+              <tr key={item.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
+                <td className="px-3 py-2.5 text-zinc-200">{item.name}</td>
+                <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell">{item.company_name || '—'}</td>
+                <td className="px-3 py-2.5 text-zinc-400 font-mono hidden sm:table-cell">{item.cgc || '—'}</td>
+                <td className="px-3 py-2.5"><ActiveBadge active={item.active} /></td>
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center gap-1 justify-end">
+                    <button onClick={() => openEdit(item)} className="p-1 text-zinc-500 hover:text-zinc-200"><Pencil size={12} /></button>
+                    <button onClick={() => remove(item.id)} disabled={deleting === item.id} className="p-1 text-zinc-500 hover:text-red-400"><Trash2 size={12} /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {(page > 1 || hasNext) && (
+        <div className="flex items-center justify-end gap-2 mt-3">
+          <button onClick={() => setPage(p => p - 1)} disabled={page === 1} className="p-1 text-zinc-500 hover:text-zinc-200 disabled:opacity-30"><ChevronLeft size={14} /></button>
+          <span className="text-xs text-zinc-500">Página {page}</span>
+          <button onClick={() => setPage(p => p + 1)} disabled={!hasNext} className="p-1 text-zinc-500 hover:text-zinc-200 disabled:opacity-30"><ChevronRight size={14} /></button>
+        </div>
+      )}
+
+      {modal.open && (
+        <ModalOverlay onClose={() => setModal({ open: false })}>
+          <div className="p-5">
+            <h3 className="text-sm font-semibold text-white mb-4">{modal.item ? 'Editar Cliente' : 'Novo Cliente'}</h3>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs text-zinc-400">Nome *</Label>
+                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
+              </div>
+              <div>
+                <Label className="text-xs text-zinc-400">Razão Social</Label>
+                <Input value={form.company_name} onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))}
+                  className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
+              </div>
+              <div>
+                <Label className="text-xs text-zinc-400">CPF/CNPJ</Label>
+                <Input value={form.cgc} onChange={e => setForm(f => ({ ...f, cgc: e.target.value }))}
+                  className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs font-mono" />
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setForm(f => ({ ...f, active: !f.active }))}
+                  className={`w-8 h-4 rounded-full transition-colors relative ${form.active ? 'bg-blue-600' : 'bg-zinc-700'}`}>
+                  <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${form.active ? 'left-4' : 'left-0.5'}`} />
+                </button>
+                <Label className="text-xs text-zinc-400">Ativo</Label>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5 justify-end">
+              <Button variant="outline" onClick={() => setModal({ open: false })} className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
+              <Button onClick={save} disabled={saving || !form.name} className="h-8 text-xs bg-blue-600 hover:bg-blue-500 text-white">
+                {saving ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+    </div>
+  )
+}
+
+// ─── TAB: ROLES ──────────────────────────────────────────────────────────────
+
+function RolesTab() {
+  const [roles, setRoles] = useState<Role[]>([])
+  const [loading, setLoading] = useState(true)
+  const [modal, setModal] = useState<{ open: boolean; item?: Role }>({ open: false })
+  const [permModal, setPermModal] = useState<Role | null>(null)
+  const [allPerms, setAllPerms] = useState<{ group: string; permissions: Permission[] }[]>([])
+  const [selectedPerms, setSelectedPerms] = useState<string[]>([])
+  const [form, setForm] = useState({ name: '' })
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState<number | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await api.get<{ data: Role[] }>('/roles?with_permissions=true')
+      setRoles(r.data ?? (r as unknown as Role[]))
+    } catch { toast.error('Erro ao carregar perfis') }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const openPerms = async (role: Role) => {
+    setPermModal(role)
+    setSelectedPerms(role.permissions?.map(p => p.id) ?? [])
+    if (allPerms.length === 0) {
+      try {
+        const r = await api.get<{ data: { group: string; permissions: Permission[] }[] }>('/permissions/grouped')
+        setAllPerms(r.data ?? (r as unknown as { group: string; permissions: Permission[] }[]))
+      } catch { toast.error('Erro ao carregar permissões') }
+    }
+  }
+
+  const savePerms = async () => {
+    if (!permModal) return
+    setSaving(true)
+    try {
+      await api.post(`/roles/${permModal.id}/permissions`, { permissions: selectedPerms })
+      toast.success('Permissões atualizadas')
+      setPermModal(null)
+      load()
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao salvar') }
+    finally { setSaving(false) }
+  }
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      if (modal.item) await api.put(`/roles/${modal.item.id}`, form)
+      else await api.post('/roles', form)
+      toast.success(modal.item ? 'Perfil atualizado' : 'Perfil criado')
+      setModal({ open: false })
+      load()
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao salvar') }
+    finally { setSaving(false) }
+  }
+
+  const remove = async (id: number) => {
+    if (!confirm('Confirmar exclusão?')) return
+    setDeleting(id)
+    try {
+      await api.delete(`/roles/${id}`)
+      toast.success('Perfil excluído')
+      load()
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao excluir') }
+    finally { setDeleting(null) }
+  }
+
+  return (
+    <div>
+      <div className="flex justify-end mb-4">
+        <Button onClick={() => { setForm({ name: '' }); setModal({ open: true }) }} className="bg-blue-600 hover:bg-blue-500 text-white h-8 text-xs gap-1.5">
+          <Plus size={13} /> Novo Perfil
+        </Button>
+      </div>
+
+      <div className="rounded-lg border border-zinc-800 overflow-hidden">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-zinc-800 bg-zinc-900">
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">Permissões</th>
+              <th className="px-3 py-2.5 w-24"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? <TableSkeleton cols={3} /> : roles.length === 0 ? (
+              <tr><td colSpan={3} className="px-3 py-8 text-center text-zinc-500">Nenhum perfil</td></tr>
+            ) : roles.map(role => (
+              <tr key={role.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
+                <td className="px-3 py-2.5 text-zinc-200">{role.name}</td>
+                <td className="px-3 py-2.5 text-zinc-400 hidden sm:table-cell">{role.permissions?.length ?? 0} permissões</td>
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center gap-1 justify-end">
+                    <button onClick={() => openPerms(role)} className="p-1 text-zinc-500 hover:text-blue-400 transition-colors" title="Gerenciar permissões"><Shield size={12} /></button>
+                    <button onClick={() => { setForm({ name: role.name }); setModal({ open: true, item: role }) }} className="p-1 text-zinc-500 hover:text-zinc-200"><Pencil size={12} /></button>
+                    <button onClick={() => remove(role.id)} disabled={deleting === role.id} className="p-1 text-zinc-500 hover:text-red-400"><Trash2 size={12} /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {modal.open && (
+        <ModalOverlay onClose={() => setModal({ open: false })}>
+          <div className="p-5">
+            <h3 className="text-sm font-semibold text-white mb-4">{modal.item ? 'Editar Perfil' : 'Novo Perfil'}</h3>
+            <div>
+              <Label className="text-xs text-zinc-400">Nome *</Label>
+              <Input value={form.name} onChange={e => setForm({ name: e.target.value })}
+                className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
+            </div>
+            <div className="flex gap-2 mt-5 justify-end">
+              <Button variant="outline" onClick={() => setModal({ open: false })} className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
+              <Button onClick={save} disabled={saving || !form.name} className="h-8 text-xs bg-blue-600 hover:bg-blue-500 text-white">
+                {saving ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+
+      {permModal && (
+        <ModalOverlay onClose={() => setPermModal(null)}>
+          <div className="p-5 max-h-[80vh] overflow-y-auto">
+            <h3 className="text-sm font-semibold text-white mb-4">Permissões — {permModal.name}</h3>
+            <div className="space-y-4">
+              {allPerms.map(group => (
+                <div key={group.group}>
+                  <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide mb-2">{group.group}</p>
+                  <div className="space-y-1">
+                    {group.permissions.map(p => (
+                      <label key={p.id} className="flex items-center gap-2 cursor-pointer group">
+                        <div
+                          onClick={() => setSelectedPerms(s => s.includes(p.id) ? s.filter(x => x !== p.id) : [...s, p.id])}
+                          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer ${selectedPerms.includes(p.id) ? 'bg-blue-600 border-blue-600' : 'border-zinc-600 hover:border-zinc-400'}`}
+                        >
+                          {selectedPerms.includes(p.id) && <Check size={10} className="text-white" />}
+                        </div>
+                        <span className="text-xs text-zinc-300 group-hover:text-white transition-colors">{p.description || p.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 mt-5 justify-end sticky bottom-0 bg-zinc-900 pt-3 border-t border-zinc-800">
+              <Button variant="outline" onClick={() => setPermModal(null)} className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
+              <Button onClick={savePerms} disabled={saving} className="h-8 text-xs bg-blue-600 hover:bg-blue-500 text-white">
+                {saving ? 'Salvando...' : 'Salvar permissões'}
+              </Button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+    </div>
+  )
+}
+
+// ─── TAB: CONSULTANT GROUPS ───────────────────────────────────────────────────
+
+function ConsultantGroupsTab() {
+  const [items, setItems] = useState<ConsultantGroup[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [hasNext, setHasNext] = useState(false)
+  const [modal, setModal] = useState<{ open: boolean; item?: ConsultantGroup }>({ open: false })
+  const [detailModal, setDetailModal] = useState<ConsultantGroup | null>(null)
+  const [availConsultants, setAvailConsultants] = useState<{ id: number; name: string; email: string }[]>([])
+  const [form, setForm] = useState({ name: '', description: '', active: true, consultant_ids: [] as number[] })
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState<number | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const p = new URLSearchParams({ page: String(page), per_page: '15' })
+      if (search) p.set('search', search)
+      const r = await api.get<{ data: ConsultantGroup[]; meta?: { last_page: number } }>(`/consultant-groups?${p}`)
+      setItems(r.data ?? [])
+      setHasNext(!!(r.meta && page < r.meta.last_page))
+    } catch { toast.error('Erro ao carregar grupos') }
+    finally { setLoading(false) }
+  }, [page, search])
+
+  useEffect(() => { load() }, [load])
+
+  const openCreate = async () => {
+    setForm({ name: '', description: '', active: true, consultant_ids: [] })
+    try {
+      const r = await api.get<{ data: { id: number; name: string; email: string }[] }>('/consultant-groups/available-consultants')
+      setAvailConsultants(r.data ?? [])
+    } catch { setAvailConsultants([]) }
+    setModal({ open: true })
+  }
+
+  const openEdit = async (item: ConsultantGroup) => {
+    setForm({ name: item.name, description: item.description ?? '', active: item.active, consultant_ids: item.consultants?.map(c => c.id) ?? [] })
+    try {
+      const r = await api.get<{ data: { id: number; name: string; email: string }[] }>('/consultant-groups/available-consultants')
+      setAvailConsultants(r.data ?? [])
+    } catch { setAvailConsultants([]) }
+    setModal({ open: true, item })
+  }
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      if (modal.item) await api.put(`/consultant-groups/${modal.item.id}`, form)
+      else await api.post('/consultant-groups', form)
+      toast.success(modal.item ? 'Grupo atualizado' : 'Grupo criado')
+      setModal({ open: false })
+      load()
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao salvar') }
+    finally { setSaving(false) }
+  }
+
+  const remove = async (id: number) => {
+    if (!confirm('Confirmar exclusão?')) return
+    setDeleting(id)
+    try {
+      await api.delete(`/consultant-groups/${id}`)
+      toast.success('Grupo excluído')
+      load()
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao excluir') }
+    finally { setDeleting(null) }
+  }
+
+  const toggleConsultant = (id: number) => {
+    setForm(f => ({
+      ...f,
+      consultant_ids: f.consultant_ids.includes(id)
+        ? f.consultant_ids.filter(x => x !== id)
+        : [...f.consultant_ids, id]
+    }))
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <div className="relative flex-1 min-w-48">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+            placeholder="Buscar grupo..." className="pl-8 bg-zinc-800 border-zinc-700 text-white h-8 text-xs" />
+        </div>
+        <Button onClick={openCreate} className="bg-blue-600 hover:bg-blue-500 text-white h-8 text-xs gap-1.5">
+          <Plus size={13} /> Novo
+        </Button>
+      </div>
+
+      <div className="rounded-lg border border-zinc-800 overflow-hidden">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-zinc-800 bg-zinc-900">
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">Consultores</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
+              <th className="px-3 py-2.5 w-16"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? <TableSkeleton cols={4} /> : items.length === 0 ? (
+              <tr><td colSpan={4} className="px-3 py-8 text-center text-zinc-500">Nenhum grupo</td></tr>
+            ) : items.map(item => (
+              <tr key={item.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
+                <td className="px-3 py-2.5">
+                  <button onClick={() => setDetailModal(item)} className="text-zinc-200 hover:text-blue-400 text-left">{item.name}</button>
+                </td>
+                <td className="px-3 py-2.5 text-zinc-400 hidden sm:table-cell">{item.consultants_count ?? item.consultants?.length ?? 0}</td>
+                <td className="px-3 py-2.5"><ActiveBadge active={item.active} /></td>
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center gap-1 justify-end">
+                    <button onClick={() => openEdit(item)} className="p-1 text-zinc-500 hover:text-zinc-200"><Pencil size={12} /></button>
+                    <button onClick={() => remove(item.id)} disabled={deleting === item.id} className="p-1 text-zinc-500 hover:text-red-400"><Trash2 size={12} /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {(page > 1 || hasNext) && (
+        <div className="flex items-center justify-end gap-2 mt-3">
+          <button onClick={() => setPage(p => p - 1)} disabled={page === 1} className="p-1 text-zinc-500 hover:text-zinc-200 disabled:opacity-30"><ChevronLeft size={14} /></button>
+          <span className="text-xs text-zinc-500">Página {page}</span>
+          <button onClick={() => setPage(p => p + 1)} disabled={!hasNext} className="p-1 text-zinc-500 hover:text-zinc-200 disabled:opacity-30"><ChevronRight size={14} /></button>
+        </div>
+      )}
+
+      {detailModal && (
+        <ModalOverlay onClose={() => setDetailModal(null)}>
+          <div className="p-5">
+            <h3 className="text-sm font-semibold text-white mb-1">{detailModal.name}</h3>
+            {detailModal.description && <p className="text-xs text-zinc-400 mb-4">{detailModal.description}</p>}
+            <p className="text-[11px] text-zinc-500 uppercase tracking-wide mb-2">Consultores</p>
+            {detailModal.consultants && detailModal.consultants.length > 0 ? (
+              <ul className="space-y-1.5">
+                {detailModal.consultants.map(c => (
+                  <li key={c.id} className="flex items-center gap-2 text-xs text-zinc-300">
+                    <div className="w-5 h-5 rounded-full bg-zinc-700 flex items-center justify-center text-[10px] text-zinc-400">
+                      {c.name[0]}
+                    </div>
+                    <span>{c.name}</span>
+                    <span className="text-zinc-500">{c.email}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="text-xs text-zinc-500">Nenhum consultor vinculado</p>}
+          </div>
+        </ModalOverlay>
+      )}
+
+      {modal.open && (
+        <ModalOverlay onClose={() => setModal({ open: false })}>
+          <div className="p-5 max-h-[80vh] overflow-y-auto">
+            <h3 className="text-sm font-semibold text-white mb-4">{modal.item ? 'Editar Grupo' : 'Novo Grupo'}</h3>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs text-zinc-400">Nome *</Label>
+                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
+              </div>
+              <div>
+                <Label className="text-xs text-zinc-400">Descrição</Label>
+                <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setForm(f => ({ ...f, active: !f.active }))}
+                  className={`w-8 h-4 rounded-full transition-colors relative ${form.active ? 'bg-blue-600' : 'bg-zinc-700'}`}>
+                  <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${form.active ? 'left-4' : 'left-0.5'}`} />
+                </button>
+                <Label className="text-xs text-zinc-400">Ativo</Label>
+              </div>
+              {availConsultants.length > 0 && (
+                <div>
+                  <Label className="text-xs text-zinc-400 mb-2 block">Consultores</Label>
+                  <div className="space-y-1 max-h-40 overflow-y-auto border border-zinc-700 rounded-md p-2">
+                    {availConsultants.map(c => (
+                      <label key={c.id} className="flex items-center gap-2 cursor-pointer">
+                        <div
+                          onClick={() => toggleConsultant(c.id)}
+                          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer ${form.consultant_ids.includes(c.id) ? 'bg-blue-600 border-blue-600' : 'border-zinc-600 hover:border-zinc-400'}`}
+                        >
+                          {form.consultant_ids.includes(c.id) && <Check size={10} className="text-white" />}
+                        </div>
+                        <span className="text-xs text-zinc-300">{c.name}</span>
+                        <span className="text-[11px] text-zinc-500">{c.email}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 mt-5 justify-end">
+              <Button variant="outline" onClick={() => setModal({ open: false })} className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
+              <Button onClick={save} disabled={saving || !form.name} className="h-8 text-xs bg-blue-600 hover:bg-blue-500 text-white">
+                {saving ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+    </div>
+  )
+}
+
+// ─── PAGE ────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState('general')
+  const active = TABS.find(t => t.id === activeTab)!
+
   return (
     <AppLayout title="Configurações">
-      <div className="flex flex-col items-center justify-center py-24 text-zinc-500">
-        <Settings size={32} className="mb-3 opacity-30" />
-        <p className="text-sm">Em breve</p>
+      <div className="flex gap-6">
+        {/* Sidebar */}
+        <nav className="w-48 shrink-0 hidden md:block">
+          <ul className="space-y-0.5">
+            {TABS.map(tab => {
+              const Icon = tab.icon
+              return (
+                <li key={tab.id}>
+                  <button
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs transition-colors text-left ${
+                      activeTab === tab.id
+                        ? 'bg-zinc-800 text-white'
+                        : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300'
+                    }`}
+                  >
+                    <Icon size={13} />
+                    {tab.label}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </nav>
+
+        {/* Mobile tabs */}
+        <div className="flex gap-1 mb-4 md:hidden flex-wrap">
+          {TABS.map(tab => {
+            const Icon = tab.icon
+            return (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                  activeTab === tab.id ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:bg-zinc-800/60'
+                }`}>
+                <Icon size={12} />
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-semibold text-white mb-5 flex items-center gap-2">
+            <active.icon size={14} className="text-zinc-400" />
+            {active.label}
+          </h2>
+
+          {activeTab === 'general'   && <GeneralTab />}
+          {activeTab === 'contracts' && <CrudTab endpoint="contract-types" label="Tipo de Contrato" />}
+          {activeTab === 'services'  && <CrudTab endpoint="service-types"  label="Tipo de Serviço" />}
+          {activeTab === 'customers' && <CustomersTab />}
+          {activeTab === 'roles'     && <RolesTab />}
+          {activeTab === 'groups'    && <ConsultantGroupsTab />}
+        </div>
       </div>
     </AppLayout>
   )
