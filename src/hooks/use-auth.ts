@@ -12,7 +12,7 @@ export function useAuth() {
     const token = localStorage.getItem('minutor_token')
     if (!token) { setLoading(false); return }
     try {
-      const data = await api.get<{ user: User }>('/auth/me')
+      const data = await api.get<{ user: User }>('/user')
       setUser(data.user)
     } catch {
       localStorage.removeItem('minutor_token')
