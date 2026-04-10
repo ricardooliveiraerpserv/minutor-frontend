@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowLeft, Clock, Calendar, User, FolderOpen, Ticket } from 'lucide-react'
 import Link from 'next/link'
-import { use } from 'react'
+import { useParams } from 'next/navigation'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   pending:    'secondary',
@@ -33,8 +33,9 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label:
   )
 }
 
-export default function TimesheetDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+export default function TimesheetDetailPage() {
+  const params = useParams()
+  const id = params.id as string
   const { data: ts, loading, error } = useApiQuery<Timesheet>(`/timesheets/${id}`)
 
   return (
