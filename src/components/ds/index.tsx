@@ -146,18 +146,19 @@ export function Tr({ children, onClick, className }: TrProps) {
 }
 
 export function Td({
-  children, right, muted, mono, className,
+  children, right, muted, mono, className, style,
 }: {
   children?: React.ReactNode
   right?: boolean
   muted?: boolean
   mono?: boolean
   className?: string
+  style?: React.CSSProperties
 }) {
   return (
     <td
       className={cn('px-5 py-3.5', right && 'text-right', mono && 'font-mono text-xs', className)}
-      style={{ color: muted ? 'var(--brand-muted)' : 'var(--brand-text)' }}
+      style={{ color: muted ? 'var(--brand-muted)' : 'var(--brand-text)', ...style }}
     >
       {children}
     </td>
