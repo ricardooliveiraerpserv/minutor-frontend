@@ -89,7 +89,7 @@ export default function UsersPage() {
   const needsPartner  = selectedRoleNames.some(n => PARCEIRO_ROLES.includes(n))
 
   useEffect(() => {
-    api.get<{ data: Role[] }>('/roles').then(r => setRoles(Array.isArray(r?.data) ? r.data : [])).catch(() => {})
+    api.get<any>('/roles?pageSize=100').then(r => setRoles(Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : [])).catch(() => {})
     api.get<any>('/customers?pageSize=1000').then(r => setCustomers(Array.isArray(r?.items) ? r.items : [])).catch(() => {})
     api.get<any>('/partners?pageSize=-1').then(r => setPartners(Array.isArray(r?.items) ? r.items : [])).catch(() => {})
   }, [])
