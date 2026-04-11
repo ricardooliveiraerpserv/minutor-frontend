@@ -665,8 +665,8 @@ function RolesTab() {
             <h3 className="text-sm font-semibold text-white mb-4">Permissões — {permModal.name}</h3>
             <div className="space-y-4">
               {allPerms.map(group => (
-                <div key={group.group}>
-                  <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide mb-2">{GROUP_LABELS[group.group] ?? group.group}</p>
+                <div key={(group as any).category ?? (group as any).group}>
+                  <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wide mb-2 border-b border-zinc-800 pb-1">{GROUP_LABELS[(group as any).category ?? (group as any).group] ?? (group as any).category ?? (group as any).group}</p>
                   <div className="space-y-1">
                     {(group.permissions ?? []).map(p => (
                       <label key={p.id} className="flex items-center gap-2 cursor-pointer group">
