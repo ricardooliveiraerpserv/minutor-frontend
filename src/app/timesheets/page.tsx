@@ -128,11 +128,18 @@ const STATUS_OPTIONS = [
   { value: 'conflicted', label: 'Conflito' },
 ]
 
+const ORIGIN_OPTIONS = [
+  { value: '',        label: 'Todas as origens' },
+  { value: 'web',     label: 'Web (manual)' },
+  { value: 'webhook', label: 'Auto (Movidesk)' },
+]
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function TimesheetsPage() {
   const [page, setPage]               = useState(1)
   const [status, setStatus]           = useState('')
+  const [origin, setOrigin]           = useState('')
   const [serviceTypeId, setServiceTypeId] = useState('')
   const [contractTypeId, setContractTypeId] = useState('')
   const [startDate, setStartDate]     = useState('')
@@ -161,6 +168,7 @@ export default function TimesheetsPage() {
   const params = useMemo(() => {
     const p = new URLSearchParams({ page: String(page), per_page: '20' })
     if (status)         p.set('status', status)
+    if (origin)         p.set('origin', origin)
     if (serviceTypeId)  p.set('service_type_id', serviceTypeId)
     if (contractTypeId) p.set('contract_type_id', contractTypeId)
     if (startDate)      p.set('start_date', startDate)
@@ -168,17 +176,17 @@ export default function TimesheetsPage() {
     if (ticket)         p.set('ticket', ticket)
     if (sortField)      p.set('order', sortDir === 'desc' ? `-${sortField}` : sortField)
     return p.toString()
-  }, [page, status, serviceTypeId, contractTypeId, startDate, endDate, ticket, sortField, sortDir])
+  }, [page, status, origin, serviceTypeId, contractTypeId, startDate, endDate, ticket, sortField, sortDir])
 
   const { data, loading, error, refetch } = useApiQuery<PaginatedResponse<Timesheet>>(
     `/timesheets?${params}`, [params]
   )
 
   const resetPage = useCallback(() => setPage(1), [])
-  const hasFilters = !!(status || serviceTypeId || contractTypeId || startDate || endDate || ticket)
+  const hasFilters = !!(status || origin || serviceTypeId || contractTypeId || startDate || endDate || ticket)
 
   const clearFilters = useCallback(() => {
-    setStatus(''); setServiceTypeId(''); setContractTypeId('')
+    setStatus(''); setOrigin(''); setServiceTypeId(''); setContractTypeId('')
     setStartDate(''); setEndDate(''); setTicket(''); setPage(1)
   }, [])
 
@@ -226,7 +234,7 @@ export default function TimesheetsPage() {
 
         {/* Filters */}
         <div
-          className="grid grid-cols-2 md:grid-cols-4 gap-3 p-5 rounded-2xl mb-6"
+          className="grid grid-cols-2 md:grid-cols-5 gap-3 p-5 rounded-2xl mb-6"
           style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}
         >
           <Select value={serviceTypeId} onChange={e => { setServiceTypeId(e.target.value); resetPage() }}>
@@ -243,13 +251,17 @@ export default function TimesheetsPage() {
             {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </Select>
 
+          <Select value={origin} onChange={e => { setOrigin(e.target.value); resetPage() }}>
+            {ORIGIN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </Select>
+
           <TextInput
             placeholder="Nº ticket..."
             value={ticket}
             onChange={e => { setTicket(e.target.value); resetPage() }}
           />
 
-          <div className="flex items-center gap-2 col-span-2">
+          <div className="flex items-center gap-2 col-span-2 md:col-span-3">
             <TextInput
               type="date"
               label="De"

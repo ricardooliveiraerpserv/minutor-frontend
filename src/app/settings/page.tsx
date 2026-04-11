@@ -11,7 +11,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import {
   Settings, FileType, Wrench, Users, Shield, UserCheck,
-  Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Check, Search
+  Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Check, Search,
+  RefreshCw, CheckCircle, XCircle, Clock,
 } from 'lucide-react'
 import type { ContractType, ServiceType, CustomerFull, Role, Permission, ConsultantGroup, SystemSettings } from '@/types'
 
@@ -131,12 +132,30 @@ const TABS = [
 
 // ─── TAB: GENERAL SETTINGS ───────────────────────────────────────────────────
 
+interface MovideskStatus {
+  last_sync: string | null
+  last_sync_human: string | null
+  total_imported: number
+  today_imported: number
+  token_configured: boolean
+}
+
 function GeneralTab() {
   const [settings, setSettings] = useState<SystemSettings>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [customers, setCustomers] = useState<{ id: number; name: string }[]>([])
   const [projects, setProjects] = useState<{ id: number; name: string }[]>([])
+  const [movideskStatus, setMovideskStatus] = useState<MovideskStatus | null>(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncOutput, setSyncOutput] = useState<string | null>(null)
+
+  const loadMovideskStatus = useCallback(async () => {
+    try {
+      const r = await api.get<MovideskStatus>('/movidesk/status')
+      setMovideskStatus(r)
+    } catch { /* silencioso */ }
+  }, [])
 
   useEffect(() => {
     Promise.all([
@@ -148,7 +167,8 @@ function GeneralTab() {
       setCustomers(cArr)
     }).catch(() => toast.error('Erro ao carregar configurações'))
       .finally(() => setLoading(false))
-  }, [])
+    loadMovideskStatus()
+  }, [loadMovideskStatus])
 
   useEffect(() => {
     if (!settings.movidesk_default_customer_id) { setProjects([]); return }
@@ -169,6 +189,26 @@ function GeneralTab() {
       toast.error(e instanceof ApiError ? e.message : 'Erro ao salvar')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const syncMovidesk = async () => {
+    setSyncing(true)
+    setSyncOutput(null)
+    try {
+      const r = await api.post<{ success: boolean; message: string; output?: string; last_sync_human?: string; today_imported?: number; total_imported?: number }>('/movidesk/sync', {})
+      setSyncOutput(r.output ?? r.message)
+      setMovideskStatus(prev => prev ? {
+        ...prev,
+        last_sync_human: r.last_sync_human ?? prev.last_sync_human,
+        today_imported:  r.today_imported  ?? prev.today_imported,
+        total_imported:  r.total_imported  ?? prev.total_imported,
+      } : null)
+      toast.success('Sync concluído')
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Erro ao sincronizar')
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -194,9 +234,50 @@ function GeneralTab() {
 
       <section>
         <h3 className="text-sm font-medium text-zinc-300 mb-4 pb-2 border-b border-zinc-800">Integração Movidesk</h3>
+
+        {/* Status panel */}
+        {movideskStatus && (
+          <div className="mb-5 rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-zinc-400">Status da integração</span>
+              {movideskStatus.token_configured
+                ? <span className="inline-flex items-center gap-1 text-[11px] text-green-400"><CheckCircle size={11} /> Token configurado</span>
+                : <span className="inline-flex items-center gap-1 text-[11px] text-red-400"><XCircle size={11} /> Token não configurado</span>
+              }
+            </div>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-lg bg-zinc-800 px-3 py-2">
+                <p className="text-[10px] text-zinc-500 mb-0.5">Último sync</p>
+                <p className="text-xs font-semibold text-zinc-200">{movideskStatus.last_sync_human ?? '—'}</p>
+              </div>
+              <div className="rounded-lg bg-zinc-800 px-3 py-2">
+                <p className="text-[10px] text-zinc-500 mb-0.5">Importados hoje</p>
+                <p className="text-xs font-semibold text-zinc-200">{movideskStatus.today_imported}</p>
+              </div>
+              <div className="rounded-lg bg-zinc-800 px-3 py-2">
+                <p className="text-[10px] text-zinc-500 mb-0.5">Total importado</p>
+                <p className="text-xs font-semibold text-zinc-200">{movideskStatus.total_imported}</p>
+              </div>
+            </div>
+            <Button
+              onClick={syncMovidesk}
+              disabled={syncing || !movideskStatus.token_configured}
+              className="w-full h-8 text-xs gap-1.5 bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-40"
+            >
+              <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
+              {syncing ? 'Sincronizando...' : 'Sincronizar agora'}
+            </Button>
+            {syncOutput && (
+              <pre className="rounded-lg bg-zinc-950 border border-zinc-800 p-3 text-[10px] text-zinc-400 whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto">
+                {syncOutput}
+              </pre>
+            )}
+          </div>
+        )}
+
         <div className="space-y-3">
           <div>
-            <Label className="text-xs text-zinc-400">Cliente padrão</Label>
+            <Label className="text-xs text-zinc-400">Cliente padrão (fallback)</Label>
             <select
               value={settings.movidesk_default_customer_id ?? ''}
               onChange={e => setSettings(s => ({ ...s, movidesk_default_customer_id: Number(e.target.value) || undefined, movidesk_default_project_id: undefined }))}
@@ -207,7 +288,7 @@ function GeneralTab() {
             </select>
           </div>
           <div>
-            <Label className="text-xs text-zinc-400">Projeto padrão</Label>
+            <Label className="text-xs text-zinc-400">Projeto padrão (fallback)</Label>
             <select
               value={settings.movidesk_default_project_id ?? ''}
               onChange={e => setSettings(s => ({ ...s, movidesk_default_project_id: Number(e.target.value) || undefined }))}
