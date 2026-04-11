@@ -485,8 +485,8 @@ function RolesTab() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const r = await api.get<{ data: Role[] }>('/roles?with_permissions=true')
-      setRoles(Array.isArray(r?.data) ? r.data : Array.isArray(r) ? (r as unknown as Role[]) : [])
+      const r = await api.get<{ items?: Role[]; data?: Role[] }>('/roles?with_permissions=true')
+      setRoles(Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : Array.isArray(r) ? (r as unknown as Role[]) : [])
     } catch { toast.error('Erro ao carregar perfis') }
     finally { setLoading(false) }
   }, [])
@@ -652,9 +652,9 @@ function ConsultantGroupsTab() {
     try {
       const p = new URLSearchParams({ page: String(page), per_page: '15' })
       if (search) p.set('search', search)
-      const r = await api.get<{ data: ConsultantGroup[]; meta?: { last_page: number } }>(`/consultant-groups?${p}`)
-      setItems(Array.isArray(r?.data) ? r.data : [])
-      setHasNext(!!(r.meta && page < r.meta.last_page))
+      const r = await api.get<{ items?: ConsultantGroup[]; data?: ConsultantGroup[]; hasNext?: boolean; meta?: { last_page: number } }>(`/consultant-groups?${p}`)
+      setItems(Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : [])
+      setHasNext(!!(r?.hasNext || (r?.meta && page < r.meta.last_page)))
     } catch { toast.error('Erro ao carregar grupos') }
     finally { setLoading(false) }
   }, [page, search])
@@ -664,8 +664,8 @@ function ConsultantGroupsTab() {
   const openCreate = async () => {
     setForm({ name: '', description: '', active: true, consultant_ids: [] })
     try {
-      const r = await api.get<{ data: { id: number; name: string; email: string }[] }>('/consultant-groups/available-consultants')
-      setAvailConsultants(Array.isArray(r?.data) ? r.data : [])
+      const r = await api.get<{ items?: { id: number; name: string; email: string }[]; data?: { id: number; name: string; email: string }[] }>('/consultant-groups/available-consultants')
+      setAvailConsultants(Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : [])
     } catch { setAvailConsultants([]) }
     setModal({ open: true })
   }
@@ -673,8 +673,8 @@ function ConsultantGroupsTab() {
   const openEdit = async (item: ConsultantGroup) => {
     setForm({ name: item.name, description: item.description ?? '', active: item.active, consultant_ids: item.consultants?.map(c => c.id) ?? [] })
     try {
-      const r = await api.get<{ data: { id: number; name: string; email: string }[] }>('/consultant-groups/available-consultants')
-      setAvailConsultants(Array.isArray(r?.data) ? r.data : [])
+      const r = await api.get<{ items?: { id: number; name: string; email: string }[]; data?: { id: number; name: string; email: string }[] }>('/consultant-groups/available-consultants')
+      setAvailConsultants(Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : [])
     } catch { setAvailConsultants([]) }
     setModal({ open: true, item })
   }
