@@ -8,8 +8,9 @@ import { BarChart2, Clock, TrendingUp, TrendingDown, AlertCircle, DollarSign, Ch
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface Customer { id: number; name: string }
-interface Project  { id: number; name: string; code: string }
+interface Customer  { id: number; name: string }
+interface Project   { id: number; name: string; code: string }
+interface Executive { id: number; name: string }
 
 interface SummaryData {
   contracted_hours: number
@@ -238,10 +239,12 @@ export default function BankHoursFixedPage() {
   const now = new Date()
   const currentMonthVal = `${now.getMonth() + 1}/${now.getFullYear()}`
 
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [projects,  setProjects]  = useState<Project[]>([])
-  const [selectedCustomer, setSelectedCustomer] = useState<number | ''>('')
-  const [selectedProject,  setSelectedProject]  = useState<number | ''>('')
+  const [customers,   setCustomers]   = useState<Customer[]>([])
+  const [executives,  setExecutives]  = useState<Executive[]>([])
+  const [projects,    setProjects]    = useState<Project[]>([])
+  const [selectedCustomer,  setSelectedCustomer]  = useState<number | ''>('')
+  const [selectedExecutive, setSelectedExecutive] = useState<number | ''>('')
+  const [selectedProject,   setSelectedProject]   = useState<number | ''>('')
 
   const [summary,      setSummary]      = useState<SummaryData | null>(null)
   const [projectsList, setProjectsList] = useState<ProjectItem[]>([])
@@ -269,6 +272,7 @@ export default function BankHoursFixedPage() {
   useEffect(() => {
     if (!isAdmin) return
     api.get<any>('/customers?pageSize=1000').then(r => setCustomers(Array.isArray(r?.items) ? r.items : [])).catch(() => {})
+    api.get<any>('/executives?pageSize=1000').then(r => setExecutives(Array.isArray(r?.items) ? r.items : [])).catch(() => {})
   }, [isAdmin])
 
   // Projects list
@@ -281,10 +285,11 @@ export default function BankHoursFixedPage() {
   // Build base params
   const baseParams = useCallback(() => {
     const p = new URLSearchParams()
-    if (selectedCustomer) p.set('customer_id', String(selectedCustomer))
-    if (selectedProject)  p.set('project_id',  String(selectedProject))
+    if (selectedCustomer)  p.set('customer_id',  String(selectedCustomer))
+    if (selectedExecutive) p.set('executive_id', String(selectedExecutive))
+    if (selectedProject)   p.set('project_id',   String(selectedProject))
     return p
-  }, [selectedCustomer, selectedProject])
+  }, [selectedCustomer, selectedExecutive, selectedProject])
 
   // Summary (Total Geral)
   const fetchSummary = useCallback(() => {
@@ -334,7 +339,7 @@ export default function BankHoursFixedPage() {
   useEffect(() => { if (activeTab === 'projects')    fetchProjects()    }, [fetchProjects, activeTab])
   useEffect(() => { if (activeTab === 'maintenance') fetchMaintenance() }, [fetchMaintenance, activeTab])
 
-  const hasFilters = !isAdmin || (!!selectedCustomer && !!selectedProject)
+  const hasFilters = !isAdmin || !!selectedProject
 
   // Projects table (shared between Projetos and Sustentação)
   const ProjectsTable = ({ items, loading }: { items: ProjectItem[]; loading: boolean }) => (
@@ -412,7 +417,13 @@ export default function BankHoursFixedPage() {
         {/* Filters */}
         <div className="flex flex-wrap items-end gap-4 p-5 rounded-2xl" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
           {isAdmin && (
-            <FilterSelect label="Cliente" value={selectedCustomer} onChange={v => { setSelectedCustomer(v === '' ? '' : Number(v)); setSelectedProject('') }} wide>
+            <FilterSelect label="Executivo" value={selectedExecutive} onChange={v => { setSelectedExecutive(v === '' ? '' : Number(v)); setSelectedCustomer(''); setSelectedProject('') }} wide>
+              <option value="">Todos os executivos</option>
+              {executives.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </FilterSelect>
+          )}
+          {isAdmin && (
+            <FilterSelect label="Cliente" value={selectedCustomer} onChange={v => { setSelectedCustomer(v === '' ? '' : Number(v)); setSelectedExecutive(''); setSelectedProject('') }} wide>
               <option value="">Todos os clientes</option>
               {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </FilterSelect>

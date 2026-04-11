@@ -8,8 +8,9 @@ import { Zap, Clock, TrendingUp, TrendingDown, DollarSign, AlertCircle } from 'l
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface Customer { id: number; name: string }
-interface Project  { id: number; name: string; code: string }
+interface Customer  { id: number; name: string }
+interface Project   { id: number; name: string; code: string }
+interface Executive { id: number; name: string }
 
 interface SummaryData {
   consumed_hours: number
@@ -207,10 +208,12 @@ export default function OnDemandPage() {
     user?.permissions?.includes('admin.full_access') || false
 
   const now = new Date()
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [projects,  setProjects]  = useState<Project[]>([])
-  const [selectedCustomer, setSelectedCustomer] = useState<number | ''>('')
-  const [selectedProject,  setSelectedProject]  = useState<number | ''>('')
+  const [customers,   setCustomers]   = useState<Customer[]>([])
+  const [executives,  setExecutives]  = useState<Executive[]>([])
+  const [projects,    setProjects]    = useState<Project[]>([])
+  const [selectedCustomer,  setSelectedCustomer]  = useState<number | ''>('')
+  const [selectedExecutive, setSelectedExecutive] = useState<number | ''>('')
+  const [selectedProject,   setSelectedProject]   = useState<number | ''>('')
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [year,  setYear]  = useState(now.getFullYear())
 
@@ -225,6 +228,9 @@ export default function OnDemandPage() {
     api.get<any>('/customers?pageSize=1000')
       .then(r => setCustomers(Array.isArray(r?.items) ? r.items : []))
       .catch(() => {})
+    api.get<any>('/executives?pageSize=1000')
+      .then(r => setExecutives(Array.isArray(r?.items) ? r.items : []))
+      .catch(() => {})
   }, [isAdmin])
 
   useEffect(() => {
@@ -238,30 +244,32 @@ export default function OnDemandPage() {
   const fetchSummary = useCallback(() => {
     if (!selectedProject && isAdmin) return
     const params = new URLSearchParams({ month: String(month), year: String(year) })
-    if (selectedCustomer) params.set('customer_id', String(selectedCustomer))
-    if (selectedProject)  params.set('project_id', String(selectedProject))
+    if (selectedCustomer)  params.set('customer_id',  String(selectedCustomer))
+    if (selectedExecutive) params.set('executive_id', String(selectedExecutive))
+    if (selectedProject)   params.set('project_id',   String(selectedProject))
     setLoadingSummary(true)
     api.get<any>(`/dashboards/on-demand?${params}`)
       .then(r => setSummary(r?.data ?? r ?? null))
       .catch(() => setSummary(null))
       .finally(() => setLoadingSummary(false))
-  }, [selectedCustomer, selectedProject, month, year, isAdmin])
+  }, [selectedCustomer, selectedExecutive, selectedProject, month, year, isAdmin])
 
   const fetchProjectsList = useCallback(() => {
     if (!selectedProject && isAdmin) return
     const params = new URLSearchParams({ month: String(month), year: String(year) })
-    if (selectedCustomer) params.set('customer_id', String(selectedCustomer))
-    if (selectedProject)  params.set('project_id', String(selectedProject))
+    if (selectedCustomer)  params.set('customer_id',  String(selectedCustomer))
+    if (selectedExecutive) params.set('executive_id', String(selectedExecutive))
+    if (selectedProject)   params.set('project_id',   String(selectedProject))
     setLoadingProjects(true)
     api.get<any>(`/dashboards/on-demand/projects?${params}`)
       .then(r => setProjectsList(Array.isArray(r?.data) ? r.data : []))
       .catch(() => setProjectsList([]))
       .finally(() => setLoadingProjects(false))
-  }, [selectedCustomer, selectedProject, month, year, isAdmin])
+  }, [selectedCustomer, selectedExecutive, selectedProject, month, year, isAdmin])
 
   useEffect(() => { fetchSummary(); fetchProjectsList() }, [fetchSummary, fetchProjectsList])
 
-  const hasFilters = !isAdmin || (!!selectedCustomer && !!selectedProject)
+  const hasFilters = !isAdmin || (!!selectedProject)
 
   const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
@@ -291,9 +299,20 @@ export default function OnDemandPage() {
         >
           {isAdmin && (
             <FilterSelect
+              label="Executivo"
+              value={selectedExecutive}
+              onChange={v => { setSelectedExecutive(v === '' ? '' : Number(v)); setSelectedCustomer(''); setSelectedProject('') }}
+              wide
+            >
+              <option value="">Todos os executivos</option>
+              {executives.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </FilterSelect>
+          )}
+          {isAdmin && (
+            <FilterSelect
               label="Cliente"
               value={selectedCustomer}
-              onChange={v => { setSelectedCustomer(v === '' ? '' : Number(v)); setSelectedProject('') }}
+              onChange={v => { setSelectedCustomer(v === '' ? '' : Number(v)); setSelectedExecutive(''); setSelectedProject('') }}
               wide
             >
               <option value="">Todos os clientes</option>

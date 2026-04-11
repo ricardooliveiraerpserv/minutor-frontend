@@ -4,12 +4,12 @@ import { AppLayout } from '@/components/layout/app-layout'
 import { useEffect, useState, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
-import { Skeleton } from '@/components/ui/skeleton'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-interface Customer { id: number; name: string }
-interface Project  { id: number; name: string; code: string }
+interface Customer  { id: number; name: string }
+interface Project   { id: number; name: string; code: string }
+interface Executive { id: number; name: string }
 
 interface SummaryData {
   month_contracted_hours: number
@@ -59,23 +59,40 @@ function fmtBRL(v: number | null | undefined) {
 }
 function fmtDate(s: string) { return new Date(s).toLocaleDateString('pt-BR') }
 
-function StatCard({ label, value, color }: { label: string; value: string; color?: 'green' | 'red' }) {
-  const c = color === 'green' ? 'text-green-400' : color === 'red' ? 'text-red-400' : 'text-zinc-100'
+function FilterSelect({ label, value, onChange, children, wide }: {
+  label: string; value: string | number; onChange: (v: string) => void; children: React.ReactNode; wide?: boolean
+}) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-col gap-1">
-      <span className="text-xs text-zinc-400">{label}</span>
-      <span className={`text-2xl font-bold ${c}`}>{value}</span>
+    <div className="flex flex-col gap-1.5">
+      <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{label}</label>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className={`rounded-xl px-4 py-2.5 text-sm appearance-none outline-none cursor-pointer ${wide ? 'min-w-52' : 'min-w-28'}`}
+        style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}
+      >
+        {children}
+      </select>
     </div>
   )
 }
 
-function TabButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function StatCard({ label, value, accent }: { label: string; value: string; accent?: 'success' | 'danger' }) {
+  const color = accent === 'success' ? '#10B981' : accent === 'danger' ? '#EF4444' : 'var(--brand-text)'
+  return (
+    <div className="rounded-2xl p-5 flex flex-col gap-3" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+      <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{label}</span>
+      <span className="text-4xl font-extrabold tracking-tight" style={{ color, lineHeight: 1 }}>{value}</span>
+    </div>
+  )
+}
+
+function Tab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-        active ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
-      }`}
+      className="px-5 py-2 text-sm font-semibold rounded-xl transition-all"
+      style={active ? { background: 'var(--brand-primary)', color: '#0A0A0B' } : { color: 'var(--brand-muted)' }}
     >
       {label}
     </button>
@@ -90,10 +107,12 @@ export default function BankHoursMonthlyPage() {
     user?.permissions?.includes('admin.full_access') || false
 
   const now = new Date()
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [projects, setProjects]   = useState<Project[]>([])
-  const [selectedCustomer, setSelectedCustomer] = useState<number | ''>('')
-  const [selectedProject, setSelectedProject]   = useState<number | ''>('')
+  const [customers,   setCustomers]   = useState<Customer[]>([])
+  const [executives,  setExecutives]  = useState<Executive[]>([])
+  const [projects,    setProjects]    = useState<Project[]>([])
+  const [selectedCustomer,  setSelectedCustomer]  = useState<number | ''>('')
+  const [selectedExecutive, setSelectedExecutive] = useState<number | ''>('')
+  const [selectedProject,   setSelectedProject]   = useState<number | ''>('')
   const [month, setMonth] = useState<number>(now.getMonth() + 1)
   const [year,  setYear]  = useState<number>(now.getFullYear())
 
@@ -105,9 +124,8 @@ export default function BankHoursMonthlyPage() {
 
   useEffect(() => {
     if (!isAdmin) return
-    api.get<any>('/customers?pageSize=1000').then(r => {
-      setCustomers(Array.isArray(r?.items) ? r.items : [])
-    }).catch(() => {})
+    api.get<any>('/customers?pageSize=1000').then(r => setCustomers(Array.isArray(r?.items) ? r.items : [])).catch(() => {})
+    api.get<any>('/executives?pageSize=1000').then(r => setExecutives(Array.isArray(r?.items) ? r.items : [])).catch(() => {})
   }, [isAdmin])
 
   useEffect(() => {
@@ -121,33 +139,35 @@ export default function BankHoursMonthlyPage() {
   const fetchSummary = useCallback(() => {
     if (!selectedProject && isAdmin) return
     const params = new URLSearchParams({ month: String(month), year: String(year) })
-    if (selectedCustomer) params.set('customer_id', String(selectedCustomer))
-    if (selectedProject)  params.set('project_id',  String(selectedProject))
+    if (selectedCustomer)  params.set('customer_id',  String(selectedCustomer))
+    if (selectedExecutive) params.set('executive_id', String(selectedExecutive))
+    if (selectedProject)   params.set('project_id',   String(selectedProject))
     setLoadingSummary(true)
     api.get<any>(`/dashboards/bank-hours-monthly?${params}`)
       .then(r => setSummary(r?.data ?? r ?? null))
       .catch(() => setSummary(null))
       .finally(() => setLoadingSummary(false))
-  }, [selectedCustomer, selectedProject, month, year, isAdmin])
+  }, [selectedCustomer, selectedExecutive, selectedProject, month, year, isAdmin])
 
   const fetchProjectsList = useCallback(() => {
     if (!selectedProject && isAdmin) return
     const params = new URLSearchParams({ month: String(month), year: String(year) })
-    if (selectedCustomer) params.set('customer_id', String(selectedCustomer))
-    if (selectedProject)  params.set('project_id',  String(selectedProject))
+    if (selectedCustomer)  params.set('customer_id',  String(selectedCustomer))
+    if (selectedExecutive) params.set('executive_id', String(selectedExecutive))
+    if (selectedProject)   params.set('project_id',   String(selectedProject))
     setLoadingProjects(true)
     api.get<any>(`/dashboards/bank-hours-monthly/projects?${params}`)
       .then(r => setProjectsList(Array.isArray(r?.data) ? r.data : []))
       .catch(() => setProjectsList([]))
       .finally(() => setLoadingProjects(false))
-  }, [selectedCustomer, selectedProject, month, year, isAdmin])
+  }, [selectedCustomer, selectedExecutive, selectedProject, month, year, isAdmin])
 
   useEffect(() => {
     fetchSummary()
     fetchProjectsList()
   }, [fetchSummary, fetchProjectsList])
 
-  const hasFilters = !isAdmin || (!!selectedCustomer && !!selectedProject)
+  const hasFilters = !isAdmin || !!selectedProject
 
   const months = [
     'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -156,60 +176,57 @@ export default function BankHoursMonthlyPage() {
   const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i)
 
   return (
-    <AppLayout title="Dashboard - Banco de Horas Mensais">
-      <div className="space-y-6">
+    <AppLayout title="Dashboard — Banco de Horas Mensais">
+      <div className="max-w-7xl mx-auto space-y-6">
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-3">
-          {isAdmin && (
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-zinc-400">Cliente</label>
-              <select
-                value={selectedCustomer}
-                onChange={e => { setSelectedCustomer(e.target.value === '' ? '' : Number(e.target.value)); setSelectedProject('') }}
-                className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 min-w-48"
-              >
-                <option value="">Todos os clientes</option>
-                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-          )}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-zinc-400">Projeto</label>
-            <select
-              value={selectedProject}
-              onChange={e => setSelectedProject(e.target.value === '' ? '' : Number(e.target.value))}
-              className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 min-w-64"
-            >
-              <option value="">Selecione um projeto</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}
-            </select>
+        {/* Page header */}
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(0,245,255,0.08)' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00F5FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-zinc-400">Mês</label>
-            <select
-              value={month}
-              onChange={e => setMonth(Number(e.target.value))}
-              className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
-            >
-              {months.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-zinc-400">Ano</label>
-            <select
-              value={year}
-              onChange={e => setYear(Number(e.target.value))}
-              className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
-            >
-              {years.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--brand-text)' }}>Banco de Horas Mensais</h1>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--brand-muted)' }}>Consumo e saldo de horas por mês e projeto</p>
           </div>
         </div>
 
+        {/* Filters */}
+        <div className="flex flex-wrap items-end gap-4 p-5 rounded-2xl" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+          {isAdmin && (
+            <FilterSelect label="Executivo" value={selectedExecutive} onChange={v => { setSelectedExecutive(v === '' ? '' : Number(v)); setSelectedCustomer(''); setSelectedProject('') }} wide>
+              <option value="">Todos os executivos</option>
+              {executives.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </FilterSelect>
+          )}
+          {isAdmin && (
+            <FilterSelect label="Cliente" value={selectedCustomer} onChange={v => { setSelectedCustomer(v === '' ? '' : Number(v)); setSelectedExecutive(''); setSelectedProject('') }} wide>
+              <option value="">Todos os clientes</option>
+              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </FilterSelect>
+          )}
+          <FilterSelect label="Projeto" value={selectedProject} onChange={v => setSelectedProject(v === '' ? '' : Number(v))} wide>
+            <option value="">Selecione um projeto</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
+          </FilterSelect>
+          <FilterSelect label="Mês" value={month} onChange={v => setMonth(Number(v))}>
+            {months.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+          </FilterSelect>
+          <FilterSelect label="Ano" value={year} onChange={v => setYear(Number(v))}>
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
+          </FilterSelect>
+        </div>
+
         {!hasFilters && (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">
-            <p className="text-zinc-400 text-sm">
+          <div className="rounded-2xl p-16 text-center" style={{ border: '1px dashed var(--brand-border)' }}>
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(0,245,255,0.06)' }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00F5FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+            </div>
+            <p className="font-semibold text-sm mb-1" style={{ color: 'var(--brand-text)' }}>Nenhum projeto selecionado</p>
+            <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>
               {isAdmin
                 ? 'Selecione um cliente e um projeto para visualizar os dados do dashboard.'
                 : 'Selecione um projeto para visualizar os dados do dashboard.'}
@@ -218,89 +235,89 @@ export default function BankHoursMonthlyPage() {
         )}
 
         {hasFilters && (
-          <>
+          <div className="space-y-6">
             {/* Tabs */}
-            <div className="flex gap-1 border-b border-zinc-800 pb-0">
-              <TabButton label="Total Geral" active={activeTab === 'total'}    onClick={() => setActiveTab('total')} />
-              <TabButton label="Projetos"    active={activeTab === 'projects'} onClick={() => setActiveTab('projects')} />
+            <div className="flex gap-1 p-1 rounded-2xl w-fit" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+              <Tab label="Total Geral" active={activeTab === 'total'}    onClick={() => setActiveTab('total')} />
+              <Tab label="Projetos"    active={activeTab === 'projects'} onClick={() => setActiveTab('projects')} />
             </div>
 
             {/* Total Tab */}
             {activeTab === 'total' && (
               <div className="space-y-4">
                 {loadingSummary ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {Array.from({ length: 3 }).map((_, i) => (
-                      <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                        <Skeleton className="h-3 w-24 mb-2" />
-                        <Skeleton className="h-7 w-16" />
+                      <div key={i} className="rounded-2xl p-5 animate-pulse" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                        <div className="h-3 w-32 rounded mb-4" style={{ background: 'var(--brand-border)' }} />
+                        <div className="h-10 w-24 rounded" style={{ background: 'var(--brand-border)' }} />
                       </div>
                     ))}
                   </div>
                 ) : summary ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <StatCard label="Horas Contratadas no Mês" value={fmtH(summary.month_contracted_hours)} />
                     <StatCard label="Consumo do Mês"           value={fmtH(summary.month_consumed_hours)} />
                     <StatCard
                       label="Saldo do Mês"
                       value={fmtH(summary.month_hours_balance)}
-                      color={summary.month_hours_balance >= 0 ? 'green' : 'red'}
+                      accent={summary.month_hours_balance >= 0 ? 'success' : 'danger'}
                     />
                   </div>
                 ) : (
-                  <p className="text-zinc-400 text-sm">Nenhum dado disponível.</p>
+                  <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>Nenhum dado disponível.</p>
                 )}
               </div>
             )}
 
             {/* Projects Tab */}
             {activeTab === 'projects' && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+              <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
                 {loadingProjects ? (
-                  <div className="p-6 space-y-3">
-                    {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+                  <div className="p-6 space-y-2">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="h-10 rounded-xl animate-pulse" style={{ background: 'var(--brand-border)' }} />
+                    ))}
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-zinc-800 bg-zinc-800/50">
-                          <th className="text-left py-3 px-4 text-xs text-zinc-400 font-medium">Código</th>
-                          <th className="text-left py-3 px-4 text-xs text-zinc-400 font-medium">Projeto</th>
-                          <th className="text-left py-3 px-4 text-xs text-zinc-400 font-medium">Status</th>
-                          <th className="text-left py-3 px-4 text-xs text-zinc-400 font-medium">Tipo</th>
-                          <th className="text-right py-3 px-4 text-xs text-zinc-400 font-medium">Horas Vendidas</th>
-                          <th className="text-right py-3 px-4 text-xs text-zinc-400 font-medium">Saldo</th>
-                          <th className="text-left py-3 px-4 text-xs text-zinc-400 font-medium">Início</th>
+                      <thead style={{ borderBottom: '1px solid var(--brand-border)', background: 'rgba(255,255,255,0.02)' }}>
+                        <tr>
+                          {['Código','Projeto','Status','Tipo','Horas Vendidas','Saldo','Início'].map(col => (
+                            <th key={col} className={`px-5 py-3.5 text-xs font-semibold uppercase tracking-wider ${col === 'Saldo' || col === 'Horas Vendidas' ? 'text-right' : 'text-left'}`} style={{ color: 'var(--brand-subtle)' }}>{col}</th>
+                          ))}
                         </tr>
                       </thead>
                       <tbody>
                         {projectsList.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} className="py-8 text-center text-zinc-500 text-sm">
-                              Nenhum projeto encontrado.
-                            </td>
-                          </tr>
+                          <tr><td colSpan={7} className="py-12 text-center text-sm" style={{ color: 'var(--brand-muted)' }}>Nenhum projeto encontrado.</td></tr>
                         ) : projectsList.map(p => {
                           const balance = p.hours_balance ?? 0
                           const contributions = p.total_contributions_hours || p.hour_contribution || 0
                           return (
-                            <tr key={p.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                              <td className="py-2.5 px-4 text-zinc-400 font-mono text-xs">{p.code}</td>
-                              <td className="py-2.5 px-4 text-zinc-200">{p.name}</td>
-                              <td className="py-2.5 px-4 text-zinc-400 text-xs">{p.status_display}</td>
-                              <td className="py-2.5 px-4 text-zinc-400 text-xs">{p.contract_type_display}</td>
-                              <td className="py-2.5 px-4 text-right text-zinc-300">
-                                {p.sold_hours !== null
-                                  ? contributions > 0 ? `${p.sold_hours} (+${contributions})` : String(p.sold_hours)
-                                  : '-'}
+                            <tr
+                              key={p.id}
+                              className="transition-colors"
+                              style={{ borderBottom: '1px solid var(--brand-border)' }}
+                              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,245,255,0.03)')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                            >
+                              <td className="px-5 py-3.5">
+                                <span className="font-mono text-xs px-2 py-1 rounded-md" style={{ background: 'var(--brand-border)', color: 'var(--brand-subtle)' }}>{p.code}</span>
                               </td>
-                              <td className={`py-2.5 px-4 text-right font-medium ${balance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              <td className="px-5 py-3.5 font-medium" style={{ color: 'var(--brand-text)' }}>{p.name}</td>
+                              <td className="px-5 py-3.5">
+                                <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(0,245,255,0.08)', color: '#00F5FF' }}>{p.status_display}</span>
+                              </td>
+                              <td className="px-5 py-3.5 text-sm" style={{ color: 'var(--brand-muted)' }}>{p.contract_type_display}</td>
+                              <td className="px-5 py-3.5 text-right font-medium" style={{ color: 'var(--brand-text)' }}>
+                                {p.sold_hours !== null ? (contributions > 0 ? `${p.sold_hours} (+${contributions})` : String(p.sold_hours)) : '—'}
+                              </td>
+                              <td className="px-5 py-3.5 text-right font-bold" style={{ color: balance >= 0 ? '#10B981' : '#EF4444' }}>
                                 {fmtH(balance)}
                               </td>
-                              <td className="py-2.5 px-4 text-zinc-400 text-xs">
-                                {p.start_date ? fmtDate(p.start_date) : '-'}
-                              </td>
+                              <td className="px-5 py-3.5 text-sm" style={{ color: 'var(--brand-muted)' }}>{p.start_date ? fmtDate(p.start_date) : '—'}</td>
                             </tr>
                           )
                         })}
@@ -310,7 +327,7 @@ export default function BankHoursMonthlyPage() {
                 )}
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </AppLayout>
