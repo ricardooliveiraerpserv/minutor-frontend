@@ -170,8 +170,10 @@ export default function BankHoursMonthlyPage() {
   const [selectedCustomer,  setSelectedCustomer]  = useState<number | ''>('')
   const [selectedExecutive, setSelectedExecutive] = useState<number | ''>('')
   const [selectedProject,   setSelectedProject]   = useState<number | ''>('')
-  const [month, setMonth] = useState<number>(now.getMonth() + 1)
-  const [year,  setYear]  = useState<number>(now.getFullYear())
+  const [startMonth, setStartMonth] = useState<number>(now.getMonth() + 1)
+  const [startYear,  setStartYear]  = useState<number>(now.getFullYear())
+  const [month,      setMonth]      = useState<number>(now.getMonth() + 1)
+  const [year,       setYear]       = useState<number>(now.getFullYear())
 
   const [summary,      setSummary]      = useState<SummaryData | null>(null)
   const [projectsList, setProjectsList] = useState<ProjectItem[]>([])
@@ -211,11 +213,15 @@ export default function BankHoursMonthlyPage() {
 
   const buildParams = useCallback(() => {
     const p = new URLSearchParams({ month: String(month), year: String(year) })
+    if (startMonth !== month || startYear !== year) {
+      p.set('start_month', String(startMonth))
+      p.set('start_year',  String(startYear))
+    }
     if (selectedCustomer)  p.set('customer_id',  String(selectedCustomer))
     if (selectedExecutive) p.set('executive_id', String(selectedExecutive))
     if (selectedProject)   p.set('project_id',   String(selectedProject))
     return p
-  }, [selectedCustomer, selectedExecutive, selectedProject, month, year])
+  }, [selectedCustomer, selectedExecutive, selectedProject, startMonth, startYear, month, year])
 
   const fetchProjectsList = useCallback(() => {
     if (!selectedProject && isAdmin) return
@@ -286,12 +292,33 @@ export default function BankHoursMonthlyPage() {
             <option value="">Selecione um projeto</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
           </FilterSelect>
-          <FilterSelect label="Mês" value={month} onChange={v => setMonth(Number(v))}>
-            {months.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
-          </FilterSelect>
-          <FilterSelect label="Ano" value={year} onChange={v => setYear(Number(v))}>
-            {years.map(y => <option key={y} value={y}>{y}</option>)}
-          </FilterSelect>
+          {/* Período range */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Período</label>
+            <div className="flex items-center gap-2">
+              <select value={startMonth} onChange={e => setStartMonth(Number(e.target.value))}
+                className="rounded-xl px-3 py-2.5 text-sm appearance-none outline-none cursor-pointer"
+                style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}>
+                {months.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+              </select>
+              <select value={startYear} onChange={e => setStartYear(Number(e.target.value))}
+                className="rounded-xl px-3 py-2.5 text-sm appearance-none outline-none cursor-pointer"
+                style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}>
+                {years.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+              <span className="text-xs px-1" style={{ color: 'var(--brand-subtle)' }}>até</span>
+              <select value={month} onChange={e => setMonth(Number(e.target.value))}
+                className="rounded-xl px-3 py-2.5 text-sm appearance-none outline-none cursor-pointer"
+                style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}>
+                {months.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+              </select>
+              <select value={year} onChange={e => setYear(Number(e.target.value))}
+                className="rounded-xl px-3 py-2.5 text-sm appearance-none outline-none cursor-pointer"
+                style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}>
+                {years.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+          </div>
         </div>
 
         {!hasFilters && (
