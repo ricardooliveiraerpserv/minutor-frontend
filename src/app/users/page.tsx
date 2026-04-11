@@ -578,7 +578,8 @@ export default function UsersPage() {
         <ModalOverlay onClose={() => setResetModal({ open: false })}>
           <div className="p-5">
             <h3 className="text-sm font-semibold text-white mb-2">Senha Temporária Gerada</h3>
-            <p className="text-xs text-zinc-400 mb-4">Anote a senha abaixo — ela não será exibida novamente.</p>
+            <p className="text-xs text-zinc-400 mb-1">Copie a senha abaixo para repassar ao usuário.</p>
+            <p className="text-xs text-zinc-500 mb-4">Um e-mail também foi enviado ao usuário com a senha temporária.</p>
             <div className="flex items-center gap-2 bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2">
               <code className="flex-1 text-sm text-yellow-400 font-mono">{resetModal.tempPassword}</code>
               <button onClick={copyPassword} className="text-zinc-500 hover:text-zinc-200 transition-colors">

@@ -1,6 +1,7 @@
 'use client'
 
 import { Bell, LogOut, User } from 'lucide-react'
+import Link from 'next/link'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,9 +63,11 @@ export function Header({ title, actions }: HeaderProps) {
             </span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem>
-              <User size={14} className="mr-2" />
-              Perfil
+            <DropdownMenuItem asChild>
+              <Link href="/profile" className="flex items-center w-full">
+                <User size={14} className="mr-2" />
+                Meu Perfil
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="text-red-600">
