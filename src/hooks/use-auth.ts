@@ -12,8 +12,13 @@ export function useAuth() {
     const token = localStorage.getItem('minutor_token')
     if (!token) { setLoading(false); return }
     try {
-      const data = await api.get<{ user: User }>('/user')
-      setUser(data.user)
+      const data = await api.get<{ user: any }>('/user')
+      const raw = data.user
+      // Spatie returns roles as objects [{id, name, ...}] — normalize to string[]
+      const roles: string[] = Array.isArray(raw.roles)
+        ? raw.roles.map((r: any) => (typeof r === 'string' ? r : r?.name)).filter(Boolean)
+        : []
+      setUser({ ...raw, roles })
     } catch {
       localStorage.removeItem('minutor_token')
     } finally {
@@ -24,10 +29,15 @@ export function useAuth() {
   useEffect(() => { loadUser() }, [loadUser])
 
   const login = async (email: string, password: string) => {
-    const data = await api.post<AuthResponse>('/auth/login', { email, password })
+    const data = await api.post<any>('/auth/login', { email, password })
     localStorage.setItem('minutor_token', data.token ?? data.access_token)
-    setUser(data.user)
-    return data.user
+    const raw = data.user
+    const roles: string[] = Array.isArray(raw?.roles)
+      ? raw.roles.map((r: any) => (typeof r === 'string' ? r : r?.name)).filter(Boolean)
+      : []
+    const user: User = { ...raw, roles }
+    setUser(user)
+    return user
   }
 
   const logout = async () => {
