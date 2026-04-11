@@ -16,6 +16,8 @@ interface SummaryData {
   accumulated_contracted_hours?: number
   contributed_hours?: number
   consumed_hours: number
+  projects_consumed_hours?: number
+  maintenance_consumed_hours?: number
   month_consumed_hours: number
   hours_balance: number
   exceeded_hours?: number
@@ -50,9 +52,9 @@ interface ProjectItem {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function fmtH(h: number) { return h.toFixed(1) + 'h' }
+function fmtH(h: number | null | undefined) { return (h ?? 0).toFixed(1) + 'h' }
 function fmtBRL(v: number | null | undefined) {
-  if (v == null) return '-'
+  if (v == null) return '—'
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 function fmtDate(s: string) { return new Date(s).toLocaleDateString('pt-BR') }
@@ -75,8 +77,8 @@ function FilterSelect({ label, value, onChange, children, wide }: {
   )
 }
 
-function StatCard({ label, value, accent }: { label: string; value: string; accent?: 'success' | 'danger' }) {
-  const color = accent === 'success' ? '#10B981' : accent === 'danger' ? '#EF4444' : 'var(--brand-text)'
+function StatCard({ label, value, accent }: { label: string; value: string; accent?: 'success' | 'danger' | 'primary' }) {
+  const color = accent === 'success' ? '#10B981' : accent === 'danger' ? '#EF4444' : accent === 'primary' ? '#00F5FF' : 'var(--brand-text)'
   return (
     <div className="rounded-2xl p-5 flex flex-col gap-3" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
       <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{label}</span>
@@ -244,24 +246,62 @@ export default function BankHoursMonthlyPage() {
             {activeTab === 'total' && (
               <div className="space-y-4">
                 {loadingSummary ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {Array.from({ length: 3 }).map((_, i) => (
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {Array.from({ length: 5 }).map((_, i) => (
                       <div key={i} className="rounded-2xl p-5 animate-pulse" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-                        <div className="h-3 w-32 rounded mb-4" style={{ background: 'var(--brand-border)' }} />
-                        <div className="h-10 w-24 rounded" style={{ background: 'var(--brand-border)' }} />
+                        <div className="h-3 w-24 rounded mb-4" style={{ background: 'var(--brand-border)' }} />
+                        <div className="h-10 w-20 rounded" style={{ background: 'var(--brand-border)' }} />
                       </div>
                     ))}
                   </div>
                 ) : summary ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <StatCard label="Horas Contratadas" value={fmtH(summary.contracted_hours)} />
-                    <StatCard label="Consumo do Mês"    value={fmtH(summary.month_consumed_hours)} />
-                    <StatCard
-                      label="Saldo de Horas"
-                      value={fmtH(summary.hours_balance)}
-                      accent={summary.hours_balance >= 0 ? 'success' : 'danger'}
-                    />
-                  </div>
+                  <>
+                    {/* Row 1 — 5 cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                      <StatCard label="Horas Contratadas" value={fmtH(summary.contracted_hours)} />
+                      <StatCard label="Aporte de Horas"   value={fmtH(summary.contributed_hours ?? 0)} />
+                      {/* Consumo Acumulado with breakdown */}
+                      <div className="rounded-2xl p-5 flex flex-col gap-3" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Consumo Acumulado</span>
+                        <div className="flex items-end gap-1.5">
+                          <span className="text-4xl font-extrabold tracking-tight" style={{ color: '#00F5FF', lineHeight: 1 }}>{fmtH(summary.consumed_hours)}</span>
+                        </div>
+                        {(summary.projects_consumed_hours !== undefined || summary.maintenance_consumed_hours !== undefined) && (
+                          <div className="flex gap-3 pt-1 border-t" style={{ borderColor: 'var(--brand-border)' }}>
+                            <div>
+                              <p className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>Projetos</p>
+                              <p className="text-sm font-bold" style={{ color: 'var(--brand-text)' }}>{fmtH(summary.projects_consumed_hours ?? 0)}</p>
+                            </div>
+                            <div className="w-px" style={{ background: 'var(--brand-border)' }} />
+                            <div>
+                              <p className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>Sustentação</p>
+                              <p className="text-sm font-bold" style={{ color: 'var(--brand-text)' }}>{fmtH(summary.maintenance_consumed_hours ?? 0)}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <StatCard label="Consumo do Mês" value={fmtH(summary.month_consumed_hours)} />
+                      <StatCard
+                        label="Saldo de Horas"
+                        value={fmtH(summary.hours_balance)}
+                        accent={summary.hours_balance >= 0 ? 'success' : 'danger'}
+                      />
+                    </div>
+                    {/* Row 2 — 3 cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <StatCard
+                        label="Horas Excedentes"
+                        value={fmtH(summary.exceeded_hours ?? 0)}
+                        accent={(summary.exceeded_hours ?? 0) > 0 ? 'danger' : undefined}
+                      />
+                      <StatCard label="Valor Hora"   value={fmtBRL(summary.hourly_rate)} />
+                      <StatCard
+                        label="Valor a Pagar"
+                        value={fmtBRL(summary.amount_to_pay)}
+                        accent={(summary.amount_to_pay ?? 0) > 0 ? 'danger' : undefined}
+                      />
+                    </div>
+                  </>
                 ) : (
                   <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>Nenhum dado disponível.</p>
                 )}
