@@ -12,18 +12,16 @@ interface Project   { id: number; name: string; code: string }
 interface Executive { id: number; name: string }
 
 interface SummaryData {
-  month_contracted_hours: number
+  contracted_hours: number
+  accumulated_contracted_hours?: number
+  contributed_hours?: number
+  consumed_hours: number
   month_consumed_hours: number
-  month_hours_balance: number
-  consumed_hours?: number
-  projects_consumed_hours?: number
-  maintenance_consumed_hours?: number
+  hours_balance: number
   exceeded_hours?: number
   amount_to_pay?: number | null
   hourly_rate?: number | null
   contributed_hours_history?: ContributionItem[]
-  month: number
-  year: number
 }
 
 interface ContributionItem {
@@ -256,12 +254,12 @@ export default function BankHoursMonthlyPage() {
                   </div>
                 ) : summary ? (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <StatCard label="Horas Contratadas no Mês" value={fmtH(summary.month_contracted_hours)} />
-                    <StatCard label="Consumo do Mês"           value={fmtH(summary.month_consumed_hours)} />
+                    <StatCard label="Horas Contratadas" value={fmtH(summary.contracted_hours)} />
+                    <StatCard label="Consumo do Mês"    value={fmtH(summary.month_consumed_hours)} />
                     <StatCard
-                      label="Saldo do Mês"
-                      value={fmtH(summary.month_hours_balance)}
-                      accent={summary.month_hours_balance >= 0 ? 'success' : 'danger'}
+                      label="Saldo de Horas"
+                      value={fmtH(summary.hours_balance)}
+                      accent={summary.hours_balance >= 0 ? 'success' : 'danger'}
                     />
                   </div>
                 ) : (
