@@ -21,9 +21,14 @@ interface UserItem {
   email: string
   enabled: boolean
   hourly_rate?: number
+  customer_id?: number | null
+  partner_id?: number | null
   roles?: { id: number; name: string }[]
   created_at: string
 }
+
+interface CustomerOption { id: number; name: string }
+interface PartnerOption  { id: number; name: string }
 
 function ModalOverlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
@@ -52,9 +57,15 @@ function TableSkeleton() {
   )
 }
 
+// Roles that require linking to a specific entity
+const CLIENTE_ROLES   = ['Cliente']
+const PARCEIRO_ROLES  = ['Parceiro', 'Parceiro ADM']
+
 export default function UsersPage() {
   const [users, setUsers] = useState<UserItem[]>([])
   const [roles, setRoles] = useState<Role[]>([])
+  const [customers, setCustomers] = useState<CustomerOption[]>([])
+  const [partners,  setPartners]  = useState<PartnerOption[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterEnabled, setFilterEnabled] = useState('')
@@ -63,14 +74,24 @@ export default function UsersPage() {
   const [hasNext, setHasNext] = useState(false)
   const [modal, setModal] = useState<{ open: boolean; item?: UserItem }>({ open: false })
   const [resetModal, setResetModal] = useState<{ open: boolean; userId?: number; tempPassword?: string }>({ open: false })
-  const [form, setForm] = useState({ name: '', email: '', password: '', enabled: true, hourly_rate: '', role_ids: [] as number[] })
+  const [form, setForm] = useState({
+    name: '', email: '', password: '', enabled: true, hourly_rate: '',
+    role_ids: [] as number[], customer_id: '' as number | '', partner_id: '' as number | '',
+  })
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<number | null>(null)
   const [resetting, setResetting] = useState<number | null>(null)
   const [copied, setCopied] = useState(false)
 
+  // Derived: which role names are currently selected
+  const selectedRoleNames = roles.filter(r => form.role_ids.includes(r.id)).map(r => r.name)
+  const needsCustomer = selectedRoleNames.some(n => CLIENTE_ROLES.includes(n))
+  const needsPartner  = selectedRoleNames.some(n => PARCEIRO_ROLES.includes(n))
+
   useEffect(() => {
     api.get<{ data: Role[] }>('/roles').then(r => setRoles(Array.isArray(r?.data) ? r.data : [])).catch(() => {})
+    api.get<any>('/customers?pageSize=1000').then(r => setCustomers(Array.isArray(r?.items) ? r.items : [])).catch(() => {})
+    api.get<any>('/partners?pageSize=-1').then(r => setPartners(Array.isArray(r?.items) ? r.items : [])).catch(() => {})
   }, [])
 
   const load = useCallback(async () => {
@@ -91,7 +112,7 @@ export default function UsersPage() {
   useEffect(() => { load() }, [load])
 
   const openCreate = () => {
-    setForm({ name: '', email: '', password: '', enabled: true, hourly_rate: '', role_ids: [] })
+    setForm({ name: '', email: '', password: '', enabled: true, hourly_rate: '', role_ids: [], customer_id: '', partner_id: '' })
     setModal({ open: true })
   }
 
@@ -102,7 +123,9 @@ export default function UsersPage() {
       password: '',
       enabled: item.enabled,
       hourly_rate: item.hourly_rate ? String(item.hourly_rate) : '',
-      role_ids: item.roles?.map(r => r.id) ?? []
+      role_ids: item.roles?.map(r => r.id) ?? [],
+      customer_id: item.customer_id ?? '',
+      partner_id:  item.partner_id  ?? '',
     })
     setModal({ open: true, item })
   }
@@ -115,6 +138,8 @@ export default function UsersPage() {
         email: form.email,
         enabled: form.enabled,
         roles: form.role_ids,
+        customer_id: needsCustomer && form.customer_id ? form.customer_id : null,
+        partner_id:  needsPartner  && form.partner_id  ? form.partner_id  : null,
       }
       if (form.hourly_rate) payload.hourly_rate = parseFloat(form.hourly_rate)
       if (!modal.item && form.password) payload.password = form.password
@@ -307,6 +332,36 @@ export default function UsersPage() {
                       </label>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Vínculo condicional: Cliente → empresa */}
+              {needsCustomer && (
+                <div>
+                  <Label className="text-xs text-zinc-400">Empresa (Cliente) *</Label>
+                  <select
+                    value={form.customer_id}
+                    onChange={e => setForm(f => ({ ...f, customer_id: e.target.value === '' ? '' : Number(e.target.value) }))}
+                    className="mt-1 w-full bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded-md h-9 px-2"
+                  >
+                    <option value="">Selecione um cliente...</option>
+                    {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {/* Vínculo condicional: Parceiro / Parceiro ADM → parceiro */}
+              {needsPartner && (
+                <div>
+                  <Label className="text-xs text-zinc-400">Parceiro *</Label>
+                  <select
+                    value={form.partner_id}
+                    onChange={e => setForm(f => ({ ...f, partner_id: e.target.value === '' ? '' : Number(e.target.value) }))}
+                    className="mt-1 w-full bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded-md h-9 px-2"
+                  >
+                    <option value="">Selecione um parceiro...</option>
+                    {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
                 </div>
               )}
             </div>

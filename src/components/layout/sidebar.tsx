@@ -16,6 +16,7 @@ import {
   BarChart2,
   CalendarClock,
   Zap,
+  Handshake,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
@@ -82,8 +83,9 @@ const NAV: NavEntry[] = [
       { label: 'On Demand',              href: '/dashboards/on-demand',           icon: Zap },
     ],
   },
-  { type: 'item', label: 'Usuários',      href: '/users',      icon: Users },
-  { type: 'item', label: 'Configurações', href: '/settings',   icon: Settings },
+  { type: 'item', label: 'Usuários',      href: '/users',    icon: Users },
+  { type: 'item', label: 'Parceiros',     href: '/partners', icon: Handshake },
+  { type: 'item', label: 'Configurações', href: '/settings', icon: Settings },
 ]
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
