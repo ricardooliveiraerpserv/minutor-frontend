@@ -38,7 +38,7 @@ export function Header({ title, actions }: HeaderProps) {
     <header className="flex items-center justify-between h-14 px-6 border-b shrink-0" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
       <div className="flex items-center gap-3">
         {title && (
-          <h1 className="text-sm font-semibold" style={{ color: 'var(--brand-text)' }}>{title}</h1>
+          <h1 className="text-sm font-semibold" style={{ color: 'var(--brand-text)', letterSpacing: '-0.01em' }}>{title}</h1>
         )}
       </div>
 

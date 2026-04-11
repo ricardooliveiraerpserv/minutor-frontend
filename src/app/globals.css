@@ -119,14 +119,25 @@
 
 /* ── Brand tokens ────────────────────────────────────────────── */
 :root {
-  --brand-bg:      #0A0A0B;
-  --brand-surface: #111113;
-  --brand-border:  #1E1E22;
-  --brand-primary: #2563EB;
-  --brand-text:    #E4E4E7;
-  --brand-muted:   #64748B;
-  --brand-success: #22C55E;
-  --brand-danger:  #EF4444;
+  /* Structure */
+  --brand-bg:       #0A0A0B;   /* Deep Space — fundo principal */
+  --brand-surface:  #161618;   /* Elevated Black — sidebar, cards */
+  --brand-border:   #27272A;   /* Steel Gray — divisores, inputs */
+
+  /* Identity */
+  --brand-primary:  #00F5FF;   /* Electric Cyan — ativo, CTA, logo */
+  --brand-primary-dim: rgba(0, 245, 255, 0.10);
+
+  /* Text */
+  --brand-text:     #FAFAFA;   /* Texto forte — títulos, valores */
+  --brand-muted:    #A1A1AA;   /* Texto fraco secundário */
+  --brand-subtle:   #71717A;   /* Texto fraco — legendas, IDs */
+
+  /* Semantic */
+  --brand-success:  #10B981;   /* Verde — aprovado, saldo positivo */
+  --brand-warning:  #F59E0B;   /* Âmbar — atenção, prazo */
+  --brand-danger:   #EF4444;   /* Vermelho — erro, excedido */
+  --brand-purple:   #8B5CF6;   /* Roxo — dev/ADVPL */
 }
 
 @layer base {

@@ -70,9 +70,9 @@ function MetricCard({
     'var(--brand-text)'
 
   const iconBg =
-    accent === 'success' ? 'rgba(34,197,94,0.12)'  :
-    accent === 'danger'  ? 'rgba(239,68,68,0.12)'  :
-    accent === 'primary' ? 'rgba(37,99,235,0.12)'   :
+    accent === 'success' ? 'rgba(16,185,129,0.12)'  :
+    accent === 'danger'  ? 'rgba(239,68,68,0.12)'   :
+    accent === 'primary' ? 'rgba(0,245,255,0.10)'   :
     'rgba(255,255,255,0.06)'
 
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : null
@@ -156,7 +156,7 @@ function Tab({ label, active, onClick }: { label: string; active: boolean; onCli
       className="px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-150"
       style={
         active
-          ? { background: 'var(--brand-primary)', color: '#fff' }
+          ? { background: 'var(--brand-primary)', color: '#0A0A0B', fontWeight: 700 }
           : { color: 'var(--brand-muted)', background: 'transparent' }
       }
     >
@@ -184,7 +184,7 @@ function EmptyState({ admin }: { admin: boolean }) {
       className="rounded-2xl p-16 flex flex-col items-center gap-4 text-center"
       style={{ background: 'var(--brand-surface)', border: '1px dashed var(--brand-border)' }}
     >
-      <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(37,99,235,0.1)' }}>
+      <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(0,245,255,0.08)' }}>
         <Zap size={22} color="var(--brand-primary)" />
       </div>
       <div>
@@ -274,7 +274,7 @@ export default function OnDemandPage() {
         {/* ── Page header ── */}
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(37,99,235,0.15)' }}>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(0,245,255,0.10)' }}>
               <Zap size={14} color="var(--brand-primary)" />
             </div>
             <h1 className="text-xl font-bold" style={{ color: 'var(--brand-text)' }}>On Demand</h1>
@@ -447,11 +447,11 @@ export default function OnDemandPage() {
                                 borderBottom: '1px solid var(--brand-border)',
                                 background: even ? 'transparent' : 'rgba(255,255,255,0.015)',
                               }}
-                              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(37,99,235,0.05)')}
+                              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,245,255,0.04)')}
                               onMouseLeave={e => (e.currentTarget.style.background = even ? 'transparent' : 'rgba(255,255,255,0.015)')}
                             >
                               <td className="px-5 py-4">
-                                <span className="font-mono text-xs px-2 py-1 rounded-md" style={{ background: 'var(--brand-border)', color: 'var(--brand-muted)' }}>
+                                <span className="font-mono text-xs px-2 py-1 rounded-md" style={{ background: 'var(--brand-border)', color: 'var(--brand-subtle)' }}>
                                   {p.code}
                                 </span>
                               </td>
@@ -459,7 +459,7 @@ export default function OnDemandPage() {
                                 {p.name}
                               </td>
                               <td className="px-5 py-4">
-                                <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: 'rgba(37,99,235,0.12)', color: 'var(--brand-primary)' }}>
+                                <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)' }}>
                                   {p.status_display}
                                 </span>
                               </td>

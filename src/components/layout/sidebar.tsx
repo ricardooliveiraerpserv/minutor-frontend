@@ -22,20 +22,48 @@ import { useState } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { LucideIcon } from 'lucide-react'
 
+// ─── Logo SVG ────────────────────────────────────────────────────────────────
+// 4 barras verticais em Electric Cyan, alturas: 40% | 70% | 100% | 60%
+function MinutorIcon({ size = 28 }: { size?: number }) {
+  const bars = [
+    { x: 0,    h: 0.45, y: 0.55 },
+    { x: 0.28, h: 0.75, y: 0.25 },
+    { x: 0.56, h: 1.00, y: 0.00 },
+    { x: 0.84, h: 0.60, y: 0.40 },
+  ]
+  const w = size * 0.72
+  const barW = w * 0.18
+  return (
+    <svg width={size} height={size} viewBox="0 0 28 28" fill="none">
+      {bars.map((b, i) => (
+        <rect
+          key={i}
+          x={b.x * 28 * 0.9 + 2}
+          y={b.y * 20 + 4}
+          width={4.2}
+          height={b.h * 20}
+          rx={1.6}
+          fill="#00F5FF"
+        />
+      ))}
+    </svg>
+  )
+}
+
+// ─── Nav config ──────────────────────────────────────────────────────────────
+
 type NavItem = {
   type: 'item'
   label: string
   href: string
   icon: LucideIcon
 }
-
 type NavGroup = {
   type: 'group'
   label: string
   icon: LucideIcon
   items: { label: string; href: string; icon: LucideIcon }[]
 }
-
 type NavEntry = NavItem | NavGroup
 
 const NAV: NavEntry[] = [
@@ -58,10 +86,17 @@ const NAV: NavEntry[] = [
   { type: 'item', label: 'Configurações', href: '/settings',   icon: Settings },
 ]
 
-// shared link styles
-const linkBase = 'flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-all duration-150 outline-none'
-const linkActive = { background: '#1e2a40', color: 'var(--brand-primary)' }
-const linkIdle = { color: 'var(--brand-muted)' }
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const base = 'flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-all duration-150 outline-none select-none'
+
+function itemStyle(active: boolean): React.CSSProperties {
+  return active
+    ? { color: '#00F5FF', background: 'rgba(0,245,255,0.08)' }
+    : { color: '#A1A1AA' }
+}
+
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -69,40 +104,42 @@ export function Sidebar() {
   const [openGroups, setOpenGroups] = useState<string[]>(['Dashboards'])
 
   const toggleGroup = (label: string) =>
-    setOpenGroups(prev =>
-      prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
-    )
+    setOpenGroups(prev => prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label])
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
-  const isGroupActive = (group: NavGroup) => group.items.some(i => isActive(i.href))
+  const isActive   = (href: string) => pathname === href || pathname.startsWith(href + '/')
+  const groupActive = (g: NavGroup) => g.items.some(i => isActive(i.href))
 
   return (
     <aside
-      className={cn('flex flex-col h-screen border-r transition-all duration-200 shrink-0', collapsed ? 'w-14' : 'w-56')}
+      className={cn('flex flex-col h-screen border-r transition-all duration-200 shrink-0', collapsed ? 'w-[52px]' : 'w-[220px]')}
       style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
     >
-      {/* Logo */}
-      <div className="flex items-center h-14 px-4 border-b" style={{ borderColor: 'var(--brand-border)' }}>
-        {!collapsed
-          ? <span className="font-bold text-base tracking-tight" style={{ color: 'var(--brand-text)' }}>
-              <span style={{ color: 'var(--brand-primary)' }}>Min</span>utor
-            </span>
-          : <span className="font-bold text-base mx-auto" style={{ color: 'var(--brand-primary)' }}>M</span>
-        }
+      {/* ── Logo ── */}
+      <div
+        className="flex items-center gap-2.5 h-14 px-3.5 border-b shrink-0"
+        style={{ borderColor: 'var(--brand-border)' }}
+      >
+        <MinutorIcon size={26} />
+        {!collapsed && (
+          <span className="font-bold text-[15px] tracking-tight" style={{ color: '#FAFAFA' }}>
+            Minutor
+          </span>
+        )}
       </div>
 
-      {/* Nav */}
+      {/* ── Nav ── */}
       <nav className="flex-1 py-3 space-y-0.5 px-2 overflow-y-auto">
         {NAV.map(entry => {
+          // ── Plain item ──
           if (entry.type === 'item') {
             const active = isActive(entry.href)
-            const Icon = entry.icon
+            const Icon   = entry.icon
             const item = (
               <Link
                 key={entry.href}
                 href={entry.href}
-                className={cn(linkBase, !active && 'hover:bg-white/5')}
-                style={active ? linkActive : linkIdle}
+                className={cn(base, !active && 'hover:bg-white/[0.04] hover:text-[#FAFAFA]')}
+                style={itemStyle(active)}
               >
                 <Icon size={15} className="shrink-0" />
                 {!collapsed && <span className="font-medium">{entry.label}</span>}
@@ -119,11 +156,11 @@ export function Sidebar() {
             return item
           }
 
-          // Group
+          // ── Group ──
           const group = entry as NavGroup
           const GroupIcon = group.icon
-          const active = isGroupActive(group)
-          const open = openGroups.includes(group.label)
+          const active = groupActive(group)
+          const open   = openGroups.includes(group.label)
 
           if (collapsed) {
             return (
@@ -135,8 +172,8 @@ export function Sidebar() {
                     <Link
                       key={sub.href}
                       href={sub.href}
-                      className={cn(linkBase, !subActive && 'hover:bg-white/5')}
-                      style={subActive ? linkActive : linkIdle}
+                      className={cn(base, !subActive && 'hover:bg-white/[0.04] hover:text-[#FAFAFA]')}
+                      style={itemStyle(subActive)}
                     >
                       <SubIcon size={15} className="shrink-0" />
                     </Link>
@@ -156,12 +193,15 @@ export function Sidebar() {
             <div key={group.label}>
               <button
                 onClick={() => toggleGroup(group.label)}
-                className={cn('w-full', linkBase, !active && 'hover:bg-white/5')}
-                style={active ? { color: 'var(--brand-text)' } : linkIdle}
+                className={cn('w-full', base, !active && 'hover:bg-white/[0.04] hover:text-[#FAFAFA]')}
+                style={active ? { color: '#FAFAFA' } : { color: '#A1A1AA' }}
               >
                 <GroupIcon size={15} className="shrink-0" />
                 <span className="flex-1 text-left font-medium">{group.label}</span>
-                <ChevronDown size={12} className={cn('transition-transform duration-200', open && 'rotate-180')} />
+                <ChevronDown
+                  size={12}
+                  className={cn('transition-transform duration-200', open && 'rotate-180')}
+                />
               </button>
               {open && (
                 <div className="ml-3 mt-0.5 space-y-0.5 border-l pl-2" style={{ borderColor: 'var(--brand-border)' }}>
@@ -172,8 +212,14 @@ export function Sidebar() {
                       <Link
                         key={sub.href}
                         href={sub.href}
-                        className={cn('flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-all duration-150', !subActive && 'hover:bg-white/5')}
-                        style={subActive ? { color: 'var(--brand-primary)', background: '#1e2a40' } : { color: 'var(--brand-muted)' }}
+                        className={cn(
+                          'flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-all duration-150',
+                          !subActive && 'hover:bg-white/[0.04] hover:text-[#FAFAFA]'
+                        )}
+                        style={subActive
+                          ? { color: '#00F5FF', background: 'rgba(0,245,255,0.08)' }
+                          : { color: '#71717A' }
+                        }
                       >
                         <SubIcon size={13} className="shrink-0" />
                         <span>{sub.label}</span>
@@ -187,11 +233,11 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Collapse toggle */}
+      {/* ── Collapse toggle ── */}
       <button
         onClick={() => setCollapsed(c => !c)}
-        className="flex items-center justify-center h-10 border-t transition-colors hover:bg-white/5"
-        style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}
+        className="flex items-center justify-center h-10 border-t transition-colors hover:bg-white/[0.04]"
+        style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-subtle)' }}
       >
         {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
