@@ -637,12 +637,6 @@ export default function ProjectsPage() {
               placeholder="Todos os clientes"
             />
             <SearchSelect
-              value={filterContractType}
-              onChange={v => { setFilterContractType(v); setPage(1) }}
-              options={filterContractTypes}
-              placeholder="Todos os tipos"
-            />
-            <SearchSelect
               value={filterApprover}
               onChange={v => { setFilterApprover(v); setPage(1) }}
               options={filterApprovers}
@@ -656,32 +650,46 @@ export default function ProjectsPage() {
                 placeholder="Todos os executivos"
               />
             )}
-            {(filterCustomer || filterContractType || filterApprover || filterExecutive || search) && (
+            <SearchSelect
+              value={statusFilter}
+              onChange={v => { setStatusFilter(v); setPage(1) }}
+              options={[
+                { id: 'started',   name: 'Iniciados' },
+                { id: 'paused',    name: 'Pausados' },
+                { id: 'finished',  name: 'Encerrados' },
+                { id: 'cancelled', name: 'Cancelados' },
+              ]}
+              placeholder="Todos os status"
+            />
+            {(filterCustomer || filterContractType || filterApprover || filterExecutive || statusFilter || search) && (
               <button
-                onClick={() => { setFilterCustomer(''); setFilterContractType(''); setFilterApprover(''); setFilterExecutive(''); setSearch(''); setPage(1) }}
+                onClick={() => { setFilterCustomer(''); setFilterContractType(''); setFilterApprover(''); setFilterExecutive(''); setStatusFilter(''); setSearch(''); setPage(1) }}
                 className="px-3 py-2 rounded-xl text-xs font-medium transition-colors hover:bg-white/5"
                 style={{ color: 'var(--brand-danger)', border: '1px solid var(--brand-border)' }}
               >Limpar</button>
             )}
           </div>
-          {/* Linha 2: botões de status */}
+          {/* Linha 2: pills de tipo de contrato */}
           <div className="flex items-center gap-1 p-1 rounded-xl w-fit" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
-            {[
-              { value: '', label: 'Todos' },
-              { value: 'started', label: 'Iniciados' },
-              { value: 'paused', label: 'Pausados' },
-              { value: 'finished', label: 'Encerrados' },
-              { value: 'cancelled', label: 'Cancelados' },
-            ].map(({ value, label }) => (
+            <button
+              onClick={() => { setFilterContractType(''); setPage(1) }}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              style={!filterContractType
+                ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
+                : { color: 'var(--brand-muted)' }}
+            >
+              Todos
+            </button>
+            {filterContractTypes.map(ct => (
               <button
-                key={value}
-                onClick={() => { setStatusFilter(value); setPage(1) }}
+                key={ct.id}
+                onClick={() => { setFilterContractType(String(ct.id)); setPage(1) }}
                 className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                style={statusFilter === value
+                style={filterContractType === String(ct.id)
                   ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
                   : { color: 'var(--brand-muted)' }}
               >
-                {label}
+                {ct.name}
               </button>
             ))}
           </div>
