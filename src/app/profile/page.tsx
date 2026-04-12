@@ -1,7 +1,7 @@
 'use client'
 
 import { AppLayout } from '@/components/layout/app-layout'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { api, ApiError } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
@@ -18,9 +18,16 @@ export default function ProfilePage() {
   const { user } = useAuth()
 
   // Info fields
-  const [name,  setName]  = useState(user?.name  ?? '')
-  const [email, setEmail] = useState(user?.email ?? '')
+  const [name,  setName]  = useState('')
+  const [email, setEmail] = useState('')
   const [savingInfo, setSavingInfo] = useState(false)
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name ?? '')
+      setEmail(user.email ?? '')
+    }
+  }, [user])
 
   // Password section
   const [passwordMode,     setPasswordMode]     = useState<PasswordMode>('none')
