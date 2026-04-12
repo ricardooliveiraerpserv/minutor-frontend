@@ -786,16 +786,16 @@ export default function ProjectsPage() {
         {/* Tabela */}
         <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm" style={{ background: 'var(--brand-surface)' }}>
+            <table className="text-sm" style={{ background: 'var(--brand-surface)', minWidth: '900px', width: '100%' }}>
               <thead style={{ borderBottom: '1px solid var(--brand-border)', background: 'rgba(255,255,255,0.02)' }}>
                 <tr>
-                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Código</th>
-                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Projeto</th>
-                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell" style={{ color: 'var(--brand-subtle)' }}>Cliente</th>
-                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: 'var(--brand-subtle)' }}>Tipo de Contrato</th>
-                  <th className="px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wider hidden xl:table-cell" style={{ color: 'var(--brand-subtle)' }}>Hs Vendidas</th>
-                  <th className="px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wider hidden xl:table-cell" style={{ color: 'var(--brand-subtle)' }}>Hs Consumidas</th>
-                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider hidden lg:table-cell w-32" style={{ color: 'var(--brand-subtle)' }}>Saldo</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '110px' }}>Código</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)', minWidth: '200px' }}>Projeto</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '140px' }}>Cliente</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '150px' }}>Tipo de Contrato</th>
+                  <th className="px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '110px' }}>Hs Vendidas</th>
+                  <th className="px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '120px' }}>Hs Consumidas</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '160px' }}>Saldo</th>
                   <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Status</th>
                   <th className="px-4 py-3.5 w-20" />
                 </tr>
@@ -891,29 +891,29 @@ export default function ProjectsPage() {
                       </td>
 
                       {/* Cliente */}
-                      <td className="px-4 py-3 hidden md:table-cell truncate max-w-[140px] text-xs" style={{ color: 'var(--brand-muted)' }}>
+                      <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>
                         {p.customer?.name ?? '—'}
                       </td>
 
                       {/* Tipo de contrato */}
-                      <td className="px-4 py-3 hidden lg:table-cell text-xs" style={{ color: 'var(--brand-muted)' }}>
+                      <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>
                         {p.contract_type_display ?? '—'}
                       </td>
 
                       {/* Hs Vendidas */}
-                      <td className="px-4 py-3 hidden xl:table-cell text-xs text-right tabular-nums" style={{ color: 'var(--brand-muted)' }}>
+                      <td className="px-4 py-3 text-xs text-right tabular-nums whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>
                         {isOnDemand ? '—'
                           : sold > 0 ? (contrib > 0 ? `${sold}h (+${contrib})` : `${sold}h`)
                           : '—'}
                       </td>
 
                       {/* Hs Consumidas */}
-                      <td className="px-4 py-3 hidden xl:table-cell text-xs text-right tabular-nums" style={{ color: 'var(--brand-muted)' }}>
+                      <td className="px-4 py-3 text-xs text-right tabular-nums whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>
                         {consumed != null ? `${consumed}h` : '—'}
                       </td>
 
                       {/* Saldo */}
-                      <td className="px-4 py-3 hidden lg:table-cell w-40">
+                      <td className="px-4 py-3 w-40">
                         {isOnDemand ? (
                           <div className="space-y-1.5">
                             <ProgressBar pct={0} />
