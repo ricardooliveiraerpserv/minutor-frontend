@@ -186,6 +186,15 @@ export default function ProjectsPage() {
   const [page, setPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
+  // Filtros de lista
+  const [filterCustomer, setFilterCustomer] = useState('')
+  const [filterContractType, setFilterContractType] = useState('')
+  const [filterApprover, setFilterApprover] = useState('')
+  // Opções de filtro de lista
+  const [filterCustomers, setFilterCustomers] = useState<SelectOption[]>([])
+  const [filterContractTypes, setFilterContractTypes] = useState<ContractType[]>([])
+  const [filterApprovers, setFilterApprovers] = useState<SelectOption[]>([])
+
   const [data, setData] = useState<PaginatedResponse<Project> | null>(null)
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<{ open: boolean; item?: Project }>({ open: false })
@@ -194,7 +203,7 @@ export default function ProjectsPage() {
   const [deleting, setDeleting] = useState<number | null>(null)
   const [codeManual, setCodeManual] = useState(false)
 
-  // Opções dos selects
+  // Opções dos selects do modal
   const [customers, setCustomers] = useState<SelectOption[]>([])
   const [contractTypes, setContractTypes] = useState<ContractType[]>([])
   const [serviceTypes, setServiceTypes] = useState<SelectOption[]>([])
@@ -226,8 +235,11 @@ export default function ProjectsPage() {
     const p = new URLSearchParams({ page: String(page), per_page: '20' })
     if (statusFilter) p.set('status', statusFilter)
     if (search) p.set('search', search)
+    if (filterCustomer) p.set('customer_id', filterCustomer)
+    if (filterContractType) p.set('contract_type_id', filterContractType)
+    if (filterApprover) p.set('approver_id', filterApprover)
     return p.toString()
-  }, [page, statusFilter, search])
+  }, [page, statusFilter, search, filterCustomer, filterContractType, filterApprover])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -239,6 +251,20 @@ export default function ProjectsPage() {
   }, [params])
 
   useEffect(() => { load() }, [load])
+
+  // Carrega opções dos filtros de lista uma única vez
+  useEffect(() => {
+    const items = (r: any) => Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
+    Promise.all([
+      api.get<any>('/customers?pageSize=1000'),
+      api.get<any>('/contract-types?pageSize=200'),
+      api.get<any>('/users?pageSize=200&enabled=1'),
+    ]).then(([c, ct, u]) => {
+      setFilterCustomers(items(c))
+      setFilterContractTypes(items(ct))
+      setFilterApprovers(items(u))
+    }).catch(() => {})
+  }, [])
 
   const loadOptions = useCallback(async () => {
     try {
@@ -418,18 +444,56 @@ export default function ProjectsPage() {
         </div>
 
         {/* Filtros */}
-        <div className="flex items-center gap-2 mb-6 p-4 rounded-2xl flex-wrap" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-          <div className="relative flex-1 min-w-48">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--brand-subtle)' }} />
-            <input
-              value={search}
-              onChange={e => { setSearch(e.target.value); setPage(1) }}
-              placeholder="Buscar projeto..."
-              className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none"
-              style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}
-            />
+        <div className="mb-6 p-4 rounded-2xl space-y-3" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+          {/* Linha 1: busca + selects */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-48">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--brand-subtle)' }} />
+              <input
+                value={search}
+                onChange={e => { setSearch(e.target.value); setPage(1) }}
+                placeholder="Buscar projeto..."
+                className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none"
+                style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}
+              />
+            </div>
+            <select
+              value={filterCustomer}
+              onChange={e => { setFilterCustomer(e.target.value); setPage(1) }}
+              className="px-3 py-2 rounded-xl text-sm outline-none appearance-none min-w-36"
+              style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: filterCustomer ? 'var(--brand-text)' : 'var(--brand-subtle)' }}
+            >
+              <option value="">Todos os clientes</option>
+              {filterCustomers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <select
+              value={filterContractType}
+              onChange={e => { setFilterContractType(e.target.value); setPage(1) }}
+              className="px-3 py-2 rounded-xl text-sm outline-none appearance-none min-w-36"
+              style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: filterContractType ? 'var(--brand-text)' : 'var(--brand-subtle)' }}
+            >
+              <option value="">Todos os tipos</option>
+              {filterContractTypes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <select
+              value={filterApprover}
+              onChange={e => { setFilterApprover(e.target.value); setPage(1) }}
+              className="px-3 py-2 rounded-xl text-sm outline-none appearance-none min-w-36"
+              style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: filterApprover ? 'var(--brand-text)' : 'var(--brand-subtle)' }}
+            >
+              <option value="">Todos os aprovadores</option>
+              {filterApprovers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+            {(filterCustomer || filterContractType || filterApprover || search) && (
+              <button
+                onClick={() => { setFilterCustomer(''); setFilterContractType(''); setFilterApprover(''); setSearch(''); setPage(1) }}
+                className="px-3 py-2 rounded-xl text-xs font-medium transition-colors hover:bg-white/5"
+                style={{ color: 'var(--brand-danger)', border: '1px solid var(--brand-border)' }}
+              >Limpar</button>
+            )}
           </div>
-          <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+          {/* Linha 2: botões de status */}
+          <div className="flex items-center gap-1 p-1 rounded-xl w-fit" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
             {[
               { value: '', label: 'Todos' },
               { value: 'started', label: 'Iniciados' },
@@ -457,19 +521,22 @@ export default function ProjectsPage() {
             <table className="w-full text-sm" style={{ background: 'var(--brand-surface)' }}>
               <thead style={{ borderBottom: '1px solid var(--brand-border)', background: 'rgba(255,255,255,0.02)' }}>
                 <tr>
-                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Código</th>
-                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Projeto</th>
-                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell" style={{ color: 'var(--brand-subtle)' }}>Cliente</th>
-                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider hidden lg:table-cell w-36" style={{ color: 'var(--brand-subtle)' }}>Saldo</th>
-                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Status</th>
-                  <th className="px-5 py-3.5 w-20" />
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Código</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Projeto</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell" style={{ color: 'var(--brand-subtle)' }}>Cliente</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: 'var(--brand-subtle)' }}>Tipo de Contrato</th>
+                  <th className="px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wider hidden xl:table-cell" style={{ color: 'var(--brand-subtle)' }}>Hs Vendidas</th>
+                  <th className="px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wider hidden xl:table-cell" style={{ color: 'var(--brand-subtle)' }}>Hs Consumidas</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider hidden lg:table-cell w-32" style={{ color: 'var(--brand-subtle)' }}>Saldo</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Status</th>
+                  <th className="px-4 py-3.5 w-20" />
                 </tr>
               </thead>
               <tbody>
                 {loading && Array.from({ length: 8 }).map((_, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid var(--brand-border)' }}>
-                    {[...Array(6)].map((_, j) => (
-                      <td key={j} className="px-5 py-4">
+                    {[...Array(9)].map((_, j) => (
+                      <td key={j} className="px-4 py-4">
                         <div className="h-3 rounded animate-pulse" style={{ background: 'var(--brand-border)', width: '70%' }} />
                       </td>
                     ))}
@@ -477,7 +544,7 @@ export default function ProjectsPage() {
                 ))}
                 {!loading && data?.items.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-20 text-center">
+                    <td colSpan={9} className="py-20 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(0,245,255,0.06)' }}>
                           <FolderOpen size={20} color="var(--brand-primary)" />
@@ -495,26 +562,40 @@ export default function ProjectsPage() {
                     onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,245,255,0.03)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <td className="px-5 py-3.5">
+                    <td className="px-4 py-3.5">
                       <span className="font-mono text-xs px-2 py-1 rounded-md" style={{ background: 'var(--brand-border)', color: 'var(--brand-subtle)' }}>
                         {p.code}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 max-w-[200px]">
-                      <span className="font-medium truncate block" style={{ color: 'var(--brand-text)' }}>{p.name}</span>
+                    <td className="px-4 py-3.5 max-w-[180px]">
+                      <div className="flex items-center gap-1.5">
+                        {p.parent_project_id && (
+                          <span className="text-[9px] font-bold px-1 py-0.5 rounded" style={{ background: 'rgba(0,245,255,0.10)', color: 'var(--brand-primary)' }}>FILHO</span>
+                        )}
+                        <span className="font-medium truncate block" style={{ color: 'var(--brand-text)' }}>{p.name}</span>
+                      </div>
                     </td>
-                    <td className="px-5 py-3.5 hidden md:table-cell truncate max-w-[160px] text-sm" style={{ color: 'var(--brand-muted)' }}>
+                    <td className="px-4 py-3.5 hidden md:table-cell truncate max-w-[140px] text-sm" style={{ color: 'var(--brand-muted)' }}>
                       {p.customer?.name ?? '—'}
                     </td>
-                    <td className="px-5 py-3.5 hidden lg:table-cell w-36">
+                    <td className="px-4 py-3.5 hidden lg:table-cell text-xs" style={{ color: 'var(--brand-muted)' }}>
+                      {p.contract_type_display ?? '—'}
+                    </td>
+                    <td className="px-4 py-3.5 hidden xl:table-cell text-xs text-right tabular-nums" style={{ color: 'var(--brand-muted)' }}>
+                      {p.sold_hours != null ? `${p.sold_hours}h` : '—'}
+                    </td>
+                    <td className="px-4 py-3.5 hidden xl:table-cell text-xs text-right tabular-nums" style={{ color: 'var(--brand-muted)' }}>
+                      {p.consumed_hours != null ? `${p.consumed_hours}h` : p.total_logged_minutes != null ? `${(p.total_logged_minutes / 60).toFixed(1)}h` : '—'}
+                    </td>
+                    <td className="px-4 py-3.5 hidden lg:table-cell w-32">
                       {p.balance_percentage != null ? (
                         <div className="space-y-1">
                           <ProgressBar pct={p.balance_percentage} />
-                          <span className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>{p.balance_percentage.toFixed(0)}%</span>
+                          <span className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>{p.balance_percentage.toFixed(0)}%{p.general_hours_balance != null ? ` · ${p.general_hours_balance}h` : ''}</span>
                         </div>
                       ) : <span style={{ color: 'var(--brand-subtle)' }}>—</span>}
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-4 py-3.5">
                       {(() => {
                         const s = p.status ?? ''
                         const variant = s === 'active' || s === 'started' ? 'started'
@@ -543,7 +624,7 @@ export default function ProjectsPage() {
                         )
                       })()}
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-4 py-3.5">
                       <div className="flex items-center gap-1 justify-end">
                         <button
                           onClick={() => openEdit(p)}

@@ -32,11 +32,14 @@ export interface Project {
   code: string
   customer_id: number
   customer?: Customer
+  parent_project_id?: number
   status: string
   status_display?: string
   contract_type_display?: string
   balance_percentage?: number
   general_hours_balance?: number
+  sold_hours?: number
+  consumed_hours?: number
   total_logged_minutes?: number
 }
 
