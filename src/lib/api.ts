@@ -49,7 +49,7 @@ async function request<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new ApiError(res.status, body.details ?? body.message ?? `Erro ${res.status}`)
+    throw new ApiError(res.status, body.details ?? body.detailMessage ?? body.message ?? `Erro ${res.status}`)
   }
 
   if (res.status === 204) return undefined as T
