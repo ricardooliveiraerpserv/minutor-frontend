@@ -761,18 +761,24 @@ export default function ProjectsPage() {
                     </td>
                     <td className="px-4 py-3.5 hidden lg:table-cell w-32">
                       {(() => {
+                        // On Demand: saldo e percentual não se aplicam
+                        const isOnDemand = p.contract_type_display?.toLowerCase().includes('on demand')
+                        if (isOnDemand) return <span style={{ color: 'var(--brand-subtle)' }}>—</span>
+
                         const sold = p.sold_hours ?? 0
                         const balance = p.general_hours_balance
                         if (balance == null) return <span style={{ color: 'var(--brand-subtle)' }}>—</span>
-                        // % restante = balance / sold_hours * 100
+
+                        // % restante = balance / sold_hours × 100 (pode passar de 100% por aportes)
                         const remainPct = sold > 0 ? Math.round((balance / sold) * 100) : null
-                        // cor do texto: vermelho se negativo, amarelo se baixo, verde se ok
-                        const textColor = balance < 0 ? '#ef4444' : remainPct != null && remainPct <= 20 ? '#f59e0b' : 'var(--brand-subtle)'
+                        // Barra usa valor clamped 0-100; texto mostra o real
+                        const barPct = remainPct != null ? Math.min(100, Math.max(0, remainPct)) : 0
+                        const textColor = balance < 0 ? '#ef4444' : (remainPct ?? 100) <= 20 ? '#f59e0b' : 'var(--brand-subtle)'
                         return (
                           <div className="space-y-1">
-                            {remainPct != null && <ProgressBar pct={Math.max(0, remainPct)} />}
+                            {sold > 0 && <ProgressBar pct={barPct} />}
                             <span className="text-[10px] tabular-nums" style={{ color: textColor }}>
-                              {remainPct != null ? `${remainPct}% · ` : ''}{balance >= 0 ? `${balance}h` : `${balance}h`}
+                              {remainPct != null ? `${remainPct}% · ` : ''}{balance}h
                             </span>
                           </div>
                         )
