@@ -25,6 +25,7 @@ interface UserItem {
   daily_hours?: number
   consultant_type?: string | null
   bank_hours_start_date?: string | null
+  guaranteed_hours?: number | null
   customer_id?: number | null
   partner_id?: number | null
   is_executive?: boolean
@@ -165,6 +166,7 @@ const EMPTY_FORM = {
   daily_hours: '8', profile: '' as ProfileType | '',
   consultant_type: '' as ConsultantType | '',
   bank_hours_start_date: '',
+  guaranteed_hours: '',
   is_partner_adm: false,
   customer_id: '' as number | '',
   partner_id:  '' as number | '',
@@ -239,6 +241,7 @@ export function UserManagementTab() {
       daily_hours: item.daily_hours != null ? String(item.daily_hours) : '8',
       profile, consultant_type: consultant_type as ConsultantType | '',
       bank_hours_start_date: item.bank_hours_start_date ?? '',
+      guaranteed_hours: item.guaranteed_hours != null ? String(item.guaranteed_hours) : '',
       is_partner_adm: item.is_executive ?? false,
       customer_id: item.customer_id ?? '',
       partner_id:  item.partner_id  ?? '',
@@ -266,6 +269,9 @@ export function UserManagementTab() {
       if (form.profile === 'consultor' && form.consultant_type) payload.consultant_type = form.consultant_type
       payload.bank_hours_start_date = (form.profile === 'consultor' || form.profile === 'parceiro_adm') && form.bank_hours_start_date
         ? form.bank_hours_start_date
+        : null
+      payload.guaranteed_hours = form.profile === 'consultor' && form.consultant_type === 'horista' && form.guaranteed_hours
+        ? parseFloat(form.guaranteed_hours)
         : null
       if (!modal.item && form.password) payload.password = form.password
       if (modal.item) await api.put(`/users/${modal.item.id}`, payload)
@@ -469,6 +475,24 @@ export function UserManagementTab() {
                     </div>
                   </div>
                 )}
+                {isConsultor && form.consultant_type === 'horista' && (
+                  <div>
+                    <Label className="text-xs text-zinc-400 mb-1 block">Horas Garantidas / mês</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number" min="0" max="744" step="1"
+                        value={form.guaranteed_hours}
+                        onChange={e => setForm(f => ({ ...f, guaranteed_hours: e.target.value }))}
+                        placeholder="Ex: 160"
+                        className="w-28 bg-zinc-800 border-zinc-700 text-white h-8 text-xs"
+                      />
+                      <span className="text-xs text-zinc-500">h/mês (piso mínimo de cobrança)</span>
+                    </div>
+                    <p className="text-[10px] text-zinc-500 mt-1">
+                      Se fizer menos horas, paga como se tivesse feito este mínimo.
+                    </p>
+                  </div>
+                )}
                 {isConsultor && (
                   <div>
                     <Label className="text-xs text-zinc-400 mb-1 block">Horas por dia útil (Banco de Horas)</Label>
@@ -591,6 +615,7 @@ export function UserManagementTab() {
         if (u.hourly_rate != null) rows.push({ label: 'Remuneração', value: `${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(u.hourly_rate))} ${u.rate_type === 'monthly' ? '/ mês' : '/ hora'}` })
         if (u.daily_hours != null) rows.push({ label: 'Horas/dia útil', value: `${u.daily_hours}h` })
         if (u.bank_hours_start_date) rows.push({ label: 'Início banco de horas', value: new Date(u.bank_hours_start_date + 'T12:00:00').toLocaleDateString('pt-BR') })
+        if (u.guaranteed_hours != null) rows.push({ label: 'Horas garantidas', value: `${u.guaranteed_hours}h/mês` })
         return (
           <ModalOverlay onClose={() => setViewUser(null)}>
             <div className="p-5">

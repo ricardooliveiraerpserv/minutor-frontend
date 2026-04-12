@@ -754,10 +754,16 @@ export default function MeuPainelPage() {
   const maxCustomerMin = tsByCustomer[0]?.minutes ?? 1
 
   // Estimated value (if user has hourly_rate)
-  const hourlyRate     = (user as any)?.hourly_rate ?? 0
-  const rateType       = (user as any)?.rate_type ?? 'hourly'
-  const estimatedValue = hourlyRate > 0 && rateType === 'hourly'
-    ? (tsTotalMin / 60) * hourlyRate
+  const hourlyRate       = (user as any)?.hourly_rate ?? 0
+  const rateType         = (user as any)?.rate_type ?? 'hourly'
+  const guaranteedHours  = (user as any)?.guaranteed_hours ?? null
+  const workedHours      = tsTotalMin / 60
+  // Para horistas com horas garantidas: piso mínimo de cobrança
+  const billableHours    = guaranteedHours !== null
+    ? Math.max(workedHours, Number(guaranteedHours))
+    : workedHours
+  const estimatedValue   = hourlyRate > 0 && rateType === 'hourly'
+    ? billableHours * hourlyRate
     : null
 
   const approvedTs = timesheets.filter(t => t.status === 'approved').length
@@ -902,7 +908,9 @@ export default function MeuPainelPage() {
                 label="Valor Estimado"
                 value={estimatedValue !== null ? formatBRL(estimatedValue) : '—'}
                 sub={estimatedValue !== null
-                  ? `${formatBRL(hourlyRate)}/h × ${(tsTotalMin / 60).toFixed(1)}h`
+                  ? guaranteedHours !== null && workedHours < Number(guaranteedHours)
+                    ? `${formatBRL(hourlyRate)}/h × ${Number(guaranteedHours)}h (garantido)`
+                    : `${formatBRL(hourlyRate)}/h × ${workedHours.toFixed(1)}h`
                   : 'Taxa não configurada'}
                 icon={TrendingUp}
                 accent="bg-green-500/15 text-green-400"

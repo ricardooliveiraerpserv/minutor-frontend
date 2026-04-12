@@ -8,6 +8,7 @@ export interface User {
   consultant_type?: string | null
   daily_hours?: number | null
   bank_hours_start_date?: string | null
+  guaranteed_hours?: number | null
 }
 
 export interface AuthResponse {
