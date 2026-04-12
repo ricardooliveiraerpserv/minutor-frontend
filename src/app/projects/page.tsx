@@ -209,7 +209,11 @@ export default function ProjectsPage() {
   const [serviceTypes, setServiceTypes] = useState<SelectOption[]>([])
   const [projectStatuses, setProjectStatuses] = useState<ProjectStatus[]>([])
   const [consultants, setConsultants] = useState<SelectOption[]>([])
+  const [approvers, setApprovers] = useState<SelectOption[]>([])
   const [parentProjects, setParentProjects] = useState<SelectOption[]>([])
+  // Busca dentro das listas de equipe
+  const [searchConsultant, setSearchConsultant] = useState('')
+  const [searchApprover, setSearchApprover] = useState('')
 
   // Contract type helpers
   const selectedContractType = useMemo(
@@ -268,12 +272,13 @@ export default function ProjectsPage() {
 
   const loadOptions = useCallback(async () => {
     try {
-      const [c, ct, st, ps, u] = await Promise.all([
+      const [c, ct, st, ps, u, appr] = await Promise.all([
         api.get<any>('/customers?pageSize=1000'),
         api.get<any>('/contract-types?pageSize=200'),
         api.get<any>('/service-types?pageSize=200'),
         api.get<any>('/project-statuses'),
-        api.get<any>('/users?pageSize=200&enabled=1'),
+        api.get<any>('/users?pageSize=500&enabled=1'),
+        api.get<any>('/users/approvers?pageSize=500'),
       ])
       const items = (r: any) => Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
       setCustomers(items(c))
@@ -281,6 +286,7 @@ export default function ProjectsPage() {
       setServiceTypes(items(st))
       setProjectStatuses(items(ps))
       setConsultants(items(u))
+      setApprovers(items(appr))
     } catch { /* silencioso */ }
   }, [])
 
@@ -317,6 +323,8 @@ export default function ProjectsPage() {
     setForm(EMPTY_FORM)
     setCodeManual(false)
     editedFinancialRef.current = []
+    setSearchConsultant('')
+    setSearchApprover('')
     setParentProjects([])
     loadOptions()
     setModal({ open: true })
@@ -333,6 +341,8 @@ export default function ProjectsPage() {
     })
     setCodeManual(true)
     editedFinancialRef.current = []
+    setSearchConsultant('')
+    setSearchApprover('')
     loadOptions()
     setModal({ open: true, item })
 
@@ -924,13 +934,22 @@ export default function ProjectsPage() {
                 {/* ── Equipe ── */}
                 <SectionTitle>Equipe do Projeto</SectionTitle>
 
-                {consultants.length > 0 && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <FieldLabel>Consultores</FieldLabel>
-                      <div className="rounded-xl p-3 max-h-36 overflow-y-auto space-y-1" style={{ border: '1px solid var(--brand-border)', background: 'var(--brand-bg)' }}>
-                        {consultants.map(u => (
-                          <label key={u.id} className="flex items-center gap-2 cursor-pointer py-0.5">
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Consultores */}
+                  <div>
+                    <FieldLabel>Consultores</FieldLabel>
+                    <input
+                      value={searchConsultant}
+                      onChange={e => setSearchConsultant(e.target.value)}
+                      placeholder="Buscar..."
+                      className="w-full px-3 py-1.5 rounded-lg text-xs outline-none mb-1.5"
+                      style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}
+                    />
+                    <div className="rounded-xl p-2 max-h-40 overflow-y-auto space-y-0.5" style={{ border: '1px solid var(--brand-border)', background: 'var(--brand-bg)' }}>
+                      {consultants
+                        .filter(u => !searchConsultant || u.name.toLowerCase().includes(searchConsultant.toLowerCase()))
+                        .map(u => (
+                          <label key={u.id} className="flex items-center gap-2 cursor-pointer px-1 py-1 rounded-lg hover:bg-white/5">
                             <div
                               onClick={() => setForm(f => ({ ...f, consultant_ids: toggleArr(f.consultant_ids, u.id) }))}
                               className="w-4 h-4 rounded flex items-center justify-center cursor-pointer shrink-0"
@@ -944,14 +963,27 @@ export default function ProjectsPage() {
                             <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>{u.name}</span>
                           </label>
                         ))}
-                      </div>
+                      {consultants.length === 0 && (
+                        <p className="text-xs text-center py-2" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p>
+                      )}
                     </div>
+                  </div>
 
-                    <div>
-                      <FieldLabel>Coordenadores/Aprovadores</FieldLabel>
-                      <div className="rounded-xl p-3 max-h-36 overflow-y-auto space-y-1" style={{ border: '1px solid var(--brand-border)', background: 'var(--brand-bg)' }}>
-                        {consultants.map(u => (
-                          <label key={u.id} className="flex items-center gap-2 cursor-pointer py-0.5">
+                  {/* Coordenadores — apenas perfil aprovador */}
+                  <div>
+                    <FieldLabel>Coordenadores/Aprovadores</FieldLabel>
+                    <input
+                      value={searchApprover}
+                      onChange={e => setSearchApprover(e.target.value)}
+                      placeholder="Buscar..."
+                      className="w-full px-3 py-1.5 rounded-lg text-xs outline-none mb-1.5"
+                      style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}
+                    />
+                    <div className="rounded-xl p-2 max-h-40 overflow-y-auto space-y-0.5" style={{ border: '1px solid var(--brand-border)', background: 'var(--brand-bg)' }}>
+                      {approvers
+                        .filter(u => !searchApprover || u.name.toLowerCase().includes(searchApprover.toLowerCase()))
+                        .map(u => (
+                          <label key={u.id} className="flex items-center gap-2 cursor-pointer px-1 py-1 rounded-lg hover:bg-white/5">
                             <div
                               onClick={() => setForm(f => ({ ...f, coordinator_ids: toggleArr(f.coordinator_ids, u.id) }))}
                               className="w-4 h-4 rounded flex items-center justify-center cursor-pointer shrink-0"
@@ -965,10 +997,12 @@ export default function ProjectsPage() {
                             <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>{u.name}</span>
                           </label>
                         ))}
-                      </div>
+                      {approvers.length === 0 && (
+                        <p className="text-xs text-center py-2" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p>
+                      )}
                     </div>
                   </div>
-                )}
+                </div>
               </div>
 
               <div className="flex gap-2 mt-6 justify-end">
