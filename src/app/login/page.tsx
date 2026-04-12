@@ -53,7 +53,7 @@ function LoginForm() {
           id="email"
           type="email"
           value={email}
-          onChange={e => setEmail(e.target.value)}
+          onChange={e => setEmail(e.target.value.toLowerCase())}
           placeholder="seu@email.com"
           required
           className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-9"
