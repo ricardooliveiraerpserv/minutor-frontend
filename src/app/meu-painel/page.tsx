@@ -50,7 +50,7 @@ interface ExpenseItem {
   receipt_url?: string
 }
 
-interface ProjectOption { id: number; name: string; code: string }
+interface ProjectOption { id: number; name: string; code: string; customer?: { id: number; name: string } }
 interface CategoryOption { id: number; name: string; parent_id?: number | null }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -224,6 +224,7 @@ function SelectField({ label, value, onChange, children, required }: {
 const todayISO = () => new Date().toISOString().split('T')[0]
 
 const EMPTY_TS = {
+  customer_id: '',
   project_id:  '',
   date:        todayISO(),
   start_time:  '09:00',
@@ -233,6 +234,7 @@ const EMPTY_TS = {
 }
 
 const EMPTY_EXP = {
+  customer_id:         '',
   project_id:          '',
   expense_category_id: '',
   expense_date:        todayISO(),
@@ -307,7 +309,7 @@ export default function MeuPainelPage() {
 
   // Load support data once
   useEffect(() => {
-    api.get<any>('/projects?pageSize=200&minimal=true').then(r =>
+    api.get<any>('/projects?pageSize=200').then(r =>
       setProjects(Array.isArray(r?.items) ? r.items : [])
     ).catch(() => {})
 
@@ -385,7 +387,9 @@ export default function MeuPainelPage() {
   }
 
   const openEditTs = (item: TimesheetItem) => {
+    const proj = projects.find(p => p.id === item.project_id)
     setTsForm({
+      customer_id: proj?.customer ? String(proj.customer.id) : '',
       project_id:  String(item.project_id),
       date:        item.date,
       start_time:  item.start_time,
@@ -436,7 +440,9 @@ export default function MeuPainelPage() {
   }
 
   const openEditExp = (item: ExpenseItem) => {
+    const proj = projects.find(p => p.id === item.project_id)
     setExpForm({
+      customer_id:         proj?.customer ? String(proj.customer.id) : '',
       project_id:          String(item.project_id),
       expense_category_id: String(item.expense_category_id),
       expense_date:        item.expense_date,
@@ -538,6 +544,31 @@ export default function MeuPainelPage() {
   ]
 
   const pmOptions = paymentMethods.length > 0 ? paymentMethods : PAYMENT_FALLBACK
+
+  // Clientes únicos derivados dos projetos do usuário
+  const consultantCustomers = useMemo(() => {
+    const seen = new Set<number>()
+    const list: { id: number; name: string }[] = []
+    projects.forEach(p => {
+      if (p.customer && !seen.has(p.customer.id)) {
+        seen.add(p.customer.id)
+        list.push(p.customer)
+      }
+    })
+    return list.sort((a, b) => a.name.localeCompare(b.name))
+  }, [projects])
+
+  // Projetos filtrados pelo cliente selecionado no form de despesa
+  const expProjectOptions = useMemo(() => {
+    if (!expForm.customer_id) return projects
+    return projects.filter(p => p.customer && String(p.customer.id) === expForm.customer_id)
+  }, [projects, expForm.customer_id])
+
+  // Projetos filtrados pelo cliente selecionado no form de apontamento
+  const tsProjectOptions = useMemo(() => {
+    if (!tsForm.customer_id) return projects
+    return projects.filter(p => p.customer && String(p.customer.id) === tsForm.customer_id)
+  }, [projects, tsForm.customer_id])
 
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1095,10 +1126,16 @@ export default function MeuPainelPage() {
               {tsModal.item ? 'Editar Apontamento' : 'Novo Apontamento'}
             </h3>
 
+            <SelectField label="Cliente" value={tsForm.customer_id}
+              onChange={v => setTsForm(f => ({ ...f, customer_id: v, project_id: '' }))}>
+              <option value="">Selecione o cliente...</option>
+              {consultantCustomers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </SelectField>
+
             <SelectField label="Projeto" value={tsForm.project_id}
               onChange={v => setTsForm(f => ({ ...f, project_id: v }))} required>
               <option value="">Selecione o projeto...</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {tsProjectOptions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </SelectField>
 
             <div>
@@ -1164,10 +1201,16 @@ export default function MeuPainelPage() {
               {expModal.item ? 'Editar Despesa' : 'Nova Despesa'}
             </h3>
 
+            <SelectField label="Cliente" value={expForm.customer_id}
+              onChange={v => setExpForm(f => ({ ...f, customer_id: v, project_id: '' }))}>
+              <option value="">Selecione o cliente...</option>
+              {consultantCustomers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </SelectField>
+
             <SelectField label="Projeto" value={expForm.project_id}
               onChange={v => setExpForm(f => ({ ...f, project_id: v }))} required>
               <option value="">Selecione o projeto...</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {expProjectOptions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </SelectField>
 
             {categories.length > 0 && (
