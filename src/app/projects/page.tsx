@@ -675,12 +675,24 @@ export default function ProjectsPage() {
                       {p.consumed_hours != null ? `${p.consumed_hours}h` : p.total_logged_minutes != null ? `${(p.total_logged_minutes / 60).toFixed(1)}h` : '—'}
                     </td>
                     <td className="px-4 py-3.5 hidden lg:table-cell w-32">
-                      {p.balance_percentage != null ? (
-                        <div className="space-y-1">
-                          <ProgressBar pct={p.balance_percentage} />
-                          <span className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>{p.balance_percentage.toFixed(0)}%{p.general_hours_balance != null ? ` · ${p.general_hours_balance}h` : ''}</span>
-                        </div>
-                      ) : <span style={{ color: 'var(--brand-subtle)' }}>—</span>}
+                      {(() => {
+                        const sold = p.sold_hours ?? 0
+                        const balance = p.general_hours_balance
+                        const pct = p.balance_percentage != null
+                          ? p.balance_percentage
+                          : (sold > 0 && balance != null)
+                            ? Math.round(((sold - balance) / sold) * 100)
+                            : null
+                        if (pct == null && balance == null) return <span style={{ color: 'var(--brand-subtle)' }}>—</span>
+                        return (
+                          <div className="space-y-1">
+                            {pct != null && <ProgressBar pct={pct} />}
+                            <span className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>
+                              {pct != null ? `${pct}% · ` : ''}{balance != null ? `${balance}h` : ''}
+                            </span>
+                          </div>
+                        )
+                      })()}
                     </td>
                     <td className="px-4 py-3.5">
                       {(() => {
