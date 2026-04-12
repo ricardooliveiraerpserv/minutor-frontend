@@ -20,8 +20,9 @@ import {
   LayoutDashboard,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useAuth } from '@/hooks/use-auth'
 import type { LucideIcon } from 'lucide-react'
 
 // ─── Logo SVG ────────────────────────────────────────────────────────────────
@@ -103,9 +104,27 @@ function itemStyle(active: boolean): React.CSSProperties {
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 export function Sidebar() {
-  const pathname = usePathname()
-  const [collapsed, setCollapsed] = useState(false)
-  const [openGroups, setOpenGroups] = useState<string[]>(['Dashboards'])
+  const pathname  = usePathname()
+  const { user }  = useAuth()
+  const [collapsed,   setCollapsed]   = useState(false)
+  const [openGroups,  setOpenGroups]  = useState<string[]>(['Dashboards'])
+
+  const isConsultor = user?.roles?.includes('Consultor') &&
+    !user.roles.includes('Administrator') &&
+    !user.roles.includes('Coordenador') &&
+    !user.roles.includes('Parceiro ADM')
+
+  const visibleNav = useMemo(() => {
+    if (isConsultor) {
+      return NAV.filter(e => e.type === 'item' && (e.href === '/dashboard' || e.href === '/meu-painel'))
+    }
+    return NAV
+  }, [isConsultor])
+
+  // First two letters of name for avatar
+  const initials = user?.name
+    ? user.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()
+    : '?'
 
   const toggleGroup = (label: string) =>
     setOpenGroups(prev => prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label])
@@ -131,9 +150,40 @@ export function Sidebar() {
         )}
       </div>
 
+      {/* ── User name (consultor) ── */}
+      {isConsultor && user && (
+        <div
+          className="flex items-center gap-2.5 px-3.5 py-3 border-b shrink-0"
+          style={{ borderColor: 'var(--brand-border)' }}
+        >
+          {!collapsed && (
+            <>
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                style={{ background: 'rgba(0,245,255,0.15)', color: '#00F5FF' }}
+              >
+                {initials}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-white truncate leading-tight">{user.name}</p>
+                <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--brand-subtle)' }}>Consultor</p>
+              </div>
+            </>
+          )}
+          {collapsed && (
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold mx-auto"
+              style={{ background: 'rgba(0,245,255,0.15)', color: '#00F5FF' }}
+            >
+              {initials}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Nav ── */}
       <nav className="flex-1 py-3 space-y-0.5 px-2 overflow-y-auto">
-        {NAV.map(entry => {
+        {visibleNav.map(entry => {
           // ── Plain item ──
           if (entry.type === 'item') {
             const active = isActive(entry.href)
