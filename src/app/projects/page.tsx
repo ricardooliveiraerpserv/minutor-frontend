@@ -655,18 +655,22 @@ export default function ProjectsPage() {
                 <SectionTitle>Valores e Horas</SectionTitle>
 
                 <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <FieldLabel>Valor do Projeto (R$)</FieldLabel>
-                    <FieldInput type="number" value={form.project_value} onChange={setF('project_value')} placeholder="0,00" min="0" step="0.01" />
-                  </div>
+                  {!isOnDemand && (
+                    <div>
+                      <FieldLabel>Valor do Projeto (R$)</FieldLabel>
+                      <FieldInput type="number" value={form.project_value} onChange={setF('project_value')} placeholder="0,00" min="0" step="0.01" />
+                    </div>
+                  )}
                   <div>
                     <FieldLabel>Valor da Hora (R$)</FieldLabel>
                     <FieldInput type="number" value={form.hourly_rate} onChange={setF('hourly_rate')} placeholder="0,00" min="0" step="0.01" />
                   </div>
-                  <div>
-                    <FieldLabel>Hora Adicional (R$)</FieldLabel>
-                    <FieldInput type="number" value={form.additional_hourly_rate} onChange={setF('additional_hourly_rate')} placeholder="0,00" min="0" step="0.01" />
-                  </div>
+                  {!isOnDemand && (
+                    <div>
+                      <FieldLabel>Hora Adicional (R$)</FieldLabel>
+                      <FieldInput type="number" value={form.additional_hourly_rate} onChange={setF('additional_hourly_rate')} placeholder="0,00" min="0" step="0.01" />
+                    </div>
+                  )}
 
                   {!isOnDemand && (
                     <>
