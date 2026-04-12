@@ -9,7 +9,7 @@ import { api } from '@/lib/api'
 import { toast } from 'sonner'
 import {
   Clock, RefreshCw, FileSpreadsheet, Plus, Pencil,
-  Trash2, X, Globe, Webhook, MoreHorizontal, Eye,
+  Trash2, X, Globe, Webhook, MoreHorizontal, Eye, Search, ChevronDown,
 } from 'lucide-react'
 import {
   PageHeader, Table, Thead, Th, Tbody, Tr, Td,
@@ -128,8 +128,8 @@ function RowActions({ id, onDeleted }: { id: number; onDeleted: () => void }) {
 
 // ─── STATUS OPTIONS ──────────────────────────────────────────────────────────
 
-const STATUS_OPTIONS = [
-  { value: '',           label: 'Todos os status' },
+const STATUS_PILLS = [
+  { value: '',           label: 'Todos' },
   { value: 'pending',    label: 'Pendente' },
   { value: 'approved',   label: 'Aprovado' },
   { value: 'rejected',   label: 'Rejeitado' },
@@ -142,6 +142,92 @@ const ORIGIN_OPTIONS = [
   { value: 'webhook', label: 'Auto (Movidesk)' },
 ]
 
+// ─── SearchSelect ─────────────────────────────────────────────────────────────
+
+interface SearchSelectOption { id: number | string; name: string }
+
+function SearchSelect({ value, onChange, options, placeholder }: {
+  value: string
+  onChange: (v: string) => void
+  options: SearchSelectOption[]
+  placeholder: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const selected = options.find(o => String(o.id) === value)
+  const filtered = options.filter(o => o.name.toLowerCase().includes(query.toLowerCase()))
+
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+
+  useEffect(() => {
+    if (open) { setQuery(''); setTimeout(() => inputRef.current?.focus(), 50) }
+  }, [open])
+
+  const select = (id: string) => { onChange(id); setOpen(false) }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm outline-none text-left"
+        style={{
+          background: 'var(--brand-bg)',
+          border: '1px solid var(--brand-border)',
+          color: selected ? 'var(--brand-text)' : 'var(--brand-subtle)',
+        }}
+      >
+        <span className="truncate text-sm">{selected ? selected.name : placeholder}</span>
+        <ChevronDown size={13} style={{ color: 'var(--brand-subtle)', flexShrink: 0 }} />
+      </button>
+      {open && (
+        <div
+          className="absolute top-full mt-1 left-0 z-50 w-full min-w-56 rounded-xl shadow-2xl overflow-hidden"
+          style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}
+        >
+          <div className="p-2 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+            <div className="relative">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--brand-subtle)' }} />
+              <input
+                ref={inputRef}
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Buscar..."
+                className="w-full pl-7 pr-3 py-1.5 rounded-lg text-xs outline-none"
+                style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}
+              />
+            </div>
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            <button type="button" onClick={() => select('')}
+              className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors"
+              style={{ color: !value ? 'var(--brand-primary)' : 'var(--brand-subtle)' }}>
+              {placeholder}
+            </button>
+            {filtered.length === 0
+              ? <p className="px-3 py-2 text-xs" style={{ color: 'var(--brand-subtle)' }}>Nenhum resultado</p>
+              : filtered.map(o => (
+                <button key={o.id} type="button" onClick={() => select(String(o.id))}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors"
+                  style={{ color: String(o.id) === value ? 'var(--brand-primary)' : 'var(--brand-text)' }}>
+                  {o.name}
+                </button>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function TimesheetsPage() {
@@ -150,12 +236,16 @@ export default function TimesheetsPage() {
   const [origin, setOrigin]           = useState('')
   const [serviceTypeId, setServiceTypeId] = useState('')
   const [contractTypeId, setContractTypeId] = useState('')
+  const [customerId, setCustomerId]   = useState('')
+  const [executiveId, setExecutiveId] = useState('')
   const [startDate, setStartDate]     = useState('')
   const [endDate, setEndDate]         = useState('')
   const [ticket, setTicket]           = useState('')
   const [exporting, setExporting]     = useState(false)
   const [sortField, setSortField]     = useState<SortField | null>('date')
   const [sortDir, setSortDir]         = useState<SortDir>('desc')
+  const [customers, setCustomers]     = useState<SelectOption[]>([])
+  const [executives, setExecutives]   = useState<SelectOption[]>([])
 
   const handleSort = useCallback((field: SortField) => {
     setSortField(prev => {
@@ -173,28 +263,43 @@ export default function TimesheetsPage() {
   const contractTypeList: SelectOption[] = Array.isArray(contractTypes)
     ? contractTypes : (contractTypes as any)?.items ?? []
 
+  // Carrega clientes e executivos
+  useEffect(() => {
+    const items = (r: any) => Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
+    Promise.all([
+      api.get<any>('/customers?pageSize=1000'),
+      api.get<any>('/executives?pageSize=500'),
+    ]).then(([c, ex]) => {
+      setCustomers(items(c))
+      setExecutives(items(ex))
+    }).catch(() => {})
+  }, [])
+
   const params = useMemo(() => {
     const p = new URLSearchParams({ page: String(page), per_page: '20' })
     if (status)         p.set('status', status)
     if (origin)         p.set('origin', origin)
     if (serviceTypeId)  p.set('service_type_id', serviceTypeId)
     if (contractTypeId) p.set('contract_type_id', contractTypeId)
+    if (customerId)     p.set('customer_id', customerId)
+    if (executiveId)    p.set('executive_id', executiveId)
     if (startDate)      p.set('start_date', startDate)
     if (endDate)        p.set('end_date', endDate)
     if (ticket)         p.set('ticket', ticket)
     if (sortField)      p.set('order', sortDir === 'desc' ? `-${sortField}` : sortField)
     return p.toString()
-  }, [page, status, origin, serviceTypeId, contractTypeId, startDate, endDate, ticket, sortField, sortDir])
+  }, [page, status, origin, serviceTypeId, contractTypeId, customerId, executiveId, startDate, endDate, ticket, sortField, sortDir])
 
   const { data, loading, error, refetch } = useApiQuery<PaginatedResponse<Timesheet>>(
     `/timesheets?${params}`, [params]
   )
 
   const resetPage = useCallback(() => setPage(1), [])
-  const hasFilters = !!(status || origin || serviceTypeId || contractTypeId || startDate || endDate || ticket)
+  const hasFilters = !!(status || origin || serviceTypeId || contractTypeId || customerId || executiveId || startDate || endDate || ticket)
 
   const clearFilters = useCallback(() => {
     setStatus(''); setOrigin(''); setServiceTypeId(''); setContractTypeId('')
+    setCustomerId(''); setExecutiveId('')
     setStartDate(''); setEndDate(''); setTicket(''); setPage(1)
   }, [])
 
@@ -242,47 +347,62 @@ export default function TimesheetsPage() {
 
         {/* Filters */}
         <div
-          className="grid grid-cols-2 md:grid-cols-5 gap-3 p-5 rounded-2xl mb-6"
+          className="p-4 rounded-2xl mb-4 space-y-3"
           style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}
         >
-          <Select value={serviceTypeId} onChange={e => { setServiceTypeId(e.target.value); resetPage() }}>
-            <option value="">Tipo de serviço</option>
-            {serviceTypeList.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
-          </Select>
+          {/* Linha 1: selects */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+            <SearchSelect
+              value={customerId}
+              onChange={v => { setCustomerId(v); resetPage() }}
+              options={customers}
+              placeholder="Todos os clientes"
+            />
+            {executives.length > 0 && (
+              <SearchSelect
+                value={executiveId}
+                onChange={v => { setExecutiveId(v); resetPage() }}
+                options={executives}
+                placeholder="Todos os executivos"
+              />
+            )}
+            <SearchSelect
+              value={serviceTypeId}
+              onChange={v => { setServiceTypeId(v); resetPage() }}
+              options={serviceTypeList}
+              placeholder="Tipo de serviço"
+            />
+            <SearchSelect
+              value={contractTypeId}
+              onChange={v => { setContractTypeId(v); resetPage() }}
+              options={contractTypeList}
+              placeholder="Tipo de contrato"
+            />
+            <Select value={origin} onChange={e => { setOrigin(e.target.value); resetPage() }}>
+              {ORIGIN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </Select>
+            <TextInput
+              placeholder="Nº ticket..."
+              value={ticket}
+              onChange={e => { setTicket(e.target.value); resetPage() }}
+            />
+          </div>
 
-          <Select value={contractTypeId} onChange={e => { setContractTypeId(e.target.value); resetPage() }}>
-            <option value="">Tipo de contrato</option>
-            {contractTypeList.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-          </Select>
-
-          <Select value={status} onChange={e => { setStatus(e.target.value); resetPage() }}>
-            {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </Select>
-
-          <Select value={origin} onChange={e => { setOrigin(e.target.value); resetPage() }}>
-            {ORIGIN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </Select>
-
-          <TextInput
-            placeholder="Nº ticket..."
-            value={ticket}
-            onChange={e => { setTicket(e.target.value); resetPage() }}
-          />
-
-          <div className="flex items-center gap-2 col-span-2 md:col-span-3">
+          {/* Linha 2: datas + limpar */}
+          <div className="flex items-center gap-2 flex-wrap">
             <TextInput
               type="date"
               label="De"
               value={startDate}
               onChange={e => { setStartDate(e.target.value); resetPage() }}
-              className="flex-1"
+              className="w-44"
             />
             <TextInput
               type="date"
               label="Até"
               value={endDate}
               onChange={e => { setEndDate(e.target.value); resetPage() }}
-              className="flex-1"
+              className="w-44"
             />
             {hasFilters && (
               <button
@@ -294,6 +414,23 @@ export default function TimesheetsPage() {
               </button>
             )}
           </div>
+        </div>
+
+        {/* Status pills */}
+        <div className="flex items-center gap-1 p-1 rounded-xl w-fit mb-6" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+          {STATUS_PILLS.map(s => (
+            <button
+              key={s.value}
+              onClick={() => { setStatus(s.value); setPage(1) }}
+              className="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              style={status === s.value
+                ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
+                : { color: 'var(--brand-muted)', background: 'transparent' }
+              }
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
 
         {/* Total horas */}
