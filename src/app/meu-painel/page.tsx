@@ -135,19 +135,22 @@ function HBBalancePill({ value, size = 'sm' }: { value: number; size?: 'sm' | 'l
   )
 }
 
-function HBPaymentSection({ data, fixedSalary }: { data: HourBankMonth; fixedSalary: number }) {
-  const hasExtra      = data.accumulated_balance > 0
-  const extraHours    = hasExtra ? data.accumulated_balance : 0
-  const valorHoraExt  = fixedSalary > 0 ? fixedSalary / 180 : 0
-  const totalExtra    = extraHours * valorHoraExt
-  const totalReceber  = fixedSalary + totalExtra
+function HBPaymentSection({ data, fixedSalary, expTotal }: { data: HourBankMonth; fixedSalary: number; expTotal: number }) {
+  const hasExtra     = data.accumulated_balance > 0
+  const extraHours   = hasExtra ? data.accumulated_balance : 0
+  const valorHoraExt = fixedSalary > 0 ? fixedSalary / 180 : 0
+  const totalExtra   = extraHours * valorHoraExt
+  const totalSalario = fixedSalary + totalExtra
+  const totalGeral   = totalSalario + expTotal
 
   return (
     <div className="rounded-2xl p-5" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
       <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>
         Remuneração — {fmtYearMonth(data.year_month)}
       </p>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+
+      {/* Linha 1: Salário */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
         {/* Salário Fixo */}
         <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
           <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Salário Fixo</p>
@@ -175,18 +178,39 @@ function HBPaymentSection({ data, fixedSalary }: { data: HourBankMonth; fixedSal
           <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>fixo ÷ 180</p>
         </div>
 
-        {/* Total a Receber */}
+        {/* Total Salário */}
+        <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Total Salário</p>
+          <p className="text-lg font-bold" style={{ color: 'var(--brand-text)' }}>
+            {fixedSalary > 0 ? formatBRL(totalSalario) : '—'}
+          </p>
+          {hasExtra
+            ? <p className="text-[10px] mt-0.5 text-green-400">+{formatBRL(totalExtra)} extras</p>
+            : <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>sem horas extras</p>
+          }
+        </div>
+      </div>
+
+      {/* Linha 2: Despesas + Total */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Despesas */}
+        <div className="rounded-xl p-3" style={{ background: expTotal > 0 ? 'rgba(249,115,22,0.06)' : 'var(--brand-bg)', border: `1px solid ${expTotal > 0 ? 'rgba(249,115,22,0.2)' : 'var(--brand-border)'}` }}>
+          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Despesas no Período</p>
+          <p className="text-lg font-bold" style={{ color: expTotal > 0 ? '#f97316' : 'var(--brand-muted)' }}>
+            {expTotal > 0 ? formatBRL(expTotal) : '—'}
+          </p>
+          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>reembolsos e gastos</p>
+        </div>
+
+        {/* Total Geral */}
         <div className="rounded-xl p-3" style={{ background: 'rgba(0,245,255,0.04)', border: '1px solid rgba(0,245,255,0.15)' }}>
           <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Total a Receber</p>
           <p className="text-lg font-bold" style={{ color: 'var(--brand-primary)' }}>
-            {fixedSalary > 0 ? formatBRL(totalReceber) : '—'}
+            {fixedSalary > 0 ? formatBRL(totalGeral) : '—'}
           </p>
-          {hasExtra && (
-            <p className="text-[10px] mt-0.5 text-green-400">+{formatBRL(totalExtra)} extras</p>
-          )}
-          {!hasExtra && (
-            <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>sem horas extras</p>
-          )}
+          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>
+            salário{hasExtra ? ' + extras' : ''}{expTotal > 0 ? ' + despesas' : ''}
+          </p>
         </div>
       </div>
     </div>
@@ -853,14 +877,14 @@ export default function MeuPainelPage() {
               const extraHours   = hbCurrent && hbCurrent.accumulated_balance > 0 ? hbCurrent.accumulated_balance : 0
               const valorHoraExt = fixedSalary > 0 ? fixedSalary / 180 : 0
               const totalExtra   = extraHours * valorHoraExt
-              const total        = fixedSalary + totalExtra
+              const total        = fixedSalary + totalExtra + expTotal
               return (
                 <SummaryCard
                   label="Total a Receber"
                   value={fixedSalary > 0 ? formatBRL(total) : '—'}
-                  sub={extraHours > 0
-                    ? `Fixo + ${fmtHours(extraHours)} extras`
-                    : 'Sem horas extras'}
+                  sub={extraHours > 0 || expTotal > 0
+                    ? `Salário${extraHours > 0 ? ' + extras' : ''}${expTotal > 0 ? ' + despesas' : ''}`
+                    : 'Sem extras ou despesas'}
                   icon={TrendingUp}
                   accent="bg-green-500/15 text-green-400"
                 />
@@ -1371,7 +1395,7 @@ export default function MeuPainelPage() {
                 const fixedSalary = (user as any)?.rate_type === 'monthly' ? ((user as any)?.hourly_rate ?? 0) : 0
                 return (
                   <>
-                    <HBPaymentSection data={hbCurrent} fixedSalary={fixedSalary} />
+                    <HBPaymentSection data={hbCurrent} fixedSalary={fixedSalary} expTotal={expTotal} />
                     <HBCurrentMonthCard data={hbCurrent} isCurrentMonth={isCurrentMonth} />
                   </>
                 )
