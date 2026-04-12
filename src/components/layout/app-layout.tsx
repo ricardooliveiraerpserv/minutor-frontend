@@ -34,7 +34,7 @@ export function AppLayout({ children, title, actions }: AppLayoutProps) {
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--brand-bg)' }}>
-      <Sidebar />
+      <Sidebar user={user} />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <Header title={title} actions={actions} />
         <main className="flex-1 overflow-y-auto p-8">

@@ -22,8 +22,8 @@ import {
 import { cn } from '@/lib/utils'
 import { useState, useMemo } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useAuth } from '@/hooks/use-auth'
 import type { LucideIcon } from 'lucide-react'
+import type { User } from '@/types'
 
 // ─── Logo SVG ────────────────────────────────────────────────────────────────
 // 4 barras verticais em Electric Cyan, alturas: 40% | 70% | 100% | 60%
@@ -103,9 +103,8 @@ function itemStyle(active: boolean): React.CSSProperties {
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-export function Sidebar() {
+export function Sidebar({ user }: { user: User }) {
   const pathname  = usePathname()
-  const { user }  = useAuth()
   const [collapsed,   setCollapsed]   = useState(false)
   const [openGroups,  setOpenGroups]  = useState<string[]>(['Dashboards'])
 
