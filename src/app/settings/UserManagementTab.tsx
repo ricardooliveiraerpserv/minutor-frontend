@@ -24,6 +24,7 @@ interface UserItem {
   rate_type?: string
   daily_hours?: number
   consultant_type?: string | null
+  bank_hours_start_date?: string | null
   customer_id?: number | null
   partner_id?: number | null
   is_executive?: boolean
@@ -163,6 +164,7 @@ const EMPTY_FORM = {
   hourly_rate: '', rate_type: 'hourly' as 'hourly' | 'monthly',
   daily_hours: '8', profile: '' as ProfileType | '',
   consultant_type: '' as ConsultantType | '',
+  bank_hours_start_date: '',
   is_partner_adm: false,
   customer_id: '' as number | '',
   partner_id:  '' as number | '',
@@ -236,6 +238,7 @@ export function UserManagementTab() {
       rate_type: (item.rate_type as 'hourly' | 'monthly') ?? 'hourly',
       daily_hours: item.daily_hours != null ? String(item.daily_hours) : '8',
       profile, consultant_type: consultant_type as ConsultantType | '',
+      bank_hours_start_date: item.bank_hours_start_date ?? '',
       is_partner_adm: item.is_executive ?? false,
       customer_id: item.customer_id ?? '',
       partner_id:  item.partner_id  ?? '',
@@ -261,6 +264,9 @@ export function UserManagementTab() {
       if (form.hourly_rate) payload.hourly_rate = parseFloat(form.hourly_rate)
       if (form.daily_hours) payload.daily_hours = parseFloat(form.daily_hours)
       if (form.profile === 'consultor' && form.consultant_type) payload.consultant_type = form.consultant_type
+      payload.bank_hours_start_date = (form.profile === 'consultor' || form.profile === 'parceiro_adm') && form.bank_hours_start_date
+        ? form.bank_hours_start_date
+        : null
       if (!modal.item && form.password) payload.password = form.password
       if (modal.item) await api.put(`/users/${modal.item.id}`, payload)
       else            await api.post('/users', payload)
@@ -474,6 +480,20 @@ export function UserManagementTab() {
                     </div>
                   </div>
                 )}
+                {(isConsultor || isParceiroAdm) && (
+                  <div>
+                    <Label className="text-xs text-zinc-400 mb-1 block">Data de início do banco de horas</Label>
+                    <Input
+                      type="date"
+                      value={form.bank_hours_start_date}
+                      onChange={e => setForm(f => ({ ...f, bank_hours_start_date: e.target.value }))}
+                      className="w-48 bg-zinc-800 border-zinc-700 text-white h-8 text-xs"
+                    />
+                    <p className="text-[10px] text-zinc-500 mt-1">
+                      Movimentações anteriores a esta data são ignoradas no cálculo.
+                    </p>
+                  </div>
+                )}
                 {isCliente && (
                   <FieldSelect label="Empresa *" value={form.customer_id}
                     onChange={v => setForm(f => ({ ...f, customer_id: v === '' ? '' : Number(v) }))}
@@ -570,6 +590,7 @@ export function UserManagementTab() {
         ]
         if (u.hourly_rate != null) rows.push({ label: 'Remuneração', value: `R$ ${Number(u.hourly_rate).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ${u.rate_type === 'monthly' ? '/ mês' : '/ hora'}` })
         if (u.daily_hours != null) rows.push({ label: 'Horas/dia útil', value: `${u.daily_hours}h` })
+        if (u.bank_hours_start_date) rows.push({ label: 'Início banco de horas', value: new Date(u.bank_hours_start_date + 'T12:00:00').toLocaleDateString('pt-BR') })
         return (
           <ModalOverlay onClose={() => setViewUser(null)}>
             <div className="p-5">

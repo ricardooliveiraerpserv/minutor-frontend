@@ -7,6 +7,7 @@ export interface User {
   profile_photo_url?: string | null
   consultant_type?: string | null
   daily_hours?: number | null
+  bank_hours_start_date?: string | null
 }
 
 export interface AuthResponse {
