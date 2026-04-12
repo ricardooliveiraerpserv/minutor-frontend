@@ -23,6 +23,7 @@ interface UserItem {
   enabled: boolean
   hourly_rate?: number
   rate_type?: string
+  daily_hours?: number
   customer_id?: number | null
   partner_id?: number | null
   is_executive?: boolean
@@ -197,6 +198,7 @@ const EMPTY_FORM = {
   enabled: true,
   hourly_rate: '',
   rate_type: 'hourly' as 'hourly' | 'monthly',
+  daily_hours: '8',
   profile: '' as ProfileType | '',
   consultant_type: '' as ConsultantType | '',
   is_partner_consultor: false,
@@ -278,6 +280,7 @@ export default function UsersPage() {
       enabled:             item.enabled,
       hourly_rate:         item.hourly_rate ? String(item.hourly_rate) : '',
       rate_type:           (item.rate_type as 'hourly' | 'monthly') ?? 'hourly',
+      daily_hours:         item.daily_hours != null ? String(item.daily_hours) : '8',
       profile,
       consultant_type:      consultantType,
       is_partner_consultor: false,
@@ -313,6 +316,7 @@ export default function UsersPage() {
         payload.hourly_rate = parseFloat(form.hourly_rate)
         payload.rate_type   = form.rate_type
       }
+      if (form.daily_hours) payload.daily_hours = parseFloat(form.daily_hours)
       if (!modal.item && form.password) payload.password = form.password
 
       if (modal.item) await api.put(`/users/${modal.item.id}`, payload)
@@ -565,6 +569,20 @@ export default function UsersPage() {
                         placeholder="0,00"
                         className="flex-1 bg-zinc-800 border-zinc-700 text-white h-8 text-xs" />
                       <span className="text-xs text-zinc-500">R$</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Horas/dia útil (Banco de Horas) ── */}
+                {isConsultor && (
+                  <div>
+                    <Label className="text-xs text-zinc-400 mb-1 block">Horas por dia útil (Banco de Horas)</Label>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" min="1" max="24" step="0.5" value={form.daily_hours}
+                        onChange={e => setForm(f => ({ ...f, daily_hours: e.target.value }))}
+                        placeholder="8"
+                        className="w-24 bg-zinc-800 border-zinc-700 text-white h-8 text-xs" />
+                      <span className="text-xs text-zinc-500">h/dia (padrão: 8h)</span>
                     </div>
                   </div>
                 )}

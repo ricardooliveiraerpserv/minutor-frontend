@@ -19,6 +19,7 @@ import {
   Handshake,
   LayoutDashboard,
   Database,
+  Landmark,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState, useMemo } from 'react'
@@ -87,10 +88,11 @@ const NAV: NavEntry[] = [
       { label: 'On Demand',              href: '/dashboards/on-demand',           icon: Zap },
     ],
   },
-  { type: 'item', label: 'Usuários',      href: '/users',     icon: Users },
-  { type: 'item', label: 'Parceiros',     href: '/partners',  icon: Handshake },
-  { type: 'item', label: 'Cadastros',     href: '/cadastros', icon: Database },
-  { type: 'item', label: 'Configurações', href: '/settings',  icon: Settings },
+  { type: 'item', label: 'Usuários',       href: '/users',       icon: Users },
+  { type: 'item', label: 'Parceiros',      href: '/partners',    icon: Handshake },
+  { type: 'item', label: 'Banco de Horas', href: '/hora-banco',  icon: Landmark },
+  { type: 'item', label: 'Cadastros',      href: '/cadastros',   icon: Database },
+  { type: 'item', label: 'Configurações',  href: '/settings',    icon: Settings },
 ]
 
 // ─── Styles ───────────────────────────────────────────────────────────────────

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
-import { FileType, Wrench, Users, Star, UserCheck, Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Search, Check } from 'lucide-react'
+import { FileType, Wrench, Users, Star, UserCheck, CalendarDays, Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Search, Check } from 'lucide-react'
 import type { CustomerFull, Executive, ConsultantGroup } from '@/types'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -53,6 +53,7 @@ const TABS = [
   { id: 'customers',  label: 'Clientes',             icon: Users },
   { id: 'executives', label: 'Executivos',           icon: Star },
   { id: 'groups',     label: 'Grupos de Consultor', icon: UserCheck },
+  { id: 'holidays',   label: 'Feriados',            icon: CalendarDays },
 ]
 
 // ─── TAB: CRUD (Tipos de Contrato e Serviço) ─────────────────────────────────
@@ -753,6 +754,173 @@ function ConsultantGroupsTab() {
   )
 }
 
+// ─── TAB: FERIADOS ───────────────────────────────────────────────────────────
+
+interface HolidayItem { id: number; date: string; name: string; type: string; state?: string | null; active: boolean }
+
+const HOLIDAY_TYPES = [
+  { value: 'national', label: 'Nacional' },
+  { value: 'state',    label: 'Estadual' },
+  { value: 'municipal',label: 'Municipal' },
+  { value: 'optional', label: 'Facultativo' },
+]
+
+function HolidaysTab() {
+  const [items, setItems] = useState<HolidayItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [year, setYear] = useState(String(new Date().getFullYear()))
+  const [modal, setModal] = useState<{ open: boolean; item?: HolidayItem }>({ open: false })
+  const [form, setForm] = useState({ date: '', name: '', type: 'national', state: '', active: true })
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState<number | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await api.get<{ items?: HolidayItem[] }>(`/holidays?year=${year}`)
+      setItems(r.items ?? [])
+    } catch { toast.error('Erro ao carregar feriados') }
+    finally { setLoading(false) }
+  }, [year])
+
+  useEffect(() => { load() }, [load])
+
+  const openCreate = () => {
+    setForm({ date: `${year}-01-01`, name: '', type: 'national', state: '', active: true })
+    setModal({ open: true })
+  }
+
+  const openEdit = (item: HolidayItem) => {
+    setForm({ date: item.date, name: item.name, type: item.type, state: item.state ?? '', active: item.active })
+    setModal({ open: true, item })
+  }
+
+  const save = async () => {
+    if (!form.date || !form.name) { toast.error('Preencha data e nome'); return }
+    setSaving(true)
+    try {
+      if (modal.item) await api.put(`/holidays/${modal.item.id}`, form)
+      else await api.post('/holidays', form)
+      toast.success(modal.item ? 'Feriado atualizado' : 'Feriado criado')
+      setModal({ open: false })
+      load()
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao salvar') }
+    finally { setSaving(false) }
+  }
+
+  const remove = async (id: number) => {
+    if (!confirm('Excluir feriado?')) return
+    setDeleting(id)
+    try {
+      await api.delete(`/holidays/${id}`)
+      toast.success('Feriado excluído')
+      load()
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao excluir') }
+    finally { setDeleting(null) }
+  }
+
+  const typeLabel = (t: string) => HOLIDAY_TYPES.find(x => x.value === t)?.label ?? t
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <div className="flex rounded-lg border border-zinc-700 overflow-hidden text-xs">
+          {[String(new Date().getFullYear() - 1), String(new Date().getFullYear()), String(new Date().getFullYear() + 1)].map(y => (
+            <button key={y} onClick={() => setYear(y)}
+              className={`px-3 py-1.5 font-medium transition-colors ${year === y ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'}`}>
+              {y}
+            </button>
+          ))}
+        </div>
+        <Button onClick={openCreate} className="bg-blue-600 hover:bg-blue-500 text-white h-8 text-xs gap-1.5 ml-auto">
+          <Plus size={13} /> Novo
+        </Button>
+      </div>
+
+      <div className="rounded-lg border border-zinc-800 overflow-hidden">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-zinc-800 bg-zinc-900">
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Data</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Tipo</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
+              <th className="px-3 py-2.5 w-16"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? <TableSkeleton cols={5} /> : items.length === 0 ? (
+              <tr><td colSpan={5} className="px-3 py-8 text-center text-zinc-500">Nenhum feriado em {year}</td></tr>
+            ) : items.map(item => (
+              <tr key={item.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
+                <td className="px-3 py-2.5 font-mono text-zinc-200">
+                  {new Date(item.date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                </td>
+                <td className="px-3 py-2.5 text-zinc-200">{item.name}</td>
+                <td className="px-3 py-2.5 text-zinc-400">{typeLabel(item.type)}{item.state && ` (${item.state})`}</td>
+                <td className="px-3 py-2.5"><ActiveBadge active={item.active} /></td>
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center gap-1 justify-end">
+                    <button onClick={() => openEdit(item)} className="p-1 text-zinc-500 hover:text-zinc-200"><Pencil size={12} /></button>
+                    <button onClick={() => remove(item.id)} disabled={deleting === item.id} className="p-1 text-zinc-500 hover:text-red-400"><Trash2 size={12} /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {modal.open && (
+        <ModalOverlay onClose={() => setModal({ open: false })}>
+          <div className="p-5">
+            <h3 className="text-sm font-semibold text-white mb-4">{modal.item ? 'Editar Feriado' : 'Novo Feriado'}</h3>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs text-zinc-400">Data *</Label>
+                <Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                  className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
+              </div>
+              <div>
+                <Label className="text-xs text-zinc-400">Nome *</Label>
+                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" placeholder="Ex: Natal" />
+              </div>
+              <div>
+                <Label className="text-xs text-zinc-400">Tipo</Label>
+                <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+                  className="mt-1 w-full px-3 py-2 rounded-md text-xs bg-zinc-800 border border-zinc-700 text-white outline-none">
+                  {HOLIDAY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              {form.type === 'state' && (
+                <div>
+                  <Label className="text-xs text-zinc-400">Estado (UF)</Label>
+                  <Input value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value.toUpperCase().slice(0, 2) }))}
+                    maxLength={2} className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs w-20" placeholder="SP" />
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <button onClick={() => setForm(f => ({ ...f, active: !f.active }))}
+                  className={`w-8 h-4 rounded-full transition-colors relative ${form.active ? 'bg-blue-600' : 'bg-zinc-700'}`}>
+                  <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${form.active ? 'left-4' : 'left-0.5'}`} />
+                </button>
+                <Label className="text-xs text-zinc-400">Ativo</Label>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5 justify-end">
+              <Button variant="outline" onClick={() => setModal({ open: false })} className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
+              <Button onClick={save} disabled={saving || !form.date || !form.name} className="h-8 text-xs bg-blue-600 hover:bg-blue-500 text-white">
+                {saving ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+    </div>
+  )
+}
+
 // ─── PAGE ────────────────────────────────────────────────────────────────────
 
 export default function CadastrosPage() {
@@ -796,6 +964,7 @@ export default function CadastrosPage() {
           {activeTab === 'customers'  && <CustomersTab />}
           {activeTab === 'executives' && <ExecutivesTab />}
           {activeTab === 'groups'     && <ConsultantGroupsTab />}
+          {activeTab === 'holidays'   && <HolidaysTab />}
         </div>
       </div>
     </AppLayout>
