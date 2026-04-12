@@ -93,7 +93,7 @@ const NAV: NavEntry[] = [
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const base = 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 outline-none select-none'
+const base = 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-[15px] transition-all duration-150 outline-none select-none'
 
 function itemStyle(active: boolean): React.CSSProperties {
   return active
