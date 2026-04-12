@@ -36,6 +36,7 @@ export default function ProfilePage() {
   const [confirmPassword,  setConfirmPassword]  = useState('')
   const [showCurrent,      setShowCurrent]      = useState(false)
   const [showNew,          setShowNew]          = useState(false)
+  const [showConfirm,      setShowConfirm]      = useState(false)
   const [generatedPassword,setGeneratedPassword]= useState('')
   const [copied,           setCopied]           = useState(false)
   const [savingPassword,   setSavingPassword]   = useState(false)
@@ -246,14 +247,20 @@ export default function ProfilePage() {
               </div>
               <div>
                 <Label className="text-xs text-zinc-400">Confirmar nova senha *</Label>
-                <Input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  className={`mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs ${
-                    confirmPassword && confirmPassword !== newPassword ? 'border-red-500' : ''
-                  }`}
-                />
+                <div className="relative mt-1">
+                  <Input
+                    type={showConfirm ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    className={`bg-zinc-800 border-zinc-700 text-white h-9 text-xs pr-9 ${
+                      confirmPassword && confirmPassword !== newPassword ? 'border-red-500' : ''
+                    }`}
+                  />
+                  <button onClick={() => setShowConfirm(v => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300">
+                    {showConfirm ? <EyeOff size={13} /> : <Eye size={13} />}
+                  </button>
+                </div>
                 {confirmPassword && confirmPassword !== newPassword && (
                   <p className="text-[10px] text-red-400 mt-1">As senhas não conferem</p>
                 )}
