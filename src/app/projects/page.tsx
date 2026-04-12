@@ -3,9 +3,9 @@
 import { AppLayout } from '@/components/layout/app-layout'
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { api, ApiError } from '@/lib/api'
-import { Project, PaginatedResponse } from '@/types'
+import { Project, PaginatedResponse, ProjectChangeLog, HourContribution } from '@/types'
 import { toast } from 'sonner'
-import { FolderOpen, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, Search, ChevronDown, Eye, Clock, Users, TrendingUp, Tag } from 'lucide-react'
+import { FolderOpen, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, Search, ChevronDown, Eye, Clock, Users, TrendingUp, Tag, History, HandCoins, Save, AlertCircle } from 'lucide-react'
 
 interface ProjectForm {
   name: string
@@ -387,6 +387,19 @@ export default function ProjectsPage() {
   const [modal, setModal] = useState<{ open: boolean; item?: Project }>({ open: false })
   const [viewProject, setViewProject] = useState<Project | null>(null)
   const [viewLoading, setViewLoading] = useState(false)
+  const [viewTab, setViewTab] = useState<'overview' | 'contributions' | 'history'>('overview')
+  // Aportes
+  const [contributions, setContributions] = useState<HourContribution[]>([])
+  const [contribLoading, setContribLoading] = useState(false)
+  const [contribModal, setContribModal] = useState<{ open: boolean; item?: HourContribution }>({ open: false })
+  const [contribForm, setContribForm] = useState({ contributed_hours: '', hourly_rate: '', contributed_at: '', description: '' })
+  const [contribSaving, setContribSaving] = useState(false)
+  // Histórico
+  const [history, setHistory] = useState<ProjectChangeLog[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyFieldFilter, setHistoryFieldFilter] = useState('all')
+  const [editingLog, setEditingLog] = useState<ProjectChangeLog | null>(null)
+  const [editLogReason, setEditLogReason] = useState('')
   const [form, setForm] = useState<ProjectForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<number | null>(null)
@@ -619,6 +632,9 @@ export default function ProjectsPage() {
 
   const openView = async (item: Project) => {
     setViewProject(item)
+    setViewTab('overview')
+    setContributions([])
+    setHistory([])
     setViewLoading(true)
     try {
       const r = await api.get<any>(`/projects/${item.id}`)
@@ -629,6 +645,88 @@ export default function ProjectsPage() {
     } finally {
       setViewLoading(false)
     }
+  }
+
+  const loadContributions = async (projectId: number) => {
+    setContribLoading(true)
+    try {
+      const r = await api.get<{ items: HourContribution[] }>(`/projects/${projectId}/hour-contributions`)
+      setContributions((r.items ?? []).map(c => ({ ...c, total_value: c.contributed_hours * c.hourly_rate })))
+    } catch { toast.error('Erro ao carregar aportes') }
+    finally { setContribLoading(false) }
+  }
+
+  const saveContrib = async () => {
+    if (!viewProject) return
+    if (!contribForm.contributed_hours || !contribForm.hourly_rate || !contribForm.contributed_at) {
+      toast.error('Preencha horas, valor/hora e data')
+      return
+    }
+    setContribSaving(true)
+    try {
+      const payload = {
+        contributed_hours: Number(contribForm.contributed_hours),
+        hourly_rate: Number(contribForm.hourly_rate),
+        contributed_at: contribForm.contributed_at,
+        description: contribForm.description || null,
+      }
+      if (contribModal.item) {
+        await api.put(`/projects/${viewProject.id}/hour-contributions/${contribModal.item.id}`, payload)
+        toast.success('Aporte atualizado')
+      } else {
+        await api.post(`/projects/${viewProject.id}/hour-contributions`, payload)
+        toast.success('Aporte adicionado')
+      }
+      setContribModal({ open: false })
+      loadContributions(viewProject.id)
+    } catch { toast.error('Erro ao salvar aporte') }
+    finally { setContribSaving(false) }
+  }
+
+  const deleteContrib = async (c: HourContribution) => {
+    if (!viewProject || !confirm(`Excluir aporte de ${c.contributed_hours}h?`)) return
+    try {
+      await api.delete(`/projects/${viewProject.id}/hour-contributions/${c.id}`)
+      toast.success('Aporte excluído')
+      loadContributions(viewProject.id)
+    } catch { toast.error('Erro ao excluir aporte') }
+  }
+
+  const loadHistory = async (projectId: number, fieldFilter = 'all') => {
+    setHistoryLoading(true)
+    try {
+      const qs = new URLSearchParams({ page: '1', pageSize: '50' })
+      if (fieldFilter !== 'all') qs.set('field_name', fieldFilter)
+      const r = await api.get<{ items: ProjectChangeLog[] }>(`/projects/${projectId}/change-history?${qs}`)
+      setHistory(r.items ?? [])
+    } catch { toast.error('Erro ao carregar histórico') }
+    finally { setHistoryLoading(false) }
+  }
+
+  const saveLogEdit = async () => {
+    if (!viewProject || !editingLog) return
+    try {
+      await api.put(`/projects/${viewProject.id}/change-history/${editingLog.id}`, { reason: editLogReason })
+      toast.success('Registro atualizado')
+      setEditingLog(null)
+      loadHistory(viewProject.id, historyFieldFilter)
+    } catch { toast.error('Erro ao atualizar registro') }
+  }
+
+  const deleteLog = async (log: ProjectChangeLog) => {
+    if (!viewProject || !confirm('Excluir este registro do histórico?')) return
+    try {
+      await api.delete(`/projects/${viewProject.id}/change-history/${log.id}`)
+      toast.success('Registro removido')
+      loadHistory(viewProject.id, historyFieldFilter)
+    } catch { toast.error('Erro ao excluir registro') }
+  }
+
+  const handleViewTab = (tab: 'overview' | 'contributions' | 'history') => {
+    setViewTab(tab)
+    if (!viewProject) return
+    if (tab === 'contributions' && contributions.length === 0) loadContributions(viewProject.id)
+    if (tab === 'history' && history.length === 0) loadHistory(viewProject.id, historyFieldFilter)
   }
 
   const save = async () => {
@@ -1353,159 +1451,349 @@ export default function ProjectsPage() {
         {/* Modal de Visualização */}
         {viewProject && (
           <ModalOverlay onClose={() => setViewProject(null)}>
-            <div className="p-6">
-              {/* Header */}
-              <div className="flex items-start gap-3 mb-6 pr-8">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(0,245,255,0.08)' }}>
-                  <FolderOpen size={16} color="var(--brand-primary)" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-xs px-2 py-0.5 rounded-md" style={{ background: 'var(--brand-border)', color: 'var(--brand-subtle)' }}>
-                      {viewProject.code}
-                    </span>
-                    {viewProject.status_display && (
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{
-                        background: viewProject.status === 'started' ? 'rgba(0,245,255,0.10)' : viewProject.status === 'paused' ? 'rgba(245,158,11,0.12)' : viewProject.status === 'cancelled' ? 'rgba(239,68,68,0.12)' : 'rgba(161,161,170,0.12)',
-                        color: viewProject.status === 'started' ? '#00F5FF' : viewProject.status === 'paused' ? '#F59E0B' : viewProject.status === 'cancelled' ? '#EF4444' : '#71717A',
-                      }}>
-                        {viewProject.status_display}
-                      </span>
-                    )}
+            <div className="flex flex-col max-h-[88vh]">
+              {/* Header fixo */}
+              <div className="px-6 pt-6 pb-0 pr-12 shrink-0">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(0,245,255,0.08)' }}>
+                    <FolderOpen size={16} color="var(--brand-primary)" />
                   </div>
-                  <h2 className="text-base font-bold mt-1" style={{ color: 'var(--brand-text)' }}>{cleanName(viewProject.name)}</h2>
-                  {viewProject.customer?.name && (
-                    <p className="text-sm mt-0.5" style={{ color: 'var(--brand-muted)' }}>{viewProject.customer.name}</p>
-                  )}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs px-2 py-0.5 rounded-md" style={{ background: 'var(--brand-border)', color: 'var(--brand-subtle)' }}>{viewProject.code}</span>
+                      {viewProject.status_display && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{
+                          background: viewProject.status === 'started' ? 'rgba(0,245,255,0.10)' : viewProject.status === 'paused' ? 'rgba(245,158,11,0.12)' : viewProject.status === 'cancelled' ? 'rgba(239,68,68,0.12)' : 'rgba(161,161,170,0.12)',
+                          color: viewProject.status === 'started' ? '#00F5FF' : viewProject.status === 'paused' ? '#F59E0B' : viewProject.status === 'cancelled' ? '#EF4444' : '#71717A',
+                        }}>{viewProject.status_display}</span>
+                      )}
+                    </div>
+                    <h2 className="text-base font-bold mt-1" style={{ color: 'var(--brand-text)' }}>{cleanName(viewProject.name)}</h2>
+                    {viewProject.customer?.name && <p className="text-sm mt-0.5" style={{ color: 'var(--brand-muted)' }}>{viewProject.customer.name}</p>}
+                  </div>
+                </div>
+
+                {/* Abas */}
+                <div className="flex gap-1 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+                  {([
+                    { id: 'overview', label: 'Visão Geral', icon: Eye },
+                    { id: 'contributions', label: 'Aportes', icon: HandCoins },
+                    { id: 'history', label: 'Histórico', icon: History },
+                  ] as const).map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      onClick={() => handleViewTab(id)}
+                      className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold border-b-2 transition-colors -mb-px"
+                      style={{
+                        borderColor: viewTab === id ? 'var(--brand-primary)' : 'transparent',
+                        color: viewTab === id ? 'var(--brand-primary)' : 'var(--brand-subtle)',
+                      }}
+                    >
+                      <Icon size={12} />{label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {viewLoading && (
-                <p className="text-xs text-center py-4" style={{ color: 'var(--brand-subtle)' }}>Carregando detalhes...</p>
-              )}
+              {/* Conteúdo scrollável */}
+              <div className="flex-1 overflow-y-auto px-6 py-5">
 
-              {/* Saldo / Horas */}
-              {(() => {
-                const isOD = viewProject.contract_type_display?.toLowerCase().includes('on demand')
-                const sold = viewProject.sold_hours ?? 0
-                const contrib = (viewProject as any).total_contributions_hours ?? viewProject.hour_contribution ?? 0
-                const consumed = viewProject.consumed_hours ?? ((viewProject.total_logged_minutes ?? 0) / 60)
-                const balance = viewProject.general_hours_balance
-                const pct = isOD ? 0 : (sold + contrib > 0 ? Math.round(consumed / (sold + contrib) * 100) : null)
-                const barVal = pct != null ? Math.min(100, Math.max(0, pct)) : 0
-                const barColor = barVal >= 90 ? '#ef4444' : barVal >= 70 ? '#f59e0b' : '#2563EB'
-                const balColor = balance != null && balance < 0 ? '#ef4444' : barVal >= 90 ? '#ef4444' : barVal >= 70 ? '#f59e0b' : '#2563EB'
-                return (
-                  <div className="rounded-xl p-4 mb-5" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
-                    <div className="grid grid-cols-3 gap-4 mb-3">
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>Hs Vendidas</p>
-                        <p className="text-sm font-bold tabular-nums" style={{ color: 'var(--brand-text)' }}>
-                          {isOD ? '—' : sold > 0 ? `${sold}h${contrib > 0 ? ` (+${contrib})` : ''}` : '—'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>Hs Consumidas</p>
-                        <p className="text-sm font-bold tabular-nums" style={{ color: 'var(--brand-text)' }}>{consumed > 0 ? `${Math.round(consumed * 10) / 10}h` : '—'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>Saldo</p>
-                        <p className="text-sm font-bold tabular-nums" style={{ color: balColor }}>
-                          {isOD ? '—' : balance != null ? `${balance}h` : '—'}
-                        </p>
-                      </div>
-                    </div>
-                    {!isOD && pct != null && (
-                      <>
-                        <div className="w-full rounded-full h-1.5 mb-1.5" style={{ background: 'var(--brand-border)' }}>
-                          <div className="h-1.5 rounded-full transition-all" style={{ width: `${barVal}%`, background: barColor }} />
+                {/* ── ABA: VISÃO GERAL ── */}
+                {viewTab === 'overview' && (
+                  <div>
+                    {viewLoading && <p className="text-xs text-center py-4" style={{ color: 'var(--brand-subtle)' }}>Carregando detalhes...</p>}
+
+                    {/* Card saldo/horas */}
+                    {(() => {
+                      const isOD = viewProject.contract_type_display?.toLowerCase().includes('on demand')
+                      const sold = viewProject.sold_hours ?? 0
+                      const contrib = (viewProject as any).total_contributions_hours ?? viewProject.hour_contribution ?? 0
+                      const consumed = viewProject.consumed_hours ?? ((viewProject.total_logged_minutes ?? 0) / 60)
+                      const balance = viewProject.general_hours_balance
+                      const pct = isOD ? 0 : (sold + contrib > 0 ? Math.round(consumed / (sold + contrib) * 100) : null)
+                      const barVal = pct != null ? Math.min(100, Math.max(0, pct)) : 0
+                      const barColor = barVal >= 90 ? '#ef4444' : barVal >= 70 ? '#f59e0b' : '#2563EB'
+                      const balColor = balance != null && balance < 0 ? '#ef4444' : barVal >= 90 ? '#ef4444' : barVal >= 70 ? '#f59e0b' : '#2563EB'
+                      return (
+                        <div className="rounded-xl p-4 mb-5" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+                          <div className="grid grid-cols-3 gap-4 mb-3">
+                            <div><p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>Hs Vendidas</p><p className="text-sm font-bold tabular-nums" style={{ color: 'var(--brand-text)' }}>{isOD ? '—' : sold > 0 ? `${sold}h${contrib > 0 ? ` (+${contrib})` : ''}` : '—'}</p></div>
+                            <div><p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>Hs Consumidas</p><p className="text-sm font-bold tabular-nums" style={{ color: 'var(--brand-text)' }}>{consumed > 0 ? `${Math.round(consumed * 10) / 10}h` : '—'}</p></div>
+                            <div><p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>Saldo</p><p className="text-sm font-bold tabular-nums" style={{ color: balColor }}>{isOD ? '—' : balance != null ? `${balance}h` : '—'}</p></div>
+                          </div>
+                          {!isOD && pct != null && (<><div className="w-full rounded-full h-1.5 mb-1.5" style={{ background: 'var(--brand-border)' }}><div className="h-1.5 rounded-full transition-all" style={{ width: `${barVal}%`, background: barColor }} /></div><p className="text-[10px] tabular-nums" style={{ color: 'var(--brand-subtle)' }}>{pct}% utilizado{balance != null && balance < 0 ? ' · ⚠ Excedido' : ''}</p></>)}
                         </div>
-                        <p className="text-[10px] tabular-nums" style={{ color: 'var(--brand-subtle)' }}>
-                          {pct}% utilizado{balance != null && balance < 0 ? ' · ⚠ Excedido' : ''}
-                        </p>
-                      </>
+                      )
+                    })()}
+
+                    {/* Detalhes */}
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-4 mb-5">
+                      {([
+                        { icon: Tag, label: 'Tipo de Contrato', value: viewProject.contract_type_display },
+                        { icon: Tag, label: 'Tipo de Serviço', value: (viewProject as any).service_type?.name },
+                        { icon: FolderOpen, label: 'Projeto Pai', value: (viewProject as any).parentProject?.name ? cleanName((viewProject as any).parentProject.name) : null },
+                        { icon: Clock, label: 'Data de Início', value: (viewProject as any).start_date },
+                        { icon: TrendingUp, label: 'Valor do Projeto', value: (viewProject as any).project_value != null ? `R$ ${Number((viewProject as any).project_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : null },
+                        { icon: Clock, label: 'Taxa/Hora', value: (viewProject as any).hourly_rate != null ? `R$ ${Number((viewProject as any).hourly_rate).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : null },
+                      ] as const).filter(f => f.value).map(({ icon: Icon, label, value }) => (
+                        <div key={label} className="flex items-start gap-2">
+                          <Icon size={13} className="mt-0.5 shrink-0" style={{ color: 'var(--brand-subtle)' }} />
+                          <div><p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{label}</p><p className="text-sm" style={{ color: 'var(--brand-text)' }}>{value}</p></div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Consultores */}
+                    {((viewProject as any).consultants?.length > 0) && (
+                      <div className="mb-5">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--brand-subtle)' }}>Consultores</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(viewProject as any).consultants.map((c: any) => (
+                            <span key={c.id} className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.15)' }}>{c.name}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Filhos */}
+                    {viewProject.child_projects && viewProject.child_projects.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--brand-subtle)' }}>Projetos Filhos</p>
+                        <div className="space-y-1">
+                          {viewProject.child_projects.map(c => (
+                            <div key={c.id} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+                              <div><span className="font-mono text-[10px] mr-2" style={{ color: 'var(--brand-subtle)' }}>{c.code}</span><span className="text-xs" style={{ color: 'var(--brand-text)' }}>{cleanName(c.name)}</span></div>
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: c.status === 'started' ? 'rgba(0,245,255,0.08)' : 'rgba(161,161,170,0.08)', color: c.status === 'started' ? '#00F5FF' : '#71717A' }}>{c.status_display ?? c.status}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
-                )
-              })()}
+                )}
 
-              {/* Detalhes */}
-              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                {[
-                  { icon: Tag, label: 'Tipo de Contrato', value: viewProject.contract_type_display },
-                  { icon: Tag, label: 'Tipo de Serviço', value: (viewProject as any).service_type?.name },
-                  { icon: FolderOpen, label: 'Projeto Pai', value: (viewProject as any).parentProject?.name ? cleanName((viewProject as any).parentProject.name) : null },
-                  { icon: Clock, label: 'Data de Início', value: (viewProject as any).start_date },
-                  { icon: TrendingUp, label: 'Valor do Projeto', value: (viewProject as any).project_value != null ? `R$ ${Number((viewProject as any).project_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : null },
-                  { icon: Clock, label: 'Taxa/Hora', value: (viewProject as any).hourly_rate != null ? `R$ ${Number((viewProject as any).hourly_rate).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : null },
-                ].filter(f => f.value).map(({ icon: Icon, label, value }) => (
-                  <div key={label} className="flex items-start gap-2">
-                    <Icon size={13} className="mt-0.5 shrink-0" style={{ color: 'var(--brand-subtle)' }} />
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{label}</p>
-                      <p className="text-sm" style={{ color: 'var(--brand-text)' }}>{value}</p>
+                {/* ── ABA: APORTES ── */}
+                {viewTab === 'contributions' && (
+                  <div>
+                    {/* Resumo financeiro */}
+                    {contributions.length > 0 && (() => {
+                      const vp = viewProject as any
+                      const baseHs = vp.sold_hours ?? 0
+                      const baseRate = vp.hourly_rate ?? 0
+                      const baseVal = baseHs * baseRate
+                      const contribHs = contributions.reduce((s, c) => s + c.contributed_hours, 0)
+                      const contribVal = contributions.reduce((s, c) => s + c.contributed_hours * c.hourly_rate, 0)
+                      const totalHs = baseHs + contribHs
+                      const totalVal = baseVal + contribVal
+                      const avg = totalHs > 0 ? totalVal / totalHs : 0
+                      return (
+                        <div className="grid grid-cols-3 gap-3 mb-4">
+                          {[
+                            { label: 'Hs Base', value: `${baseHs}h`, sub: baseRate > 0 ? `R$ ${baseRate.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/h` : '' },
+                            { label: 'Hs Aportes', value: `${contribHs}h`, sub: `R$ ${contribVal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` },
+                            { label: 'Total', value: `${totalHs}h`, sub: `R$ ${totalVal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} · média R$ ${avg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/h` },
+                          ].map(({ label, value, sub }) => (
+                            <div key={label} className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+                              <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{label}</p>
+                              <p className="text-sm font-bold tabular-nums mt-0.5" style={{ color: 'var(--brand-text)' }}>{value}</p>
+                              {sub && <p className="text-[10px] tabular-nums mt-0.5" style={{ color: 'var(--brand-subtle)' }}>{sub}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })()}
+
+                    {/* Botão adicionar */}
+                    <div className="flex justify-end mb-3">
+                      <button
+                        onClick={() => {
+                          const lastRate = contributions.length > 0 ? contributions[0].hourly_rate : (viewProject as any).hourly_rate ?? 0
+                          setContribForm({ contributed_hours: '', hourly_rate: String(lastRate || ''), contributed_at: new Date().toISOString().split('T')[0], description: '' })
+                          setContribModal({ open: true })
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+                        style={{ background: 'var(--brand-primary)', color: '#0A0A0B' }}
+                      ><Plus size={12} />Novo Aporte</button>
                     </div>
+
+                    {contribLoading && <p className="text-xs text-center py-6" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p>}
+
+                    {!contribLoading && contributions.length === 0 && (
+                      <p className="text-xs text-center py-8" style={{ color: 'var(--brand-subtle)' }}>Nenhum aporte registrado.</p>
+                    )}
+
+                    {/* Lista */}
+                    {!contribLoading && contributions.length > 0 && (
+                      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
+                        <table className="w-full text-xs">
+                          <thead style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--brand-border)' }}>
+                            <tr>
+                              {['Data', 'Horas', 'Valor/h', 'Total', 'Registrado por', 'Descrição', ''].map(h => (
+                                <th key={h} className="px-3 py-2.5 text-left font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {contributions.map(c => (
+                              <tr key={c.id} style={{ borderBottom: '1px solid var(--brand-border)' }}>
+                                <td className="px-3 py-2.5 tabular-nums whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>{new Date(c.contributed_at).toLocaleDateString('pt-BR')}</td>
+                                <td className="px-3 py-2.5 tabular-nums font-bold" style={{ color: 'var(--brand-text)' }}>{c.contributed_hours}h</td>
+                                <td className="px-3 py-2.5 tabular-nums" style={{ color: 'var(--brand-muted)' }}>R$ {c.hourly_rate.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                <td className="px-3 py-2.5 tabular-nums font-semibold" style={{ color: 'var(--brand-text)' }}>R$ {(c.contributed_hours * c.hourly_rate).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                <td className="px-3 py-2.5" style={{ color: 'var(--brand-muted)' }}>{c.contributed_by_user?.name ?? '—'}</td>
+                                <td className="px-3 py-2.5 max-w-[140px] truncate" style={{ color: 'var(--brand-muted)' }}>{c.description ?? '—'}</td>
+                                <td className="px-3 py-2.5">
+                                  <div className="flex items-center gap-1">
+                                    <button onClick={() => { setContribForm({ contributed_hours: String(c.contributed_hours), hourly_rate: String(c.hourly_rate), contributed_at: c.contributed_at.split('T')[0], description: c.description ?? '' }); setContribModal({ open: true, item: c }) }} className="p-1 rounded hover:bg-white/5" style={{ color: 'var(--brand-subtle)' }}><Pencil size={11} /></button>
+                                    <button onClick={() => deleteContrib(c)} className="p-1 rounded hover:bg-white/5" style={{ color: 'var(--brand-danger)' }}><Trash2 size={11} /></button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
-                ))}
+                )}
+
+                {/* ── ABA: HISTÓRICO ── */}
+                {viewTab === 'history' && (
+                  <div>
+                    {/* Filtro por campo */}
+                    <div className="mb-3">
+                      <select
+                        value={historyFieldFilter}
+                        onChange={e => { setHistoryFieldFilter(e.target.value); loadHistory(viewProject.id, e.target.value) }}
+                        className="px-3 py-2 rounded-xl text-xs outline-none"
+                        style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}
+                      >
+                        <option value="all">Todos os campos</option>
+                        <option value="project_value">Valor do Projeto</option>
+                        <option value="hourly_rate">Valor/Hora</option>
+                        <option value="sold_hours">Horas Vendidas</option>
+                        <option value="hour_contribution">Aporte de Horas</option>
+                        <option value="consultant_hours">Horas por Consultor</option>
+                        <option value="coordinator_hours">% Horas Coordenador</option>
+                        <option value="additional_hourly_rate">Valor/Hora Adicional</option>
+                        <option value="max_expense_per_consultant">Despesa Máx/Consultor</option>
+                      </select>
+                    </div>
+
+                    {historyLoading && <p className="text-xs text-center py-6" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p>}
+                    {!historyLoading && history.length === 0 && <p className="text-xs text-center py-8" style={{ color: 'var(--brand-subtle)' }}>Nenhuma alteração encontrada.</p>}
+
+                    {!historyLoading && history.length > 0 && (
+                      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs" style={{ minWidth: '700px' }}>
+                            <thead style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--brand-border)' }}>
+                              <tr>
+                                {['Data', 'Alterado por', 'Campo', 'Valor Anterior', 'Novo Valor', 'Vigência', 'Motivo', ''].map(h => (
+                                  <th key={h} className="px-3 py-2.5 text-left font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)' }}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {history.map(log => (
+                                <tr key={log.id} style={{ borderBottom: '1px solid var(--brand-border)' }}>
+                                  <td className="px-3 py-2.5 tabular-nums whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>{new Date(log.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                                  <td className="px-3 py-2.5 whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>{log.changed_by_user?.name ?? '—'}</td>
+                                  <td className="px-3 py-2.5 whitespace-nowrap"><span className="px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)' }}>{log.field_label}</span></td>
+                                  <td className="px-3 py-2.5 tabular-nums" style={{ color: 'var(--brand-muted)' }}>{log.old_value_formatted ?? String(log.old_value ?? '—')}</td>
+                                  <td className="px-3 py-2.5 tabular-nums font-semibold" style={{ color: 'var(--brand-text)' }}>{log.new_value_formatted ?? String(log.new_value ?? '—')}</td>
+                                  <td className="px-3 py-2.5 tabular-nums whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>{log.effective_from ? new Date(log.effective_from + '-01').toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' }) : '—'}</td>
+                                  <td className="px-3 py-2.5 max-w-[120px] truncate" style={{ color: 'var(--brand-muted)' }} title={log.reason ?? ''}>{log.reason ?? '—'}</td>
+                                  <td className="px-3 py-2.5">
+                                    <div className="flex items-center gap-1">
+                                      <button onClick={() => { setEditingLog(log); setEditLogReason(log.reason ?? '') }} className="p-1 rounded hover:bg-white/5" style={{ color: 'var(--brand-subtle)' }}><Pencil size={11} /></button>
+                                      <button onClick={() => deleteLog(log)} className="p-1 rounded hover:bg-white/5" style={{ color: 'var(--brand-danger)' }}><Trash2 size={11} /></button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Consultores */}
-              {((viewProject as any).consultants?.length > 0) && (
-                <div className="mt-5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Users size={13} style={{ color: 'var(--brand-subtle)' }} />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Consultores</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(viewProject as any).consultants.map((c: any) => (
-                      <span key={c.id} className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.15)' }}>
-                        {c.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Projetos filhos */}
-              {viewProject.child_projects && viewProject.child_projects.length > 0 && (
-                <div className="mt-5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <FolderOpen size={13} style={{ color: 'var(--brand-subtle)' }} />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Projetos Filhos</span>
-                  </div>
-                  <div className="space-y-1">
-                    {viewProject.child_projects.map(c => (
-                      <div key={c.id} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
-                        <div>
-                          <span className="font-mono text-[10px] mr-2" style={{ color: 'var(--brand-subtle)' }}>{c.code}</span>
-                          <span className="text-xs" style={{ color: 'var(--brand-text)' }}>{cleanName(c.name)}</span>
-                        </div>
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{
-                          background: c.status === 'started' ? 'rgba(0,245,255,0.08)' : 'rgba(161,161,170,0.08)',
-                          color: c.status === 'started' ? '#00F5FF' : '#71717A',
-                        }}>{c.status_display ?? c.status}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end mt-6">
-                <button
-                  onClick={() => { setViewProject(null); openEdit(viewProject) }}
-                  className="px-4 py-2 rounded-xl text-sm font-bold transition-all hover:opacity-90 mr-2"
-                  style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.2)' }}
-                >
-                  <Pencil size={13} className="inline mr-1.5" />Editar
+              {/* Footer */}
+              <div className="flex justify-end gap-2 px-6 py-4 shrink-0" style={{ borderTop: '1px solid var(--brand-border)' }}>
+                <button onClick={() => { setViewProject(null); openEdit(viewProject) }} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:opacity-90" style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.2)' }}>
+                  <Pencil size={13} />Editar
                 </button>
-                <button
-                  onClick={() => setViewProject(null)}
-                  className="px-4 py-2 rounded-xl text-sm font-medium transition-colors hover:bg-white/5"
-                  style={{ color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}
-                >Fechar</button>
+                <button onClick={() => setViewProject(null)} className="px-4 py-2 rounded-xl text-sm font-medium transition-colors hover:bg-white/5" style={{ color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}>Fechar</button>
               </div>
             </div>
           </ModalOverlay>
+        )}
+
+        {/* Modal de Aporte */}
+        {contribModal.open && viewProject && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)' }}>
+            <div className="w-full max-w-md rounded-2xl shadow-2xl" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+              <div className="p-5">
+                <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--brand-text)' }}>{contribModal.item ? 'Editar Aporte' : 'Novo Aporte'}</h3>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Horas *</label>
+                      <input type="number" min="1" max="999999" value={contribForm.contributed_hours} onChange={e => setContribForm(f => ({ ...f, contributed_hours: e.target.value }))} className="w-full px-3 py-2 rounded-xl text-sm outline-none" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }} placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Valor/Hora (R$) *</label>
+                      <input type="number" min="0.01" step="0.01" value={contribForm.hourly_rate} onChange={e => setContribForm(f => ({ ...f, hourly_rate: e.target.value }))} className="w-full px-3 py-2 rounded-xl text-sm outline-none" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }} placeholder="0,00" />
+                    </div>
+                  </div>
+                  {contribForm.contributed_hours && contribForm.hourly_rate && (
+                    <p className="text-xs font-semibold" style={{ color: 'var(--brand-primary)' }}>
+                      Total: R$ {(Number(contribForm.contributed_hours) * Number(contribForm.hourly_rate)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  )}
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Data *</label>
+                    <input type="date" value={contribForm.contributed_at} onChange={e => setContribForm(f => ({ ...f, contributed_at: e.target.value }))} className="w-full px-3 py-2 rounded-xl text-sm outline-none" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }} />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Descrição</label>
+                    <textarea rows={2} value={contribForm.description} onChange={e => setContribForm(f => ({ ...f, description: e.target.value }))} maxLength={1000} className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-none" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }} placeholder="Opcional..." />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-4">
+                  <button onClick={() => setContribModal({ open: false })} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-white/5" style={{ color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}>Cancelar</button>
+                  <button onClick={saveContrib} disabled={contribSaving} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50" style={{ background: 'var(--brand-primary)', color: '#0A0A0B' }}>
+                    <Save size={13} />{contribSaving ? 'Salvando...' : 'Salvar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal editar motivo do histórico */}
+        {editingLog && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)' }}>
+            <div className="w-full max-w-sm rounded-2xl shadow-2xl" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+              <div className="p-5">
+                <h3 className="text-sm font-bold mb-1" style={{ color: 'var(--brand-text)' }}>Editar Registro</h3>
+                <p className="text-xs mb-4" style={{ color: 'var(--brand-muted)' }}><span className="font-semibold" style={{ color: 'var(--brand-primary)' }}>{editingLog.field_label}</span> · {editingLog.old_value_formatted ?? String(editingLog.old_value)} → {editingLog.new_value_formatted ?? String(editingLog.new_value)}</p>
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Motivo</label>
+                  <textarea rows={3} value={editLogReason} onChange={e => setEditLogReason(e.target.value)} className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-none" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }} placeholder="Descreva o motivo da alteração..." />
+                </div>
+                <div className="flex justify-end gap-2 mt-4">
+                  <button onClick={() => setEditingLog(null)} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-white/5" style={{ color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}>Cancelar</button>
+                  <button onClick={saveLogEdit} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold" style={{ background: 'var(--brand-primary)', color: '#0A0A0B' }}>
+                    <Save size={13} />Salvar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </AppLayout>

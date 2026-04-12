@@ -140,6 +140,47 @@ export interface SystemSettings {
   [key: string]: string | number | null | undefined
 }
 
+export interface ProjectChangeLog {
+  id: number
+  project_id: number
+  changed_by: number
+  field_name: string
+  field_label: string
+  old_value: unknown
+  new_value: unknown
+  old_value_formatted?: string | null
+  new_value_formatted?: string | null
+  reason: string | null
+  effective_from: string | null
+  created_at: string
+  changed_by_user: { id: number; name: string; email: string }
+}
+
+export interface HourContribution {
+  id: number
+  project_id: number
+  contributed_hours: number
+  hourly_rate: number
+  description?: string | null
+  contributed_by?: number | null
+  contributed_at: string
+  contributed_by_user?: { id: number; name: string; email: string }
+  total_value?: number
+}
+
+export interface UserHourlyRateLog {
+  id: number
+  user_id: number
+  changed_by: number
+  old_hourly_rate: number | null
+  new_hourly_rate: number | null
+  old_rate_type: 'hourly' | 'monthly' | null
+  new_rate_type: 'hourly' | 'monthly' | null
+  reason: string | null
+  created_at: string
+  changed_by_user: { id: number; name: string; email: string }
+}
+
 export interface Expense {
   id: number
   user_id: number
