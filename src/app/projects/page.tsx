@@ -1,7 +1,7 @@
 'use client'
 
 import { AppLayout } from '@/components/layout/app-layout'
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { api, ApiError } from '@/lib/api'
 import { Project, PaginatedResponse } from '@/types'
 import { toast } from 'sonner'
@@ -316,6 +316,7 @@ export default function ProjectsPage() {
   const openCreate = () => {
     setForm(EMPTY_FORM)
     setCodeManual(false)
+    editedFinancialRef.current = []
     setParentProjects([])
     loadOptions()
     setModal({ open: true })
@@ -324,6 +325,7 @@ export default function ProjectsPage() {
   const openEdit = (item: Project) => {
     setForm(EMPTY_FORM)
     setCodeManual(true) // Don't auto-generate when editing
+    editedFinancialRef.current = []
     loadOptions()
     setModal({ open: true, item })
     api.get<any>(`/projects/${item.id}`).then(r => {
@@ -354,6 +356,12 @@ export default function ProjectsPage() {
         coordinator_ids: (d.coordinators ?? d.approvers ?? []).map((c: any) => c.id),
       }
       setForm(f)
+      // Inicializa editedFields com os campos já preenchidos (para recalcular corretamente ao editar)
+      const preloaded: ('project_value' | 'hourly_rate' | 'sold_hours')[] = []
+      if (f.project_value) preloaded.push('project_value')
+      if (f.sold_hours)    preloaded.push('sold_hours')
+      if (f.hourly_rate)   preloaded.push('hourly_rate')
+      editedFinancialRef.current = preloaded.slice(0, 2)
       if (d.customer_id) loadParentProjects(String(d.customer_id), item.id)
     }).catch(() => {})
   }
@@ -416,6 +424,43 @@ export default function ProjectsPage() {
 
   const setF = (key: keyof ProjectForm) => (v: string | boolean | number[]) =>
     setForm(f => ({ ...f, [key]: v }))
+
+  // Rastreia os 2 últimos campos financeiros editados pelo usuário
+  // O 3º (não editado) é auto-calculado: pv = hr × sh | hr = pv ÷ sh | sh = pv ÷ hr
+  const editedFinancialRef = useRef<('project_value' | 'hourly_rate' | 'sold_hours')[]>([])
+
+  const handleFinancialChange = useCallback((
+    field: 'project_value' | 'hourly_rate' | 'sold_hours',
+    value: string
+  ) => {
+    const allFields = ['project_value', 'hourly_rate', 'sold_hours'] as const
+    // Atualiza histórico de edição
+    editedFinancialRef.current = [
+      field,
+      ...editedFinancialRef.current.filter(f => f !== field),
+    ].slice(0, 2)
+    const edited = editedFinancialRef.current
+
+    setForm(f => {
+      const next = { ...f, [field]: value }
+      // Campo a calcular: o que NÃO está nos 2 últimos editados
+      const toCalc: 'project_value' | 'hourly_rate' | 'sold_hours' =
+        edited.length >= 2
+          ? (allFields.find(x => !edited.includes(x)) ?? 'hourly_rate')
+          : 'hourly_rate'
+
+      const pv = Number(field === 'project_value' ? value : f.project_value) || 0
+      const hr = Number(field === 'hourly_rate'   ? value : f.hourly_rate)   || 0
+      const sh = Number(field === 'sold_hours'    ? value : f.sold_hours)    || 0
+
+      let result = 0
+      if (toCalc === 'project_value') result = Math.round(hr * sh * 100) / 100
+      else if (toCalc === 'hourly_rate')  result = sh > 0 ? Math.round((pv / sh) * 100) / 100 : 0
+      else                                result = hr > 0 ? Math.round(pv / hr)             : 0 // sold_hours é inteiro
+
+      return { ...next, [toCalc]: result > 0 ? String(result) : '' }
+    })
+  }, [])
 
   const toggleArr = (arr: number[], id: number) =>
     arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id]
@@ -754,12 +799,12 @@ export default function ProjectsPage() {
                   {!isOnDemand && (
                     <div>
                       <FieldLabel>Valor do Projeto (R$)</FieldLabel>
-                      <FieldInput type="number" value={form.project_value} onChange={setF('project_value')} placeholder="0,00" min="0" step="0.01" />
+                      <FieldInput type="number" value={form.project_value} onChange={v => handleFinancialChange('project_value', v)} placeholder="0,00" min="0" step="0.01" />
                     </div>
                   )}
                   <div>
                     <FieldLabel>Valor da Hora (R$)</FieldLabel>
-                    <FieldInput type="number" value={form.hourly_rate} onChange={setF('hourly_rate')} placeholder="0,00" min="0" step="0.01" />
+                    <FieldInput type="number" value={form.hourly_rate} onChange={v => handleFinancialChange('hourly_rate', v)} placeholder="0,00" min="0" step="0.01" />
                   </div>
                   {!isOnDemand && (
                     <div>
@@ -772,7 +817,7 @@ export default function ProjectsPage() {
                     <>
                       <div>
                         <FieldLabel>Horas Vendidas</FieldLabel>
-                        <FieldInput type="number" value={form.sold_hours} onChange={setF('sold_hours')} placeholder="0" min="0" step="1" />
+                        <FieldInput type="number" value={form.sold_hours} onChange={v => handleFinancialChange('sold_hours', v)} placeholder="0" min="0" step="1" />
                       </div>
                       <div>
                         <FieldLabel>% Horas Coordenador</FieldLabel>
