@@ -848,15 +848,34 @@ export default function MeuPainelPage() {
               icon={Clock}
               accent="bg-blue-500/15 text-blue-400"
             />
-            <SummaryCard
-              label="Valor Estimado"
-              value={estimatedValue !== null ? formatBRL(estimatedValue) : '—'}
-              sub={estimatedValue !== null
-                ? `${formatBRL(hourlyRate)}/h × ${(tsTotalMin / 60).toFixed(1)}h`
-                : 'Taxa não configurada'}
-              icon={TrendingUp}
-              accent="bg-green-500/15 text-green-400"
-            />
+            {isHBConsultant ? (() => {
+              const fixedSalary  = hourlyRate
+              const extraHours   = hbCurrent && hbCurrent.accumulated_balance > 0 ? hbCurrent.accumulated_balance : 0
+              const valorHoraExt = fixedSalary > 0 ? fixedSalary / 180 : 0
+              const totalExtra   = extraHours * valorHoraExt
+              const total        = fixedSalary + totalExtra
+              return (
+                <SummaryCard
+                  label="Total a Receber"
+                  value={fixedSalary > 0 ? formatBRL(total) : '—'}
+                  sub={extraHours > 0
+                    ? `Fixo + ${fmtHours(extraHours)} extras`
+                    : 'Sem horas extras'}
+                  icon={TrendingUp}
+                  accent="bg-green-500/15 text-green-400"
+                />
+              )
+            })() : (
+              <SummaryCard
+                label="Valor Estimado"
+                value={estimatedValue !== null ? formatBRL(estimatedValue) : '—'}
+                sub={estimatedValue !== null
+                  ? `${formatBRL(hourlyRate)}/h × ${(tsTotalMin / 60).toFixed(1)}h`
+                  : 'Taxa não configurada'}
+                icon={TrendingUp}
+                accent="bg-green-500/15 text-green-400"
+              />
+            )}
             <SummaryCard
               label="Total Despesas"
               value={formatBRL(expTotal)}
