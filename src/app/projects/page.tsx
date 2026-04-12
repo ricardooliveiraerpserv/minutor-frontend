@@ -682,17 +682,25 @@ export default function ProjectsPage() {
                         <FieldLabel>% Horas Coordenador</FieldLabel>
                         <FieldInput type="number" value={form.coordinator_hours} onChange={setF('coordinator_hours')} placeholder="0" min="0" max="100" step="1" />
                       </div>
-                      <div>
-                        <FieldLabel>Saldo Inicial de Horas</FieldLabel>
-                        <FieldInput type="number" value={form.initial_hours_balance} onChange={setF('initial_hours_balance')} placeholder="0" step="0.5" />
-                      </div>
-                      <div>
-                        <FieldLabel>Custo Inicial (R$)</FieldLabel>
-                        <FieldInput type="number" value={form.initial_cost} onChange={setF('initial_cost')} placeholder="0,00" min="0" step="0.01" />
-                      </div>
                     </>
                   )}
                 </div>
+
+                {!isOnDemand && (
+                  <div className="rounded-xl p-3 grid grid-cols-2 gap-3" style={{ border: '1px solid var(--brand-border)', background: 'rgba(255,255,255,0.02)' }}>
+                    <div className="col-span-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--brand-subtle)' }}>Histórico do sistema anterior</p>
+                    </div>
+                    <div>
+                      <FieldLabel>Saldo Inicial de Horas</FieldLabel>
+                      <FieldInput type="number" value={form.initial_hours_balance} onChange={setF('initial_hours_balance')} placeholder="0" step="0.5" />
+                    </div>
+                    <div>
+                      <FieldLabel>Custo Inicial (R$)</FieldLabel>
+                      <FieldInput type="number" value={form.initial_cost} onChange={setF('initial_cost')} placeholder="0,00" min="0" step="0.01" />
+                    </div>
+                  </div>
+                )}
 
                 {/* ── Política de Despesas ── */}
                 <SectionTitle>Política de Despesas</SectionTitle>
