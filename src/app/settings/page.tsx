@@ -10,11 +10,11 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import {
-  Settings, Shield, UserCheck,
+  Settings, Shield,
   Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Check, Search,
   RefreshCw, CheckCircle, XCircle, Clock, History, TrendingUp,
 } from 'lucide-react'
-import type { Role, Permission, ConsultantGroup, SystemSettings, UserHourlyRateLog } from '@/types'
+import type { Role, Permission, SystemSettings, UserHourlyRateLog } from '@/types'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -122,10 +122,9 @@ const GROUP_LABELS: Record<string, string> = {
 // ─── TABS ────────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'general',     label: 'Geral',               icon: Settings },
-  { id: 'users',       label: 'Usuários',            icon: TrendingUp },
-  { id: 'roles',       label: 'Perfis de Acesso',    icon: Shield },
-  { id: 'groups',      label: 'Grupos de Consultor', icon: UserCheck },
+  { id: 'general',     label: 'Geral',            icon: Settings },
+  { id: 'users',       label: 'Usuários',         icon: TrendingUp },
+  { id: 'roles',       label: 'Perfis de Acesso', icon: Shield },
 ]
 
 // ─── TAB: GENERAL SETTINGS ───────────────────────────────────────────────────
@@ -471,215 +470,6 @@ function RolesTab() {
   )
 }
 
-// ─── TAB: CONSULTANT GROUPS ───────────────────────────────────────────────────
-
-function ConsultantGroupsTab() {
-  const [items, setItems] = useState<ConsultantGroup[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
-  const [hasNext, setHasNext] = useState(false)
-  const [modal, setModal] = useState<{ open: boolean; item?: ConsultantGroup }>({ open: false })
-  const [detailModal, setDetailModal] = useState<ConsultantGroup | null>(null)
-  const [availConsultants, setAvailConsultants] = useState<{ id: number; name: string; email: string }[]>([])
-  const [form, setForm] = useState({ name: '', description: '', active: true, consultant_ids: [] as number[] })
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState<number | null>(null)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const p = new URLSearchParams({ page: String(page), per_page: '15' })
-      if (search) p.set('search', search)
-      const r = await api.get<{ items?: ConsultantGroup[]; data?: ConsultantGroup[]; hasNext?: boolean; meta?: { last_page: number } }>(`/consultant-groups?${p}`)
-      setItems(Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : [])
-      setHasNext(!!(r?.hasNext || (r?.meta && page < r.meta.last_page)))
-    } catch { toast.error('Erro ao carregar grupos') }
-    finally { setLoading(false) }
-  }, [page, search])
-
-  useEffect(() => { load() }, [load])
-
-  const openCreate = async () => {
-    setForm({ name: '', description: '', active: true, consultant_ids: [] })
-    try {
-      const r = await api.get<{ items?: { id: number; name: string; email: string }[]; data?: { id: number; name: string; email: string }[] }>('/consultant-groups/available-consultants')
-      setAvailConsultants(Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : [])
-    } catch { setAvailConsultants([]) }
-    setModal({ open: true })
-  }
-
-  const openEdit = async (item: ConsultantGroup) => {
-    setForm({ name: item.name, description: item.description ?? '', active: item.active, consultant_ids: item.consultants?.map(c => c.id) ?? [] })
-    try {
-      const r = await api.get<{ items?: { id: number; name: string; email: string }[]; data?: { id: number; name: string; email: string }[] }>('/consultant-groups/available-consultants')
-      setAvailConsultants(Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : [])
-    } catch { setAvailConsultants([]) }
-    setModal({ open: true, item })
-  }
-
-  const save = async () => {
-    setSaving(true)
-    try {
-      if (modal.item) await api.put(`/consultant-groups/${modal.item.id}`, form)
-      else await api.post('/consultant-groups', form)
-      toast.success(modal.item ? 'Grupo atualizado' : 'Grupo criado')
-      setModal({ open: false })
-      load()
-    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao salvar') }
-    finally { setSaving(false) }
-  }
-
-  const remove = async (id: number) => {
-    if (!confirm('Confirmar exclusão?')) return
-    setDeleting(id)
-    try {
-      await api.delete(`/consultant-groups/${id}`)
-      toast.success('Grupo excluído')
-      load()
-    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao excluir') }
-    finally { setDeleting(null) }
-  }
-
-  const toggleConsultant = (id: number) => {
-    setForm(f => ({
-      ...f,
-      consultant_ids: f.consultant_ids.includes(id)
-        ? f.consultant_ids.filter(x => x !== id)
-        : [...f.consultant_ids, id]
-    }))
-  }
-
-  return (
-    <div>
-      <div className="flex items-center gap-2 mb-4">
-        <div className="relative flex-1 min-w-48">
-          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
-            placeholder="Buscar grupo..." className="pl-8 bg-zinc-800 border-zinc-700 text-white h-8 text-xs" />
-        </div>
-        <Button onClick={openCreate} className="bg-blue-600 hover:bg-blue-500 text-white h-8 text-xs gap-1.5">
-          <Plus size={13} /> Novo
-        </Button>
-      </div>
-
-      <div className="rounded-lg border border-zinc-800 overflow-hidden">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-zinc-800 bg-zinc-900">
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">Consultores</th>
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
-              <th className="px-3 py-2.5 w-16"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? <TableSkeleton cols={4} /> : items.length === 0 ? (
-              <tr><td colSpan={4} className="px-3 py-8 text-center text-zinc-500">Nenhum grupo</td></tr>
-            ) : items.map(item => (
-              <tr key={item.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
-                <td className="px-3 py-2.5">
-                  <button onClick={() => setDetailModal(item)} className="text-zinc-200 hover:text-blue-400 text-left">{item.name}</button>
-                </td>
-                <td className="px-3 py-2.5 text-zinc-400 hidden sm:table-cell">{item.consultants_count ?? item.consultants?.length ?? 0}</td>
-                <td className="px-3 py-2.5"><ActiveBadge active={item.active} /></td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-1 justify-end">
-                    <button onClick={() => openEdit(item)} className="p-1 text-zinc-500 hover:text-zinc-200"><Pencil size={12} /></button>
-                    <button onClick={() => remove(item.id)} disabled={deleting === item.id} className="p-1 text-zinc-500 hover:text-red-400"><Trash2 size={12} /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {(page > 1 || hasNext) && (
-        <div className="flex items-center justify-end gap-2 mt-3">
-          <button onClick={() => setPage(p => p - 1)} disabled={page === 1} className="p-1 text-zinc-500 hover:text-zinc-200 disabled:opacity-30"><ChevronLeft size={14} /></button>
-          <span className="text-xs text-zinc-500">Página {page}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={!hasNext} className="p-1 text-zinc-500 hover:text-zinc-200 disabled:opacity-30"><ChevronRight size={14} /></button>
-        </div>
-      )}
-
-      {detailModal && (
-        <ModalOverlay onClose={() => setDetailModal(null)}>
-          <div className="p-5">
-            <h3 className="text-sm font-semibold text-white mb-1">{detailModal.name}</h3>
-            {detailModal.description && <p className="text-xs text-zinc-400 mb-4">{detailModal.description}</p>}
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wide mb-2">Consultores</p>
-            {detailModal.consultants && detailModal.consultants.length > 0 ? (
-              <ul className="space-y-1.5">
-                {detailModal.consultants.map(c => (
-                  <li key={c.id} className="flex items-center gap-2 text-xs text-zinc-300">
-                    <div className="w-5 h-5 rounded-full bg-zinc-700 flex items-center justify-center text-[10px] text-zinc-400">
-                      {c.name[0]}
-                    </div>
-                    <span>{c.name}</span>
-                    <span className="text-zinc-500">{c.email}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="text-xs text-zinc-500">Nenhum consultor vinculado</p>}
-          </div>
-        </ModalOverlay>
-      )}
-
-      {modal.open && (
-        <ModalOverlay onClose={() => setModal({ open: false })}>
-          <div className="p-5 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-sm font-semibold text-white mb-4">{modal.item ? 'Editar Grupo' : 'Novo Grupo'}</h3>
-            <div className="space-y-3">
-              <div>
-                <Label className="text-xs text-zinc-400">Nome *</Label>
-                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
-              </div>
-              <div>
-                <Label className="text-xs text-zinc-400">Descrição</Label>
-                <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                  className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setForm(f => ({ ...f, active: !f.active }))}
-                  className={`w-8 h-4 rounded-full transition-colors relative ${form.active ? 'bg-blue-600' : 'bg-zinc-700'}`}>
-                  <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${form.active ? 'left-4' : 'left-0.5'}`} />
-                </button>
-                <Label className="text-xs text-zinc-400">Ativo</Label>
-              </div>
-              {availConsultants.length > 0 && (
-                <div>
-                  <Label className="text-xs text-zinc-400 mb-2 block">Consultores</Label>
-                  <div className="space-y-1 max-h-40 overflow-y-auto border border-zinc-700 rounded-md p-2">
-                    {availConsultants.map(c => (
-                      <label key={c.id} className="flex items-center gap-2 cursor-pointer">
-                        <div
-                          onClick={() => toggleConsultant(c.id)}
-                          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer ${form.consultant_ids.includes(c.id) ? 'bg-blue-600 border-blue-600' : 'border-zinc-600 hover:border-zinc-400'}`}
-                        >
-                          {form.consultant_ids.includes(c.id) && <Check size={10} className="text-white" />}
-                        </div>
-                        <span className="text-xs text-zinc-300">{c.name}</span>
-                        <span className="text-[11px] text-zinc-500">{c.email}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="flex gap-2 mt-5 justify-end">
-              <Button variant="outline" onClick={() => setModal({ open: false })} className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
-              <Button onClick={save} disabled={saving || !form.name} className="h-8 text-xs bg-blue-600 hover:bg-blue-500 text-white">
-                {saving ? 'Salvando...' : 'Salvar'}
-              </Button>
-            </div>
-          </div>
-        </ModalOverlay>
-      )}
-    </div>
-  )
-}
 
 
 // ─── USERS TAB ───────────────────────────────────────────────────────────────
@@ -874,7 +664,6 @@ export default function SettingsPage() {
           {activeTab === 'general'    && <GeneralTab />}
           {activeTab === 'users'      && <UsersTab />}
           {activeTab === 'roles'      && <RolesTab />}
-          {activeTab === 'groups'     && <ConsultantGroupsTab />}
         </div>
       </div>
     </AppLayout>

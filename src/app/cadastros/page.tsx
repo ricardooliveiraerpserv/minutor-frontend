@@ -9,8 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
-import { FileType, Wrench, Users, Star, Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Search } from 'lucide-react'
-import type { CustomerFull, Executive } from '@/types'
+import { FileType, Wrench, Users, Star, UserCheck, Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Search, Check } from 'lucide-react'
+import type { CustomerFull, Executive, ConsultantGroup } from '@/types'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -48,10 +48,11 @@ function ModalOverlay({ children, onClose }: { children: React.ReactNode; onClos
 // ─── TABS ────────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'contracts',  label: 'Tipos de Contrato', icon: FileType },
-  { id: 'services',   label: 'Tipos de Serviço',  icon: Wrench },
-  { id: 'customers',  label: 'Clientes',           icon: Users },
-  { id: 'executives', label: 'Executivos',         icon: Star },
+  { id: 'contracts',  label: 'Tipos de Contrato',   icon: FileType },
+  { id: 'services',   label: 'Tipos de Serviço',    icon: Wrench },
+  { id: 'customers',  label: 'Clientes',             icon: Users },
+  { id: 'executives', label: 'Executivos',           icon: Star },
+  { id: 'groups',     label: 'Grupos de Consultor', icon: UserCheck },
 ]
 
 // ─── TAB: CRUD (Tipos de Contrato e Serviço) ─────────────────────────────────
@@ -498,6 +499,259 @@ function ExecutivesTab() {
   )
 }
 
+// ─── TAB: GRUPOS DE CONSULTOR ────────────────────────────────────────────────
+
+function ConsultantGroupsTab() {
+  const [items, setItems] = useState<ConsultantGroup[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [searchConsultant, setSearchConsultant] = useState('')
+  const [page, setPage] = useState(1)
+  const [hasNext, setHasNext] = useState(false)
+  const [modal, setModal] = useState<{ open: boolean; item?: ConsultantGroup }>({ open: false })
+  const [availConsultants, setAvailConsultants] = useState<{ id: number; name: string; email: string }[]>([])
+  const [loadingConsultants, setLoadingConsultants] = useState(false)
+  const [form, setForm] = useState({ name: '', description: '', active: true, consultant_ids: [] as number[] })
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState<number | null>(null)
+  const [detailModal, setDetailModal] = useState<ConsultantGroup | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const p = new URLSearchParams({ page: String(page), per_page: '15' })
+      if (search) p.set('search', search)
+      const r = await api.get<{ items?: ConsultantGroup[]; data?: ConsultantGroup[]; hasNext?: boolean; meta?: { last_page: number } }>(`/consultant-groups?${p}`)
+      setItems(Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : [])
+      setHasNext(!!(r?.hasNext || (r?.meta && page < r.meta.last_page)))
+    } catch { toast.error('Erro ao carregar grupos') }
+    finally { setLoading(false) }
+  }, [page, search])
+
+  useEffect(() => { load() }, [load])
+
+  const loadConsultants = async () => {
+    setLoadingConsultants(true)
+    try {
+      const r = await api.get<{ items?: { id: number; name: string; email: string }[]; data?: { id: number; name: string; email: string }[] }>('/consultant-groups/available-consultants')
+      setAvailConsultants(Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : [])
+    } catch { setAvailConsultants([]) }
+    finally { setLoadingConsultants(false) }
+  }
+
+  const openCreate = async () => {
+    setForm({ name: '', description: '', active: true, consultant_ids: [] })
+    setSearchConsultant('')
+    setModal({ open: true })
+    loadConsultants()
+  }
+
+  const openEdit = async (item: ConsultantGroup) => {
+    setForm({ name: item.name, description: item.description ?? '', active: item.active, consultant_ids: item.consultants?.map(c => c.id) ?? [] })
+    setSearchConsultant('')
+    setModal({ open: true, item })
+    loadConsultants()
+  }
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      if (modal.item) await api.put(`/consultant-groups/${modal.item.id}`, form)
+      else await api.post('/consultant-groups', form)
+      toast.success(modal.item ? 'Grupo atualizado' : 'Grupo criado')
+      setModal({ open: false })
+      load()
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao salvar') }
+    finally { setSaving(false) }
+  }
+
+  const remove = async (id: number) => {
+    if (!confirm('Confirmar exclusão?')) return
+    setDeleting(id)
+    try {
+      await api.delete(`/consultant-groups/${id}`)
+      toast.success('Grupo excluído')
+      load()
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao excluir') }
+    finally { setDeleting(null) }
+  }
+
+  const toggleConsultant = (id: number) =>
+    setForm(f => ({
+      ...f,
+      consultant_ids: f.consultant_ids.includes(id)
+        ? f.consultant_ids.filter(x => x !== id)
+        : [...f.consultant_ids, id]
+    }))
+
+  const filteredConsultants = availConsultants.filter(c =>
+    !searchConsultant ||
+    c.name.toLowerCase().includes(searchConsultant.toLowerCase()) ||
+    c.email.toLowerCase().includes(searchConsultant.toLowerCase())
+  )
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+            placeholder="Buscar grupo..." className="pl-8 bg-zinc-800 border-zinc-700 text-white h-8 text-xs" />
+        </div>
+        <Button onClick={openCreate} className="bg-blue-600 hover:bg-blue-500 text-white h-8 text-xs gap-1.5">
+          <Plus size={13} /> Novo
+        </Button>
+      </div>
+
+      <div className="rounded-lg border border-zinc-800 overflow-hidden">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-zinc-800 bg-zinc-900">
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Consultores</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
+              <th className="px-3 py-2.5 w-16"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? <TableSkeleton cols={4} /> : items.length === 0 ? (
+              <tr><td colSpan={4} className="px-3 py-8 text-center text-zinc-500">Nenhum grupo encontrado</td></tr>
+            ) : items.map(item => (
+              <tr key={item.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
+                <td className="px-3 py-2.5">
+                  <button onClick={() => setDetailModal(item)} className="text-zinc-200 hover:text-blue-400 text-left font-medium">{item.name}</button>
+                  {item.description && <p className="text-[11px] text-zinc-500 mt-0.5">{item.description}</p>}
+                </td>
+                <td className="px-3 py-2.5 text-zinc-400">{item.consultants_count ?? item.consultants?.length ?? 0}</td>
+                <td className="px-3 py-2.5"><ActiveBadge active={item.active} /></td>
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center gap-1 justify-end">
+                    <button onClick={() => openEdit(item)} className="p-1 text-zinc-500 hover:text-zinc-200"><Pencil size={12} /></button>
+                    <button onClick={() => remove(item.id)} disabled={deleting === item.id} className="p-1 text-zinc-500 hover:text-red-400"><Trash2 size={12} /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {(page > 1 || hasNext) && (
+        <div className="flex items-center justify-end gap-2 mt-3">
+          <button onClick={() => setPage(p => p - 1)} disabled={page === 1} className="p-1 text-zinc-500 hover:text-zinc-200 disabled:opacity-30"><ChevronLeft size={14} /></button>
+          <span className="text-xs text-zinc-500">Página {page}</span>
+          <button onClick={() => setPage(p => p + 1)} disabled={!hasNext} className="p-1 text-zinc-500 hover:text-zinc-200 disabled:opacity-30"><ChevronRight size={14} /></button>
+        </div>
+      )}
+
+      {/* Modal de detalhe */}
+      {detailModal && (
+        <ModalOverlay onClose={() => setDetailModal(null)}>
+          <div className="p-5">
+            <h3 className="text-sm font-semibold text-white mb-1">{detailModal.name}</h3>
+            {detailModal.description && <p className="text-xs text-zinc-400 mb-4">{detailModal.description}</p>}
+            <p className="text-[11px] text-zinc-500 uppercase tracking-wide mb-2">Consultores vinculados</p>
+            {detailModal.consultants && detailModal.consultants.length > 0 ? (
+              <ul className="space-y-1.5">
+                {detailModal.consultants.map(c => (
+                  <li key={c.id} className="flex items-center gap-2 text-xs text-zinc-300">
+                    <div className="w-6 h-6 rounded-full bg-zinc-700 flex items-center justify-center text-[11px] font-semibold text-zinc-400">{c.name[0]}</div>
+                    <div>
+                      <p className="font-medium">{c.name}</p>
+                      <p className="text-zinc-500 text-[11px]">{c.email}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="text-xs text-zinc-500">Nenhum consultor vinculado</p>}
+          </div>
+        </ModalOverlay>
+      )}
+
+      {/* Modal de criar/editar */}
+      {modal.open && (
+        <ModalOverlay onClose={() => setModal({ open: false })}>
+          <div className="p-5">
+            <h3 className="text-sm font-semibold text-white mb-4">{modal.item ? 'Editar Grupo' : 'Novo Grupo'}</h3>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-xs text-zinc-400">Nome *</Label>
+                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" placeholder="Nome do grupo" />
+              </div>
+              <div>
+                <Label className="text-xs text-zinc-400">Descrição</Label>
+                <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" placeholder="Opcional" />
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setForm(f => ({ ...f, active: !f.active }))}
+                  className={`w-8 h-4 rounded-full transition-colors relative ${form.active ? 'bg-blue-600' : 'bg-zinc-700'}`}>
+                  <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${form.active ? 'left-4' : 'left-0.5'}`} />
+                </button>
+                <Label className="text-xs text-zinc-400">Ativo</Label>
+              </div>
+
+              {/* Consultores */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-xs text-zinc-400">Consultores</Label>
+                  {form.consultant_ids.length > 0 && (
+                    <span className="text-[11px] text-blue-400">{form.consultant_ids.length} selecionado{form.consultant_ids.length > 1 ? 's' : ''}</span>
+                  )}
+                </div>
+                <div className="relative mb-1.5">
+                  <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+                  <Input
+                    value={searchConsultant}
+                    onChange={e => setSearchConsultant(e.target.value)}
+                    placeholder="Buscar consultor..."
+                    className="pl-7 bg-zinc-800 border-zinc-700 text-white h-8 text-xs"
+                  />
+                </div>
+                <div className="border border-zinc-700 rounded-md overflow-hidden">
+                  {loadingConsultants ? (
+                    <p className="text-xs text-zinc-500 text-center py-4">Carregando consultores...</p>
+                  ) : filteredConsultants.length === 0 ? (
+                    <p className="text-xs text-zinc-500 text-center py-4">Nenhum consultor encontrado</p>
+                  ) : (
+                    <div className="max-h-52 overflow-y-auto divide-y divide-zinc-800">
+                      {filteredConsultants.map(c => {
+                        const selected = form.consultant_ids.includes(c.id)
+                        return (
+                          <label key={c.id} className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors ${selected ? 'bg-blue-600/10' : 'hover:bg-zinc-800/60'}`}>
+                            <div
+                              onClick={() => toggleConsultant(c.id)}
+                              className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors cursor-pointer ${selected ? 'bg-blue-600 border-blue-600' : 'border-zinc-600 hover:border-zinc-400'}`}
+                            >
+                              {selected && <Check size={10} className="text-white" />}
+                            </div>
+                            <div className="min-w-0 flex-1" onClick={() => toggleConsultant(c.id)}>
+                              <p className="text-xs text-zinc-200 font-medium truncate">{c.name}</p>
+                              <p className="text-[11px] text-zinc-500 truncate">{c.email}</p>
+                            </div>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-5 justify-end">
+              <Button variant="outline" onClick={() => setModal({ open: false })} className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
+              <Button onClick={save} disabled={saving || !form.name} className="h-8 text-xs bg-blue-600 hover:bg-blue-500 text-white">
+                {saving ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+    </div>
+  )
+}
+
 // ─── PAGE ────────────────────────────────────────────────────────────────────
 
 export default function CadastrosPage() {
@@ -540,6 +794,7 @@ export default function CadastrosPage() {
           {activeTab === 'services'   && <CrudTab endpoint="service-types"  label="Tipo de Serviço" />}
           {activeTab === 'customers'  && <CustomersTab />}
           {activeTab === 'executives' && <ExecutivesTab />}
+          {activeTab === 'groups'     && <ConsultantGroupsTab />}
         </div>
       </div>
     </AppLayout>
