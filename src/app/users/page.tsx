@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import {
-  Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight,
+  Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, ChevronDown,
   Search, KeyRound, Check, Copy
 } from 'lucide-react'
 
@@ -114,6 +114,59 @@ function FieldSelect({ label, value, onChange, options, placeholder }: {
         {placeholder && <option value="">{placeholder}</option>}
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
+    </div>
+  )
+}
+
+function ConsultantTypeCard({
+  value,
+  onChange,
+}: {
+  value: ConsultantType | ''
+  onChange: (v: ConsultantType) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const selected = CONSULTANT_OPTIONS.find(o => o.value === value)
+
+  return (
+    <div>
+      <Label className="text-xs text-zinc-400 mb-1 block">Tipo de Consultor *</Label>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-zinc-700 bg-zinc-800 text-xs text-left transition-colors hover:border-zinc-500"
+      >
+        <span className={selected ? 'text-blue-300 font-medium' : 'text-zinc-500'}>
+          {selected ? (
+            <>
+              {selected.label}
+              <span className="ml-2 text-[10px] opacity-60">
+                {selected.value === 'horista' ? '(por hora)' : '(fixo)'}
+              </span>
+            </>
+          ) : 'Selecione o tipo...'}
+        </span>
+        <ChevronDown size={13} className={`text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="mt-1.5 space-y-1.5">
+          {CONSULTANT_OPTIONS.map(opt => (
+            <button key={opt.value} type="button"
+              onClick={() => { onChange(opt.value); setOpen(false) }}
+              className={`w-full py-2 px-3 rounded-lg text-xs font-medium border transition-all text-left ${
+                value === opt.value
+                  ? 'bg-blue-600/20 border-blue-500 text-blue-300'
+                  : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500'
+              }`}>
+              {value === opt.value && <span className="mr-1.5">●</span>}
+              {opt.label}
+              <span className="ml-2 text-[10px] opacity-50">
+                {opt.value === 'horista' ? '(por hora)' : '(fixo)'}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -524,33 +577,16 @@ export default function UsersPage() {
                   />
                 )}
 
-                {/* ── Consultor: tipo de consultor ── */}
+                {/* ── Consultor: tipo de consultor (colapsável) ── */}
                 {isConsultor && (
-                  <div>
-                    <Label className="text-xs text-zinc-400 mb-2 block">Tipo de Consultor *</Label>
-                    <div className="space-y-1.5">
-                      {CONSULTANT_OPTIONS.map(opt => (
-                        <button key={opt.value} type="button"
-                          onClick={() => setForm(f => ({
-                            ...f,
-                            consultant_type: opt.value,
-                            // Horista → por hora | Fixo e Banco de Horas → fixo mensal
-                            rate_type: opt.value === 'horista' ? 'hourly' : 'monthly',
-                          }))}
-                          className={`w-full py-2 px-3 rounded-lg text-xs font-medium border transition-all text-left ${
-                            form.consultant_type === opt.value
-                              ? 'bg-blue-600/20 border-blue-500 text-blue-300'
-                              : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500'
-                          }`}>
-                          {form.consultant_type === opt.value && <span className="mr-1.5">●</span>}
-                          {opt.label}
-                          <span className="ml-2 text-[10px] opacity-50">
-                            {opt.value === 'horista' ? '(por hora)' : '(fixo)'}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  <ConsultantTypeCard
+                    value={form.consultant_type}
+                    onChange={(opt) => setForm(f => ({
+                      ...f,
+                      consultant_type: opt,
+                      rate_type: opt === 'horista' ? 'hourly' : 'monthly',
+                    }))}
+                  />
                 )}
 
 
