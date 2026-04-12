@@ -141,9 +141,9 @@ export function Sidebar({ user }: { user: User }) {
         className="flex items-center gap-2.5 h-14 px-3.5 border-b shrink-0"
         style={{ borderColor: 'var(--brand-border)' }}
       >
-        <MinutorIcon size={30} />
+        <MinutorIcon size={26} />
         {!collapsed && (
-          <span className="font-bold text-[17px] tracking-tight" style={{ color: '#FAFAFA' }}>
+          <span className="font-bold text-[15px] tracking-tight" style={{ color: '#FAFAFA' }}>
             Minutor
           </span>
         )}
