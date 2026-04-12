@@ -372,7 +372,7 @@ export default function ProjectsPage() {
     if (statusFilter) p.set('status', statusFilter)
     if (search) p.set('search', search)
     if (filterCustomer) p.set('customer_id', filterCustomer)
-    if (filterContractType) p.set('contract_type_id', filterContractType)
+    if (!multiContratual && filterContractType) p.set('contract_type_id', filterContractType)
     if (filterApprover) p.set('approver_id', filterApprover)
     if (filterExecutive) p.set('executive_id', filterExecutive)
     return p.toString()
@@ -738,7 +738,7 @@ export default function ProjectsPage() {
           <div className="flex items-center gap-3 flex-wrap">
             {/* Botão Multi-contratual em destaque */}
             <button
-              onClick={() => { setMultiContratual(v => !v); setPage(1) }}
+              onClick={() => { setMultiContratual(v => { if (!v) setFilterContractType(''); return !v }); setPage(1) }}
               className="px-4 py-1.5 rounded-xl text-xs font-bold transition-all"
               style={multiContratual
                 ? { background: 'var(--brand-primary)', color: '#0A0A0B', boxShadow: '0 0 12px rgba(0,245,255,0.35)' }
@@ -748,8 +748,16 @@ export default function ProjectsPage() {
               ⬡ Multi-contratual
             </button>
 
-          {/* pills de tipo de contrato */}
-          <div className="flex items-center gap-1 p-1 rounded-xl w-fit" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+          {/* pills de tipo de contrato — desabilitado quando Multi-contratual ativo */}
+          <div
+            className="flex items-center gap-1 p-1 rounded-xl w-fit transition-opacity"
+            style={{
+              background: 'var(--brand-bg)',
+              border: '1px solid var(--brand-border)',
+              opacity: multiContratual ? 0.35 : 1,
+              pointerEvents: multiContratual ? 'none' : 'auto',
+            }}
+          >
             <button
               onClick={() => { setFilterContractType(''); setPage(1) }}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
