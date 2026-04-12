@@ -314,6 +314,7 @@ export default function ProjectsPage() {
   const [page, setPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
+  const [multiContratual, setMultiContratual] = useState(false)
   // Filtros de lista
   const [filterCustomer, setFilterCustomer] = useState('')
   const [filterContractType, setFilterContractType] = useState('')
@@ -366,7 +367,8 @@ export default function ProjectsPage() {
   }, [isFechado, form.sold_hours, form.consultant_hours, form.coordinator_hours])
 
   const params = useMemo(() => {
-    const p = new URLSearchParams({ page: String(page), per_page: '20', parent_projects_only: 'true' })
+    const p = new URLSearchParams({ page: String(page), per_page: '20' })
+    if (multiContratual) p.set('parent_projects_only', 'true')
     if (statusFilter) p.set('status', statusFilter)
     if (search) p.set('search', search)
     if (filterCustomer) p.set('customer_id', filterCustomer)
@@ -374,7 +376,7 @@ export default function ProjectsPage() {
     if (filterApprover) p.set('approver_id', filterApprover)
     if (filterExecutive) p.set('executive_id', filterExecutive)
     return p.toString()
-  }, [page, statusFilter, search, filterCustomer, filterContractType, filterApprover, filterExecutive])
+  }, [page, multiContratual, statusFilter, search, filterCustomer, filterContractType, filterApprover, filterExecutive])
 
   const [rows, setRows] = useState<TreeRow[]>([])
 
@@ -732,7 +734,21 @@ export default function ProjectsPage() {
               >Limpar</button>
             )}
           </div>
-          {/* Linha 2: pills de tipo de contrato */}
+          {/* Linha 2: Multi-contratual + pills de tipo de contrato */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Botão Multi-contratual em destaque */}
+            <button
+              onClick={() => { setMultiContratual(v => !v); setPage(1) }}
+              className="px-4 py-1.5 rounded-xl text-xs font-bold transition-all"
+              style={multiContratual
+                ? { background: 'var(--brand-primary)', color: '#0A0A0B', boxShadow: '0 0 12px rgba(0,245,255,0.35)' }
+                : { background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.25)' }
+              }
+            >
+              ⬡ Multi-contratual
+            </button>
+
+          {/* pills de tipo de contrato */}
           <div className="flex items-center gap-1 p-1 rounded-xl w-fit" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
             <button
               onClick={() => { setFilterContractType(''); setPage(1) }}
@@ -755,6 +771,7 @@ export default function ProjectsPage() {
                 {ct.name}
               </button>
             ))}
+          </div>
           </div>
         </div>
 
@@ -839,8 +856,8 @@ export default function ProjectsPage() {
                       {/* Nome com controle de árvore */}
                       <td className="px-4 py-3 max-w-[200px]">
                         <div className="flex items-center gap-1.5">
-                          {/* Botão expand/collapse */}
-                          {p._hasChildren && (
+                          {/* Botão expand/collapse — só no modo Multi-contratual */}
+                          {multiContratual && p._hasChildren && (
                             <button
                               onClick={() => toggleExpand(p)}
                               className="w-5 h-5 rounded flex items-center justify-center text-xs font-bold shrink-0 transition-colors hover:bg-white/10"
@@ -850,7 +867,7 @@ export default function ProjectsPage() {
                             </button>
                           )}
                           {/* Espaçador para pais sem filhos */}
-                          {!p._hasChildren && p._level === 0 && <span className="w-5 shrink-0" />}
+                          {multiContratual && !p._hasChildren && p._level === 0 && <span className="w-5 shrink-0" />}
                           {/* Badge PAI/FILHO */}
                           {p._level === 0 && p._hasChildren && (
                             <span className="text-[9px] font-bold px-1 py-0.5 rounded shrink-0" style={{ background: 'rgba(0,245,255,0.12)', color: 'var(--brand-primary)' }}>PAI</span>
