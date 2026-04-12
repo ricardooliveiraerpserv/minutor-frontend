@@ -533,8 +533,9 @@ function ConsultantGroupsTab() {
   const loadConsultants = async () => {
     setLoadingConsultants(true)
     try {
-      const r = await api.get<{ items?: { id: number; name: string; email: string }[]; data?: { id: number; name: string; email: string }[] }>('/consultant-groups/available-consultants')
-      setAvailConsultants(Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : [])
+      const r = await api.get<{ items?: { id: number; name: string; email: string }[] }>('/users?pageSize=500&enabled=1')
+      const list = Array.isArray(r?.items) ? r.items : Array.isArray((r as any)?.data) ? (r as any).data : []
+      setAvailConsultants(list)
     } catch { setAvailConsultants([]) }
     finally { setLoadingConsultants(false) }
   }
