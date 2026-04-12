@@ -88,12 +88,20 @@ export interface ServiceType {
   created_at: string
 }
 
+export interface Executive {
+  id: number
+  name: string
+  email?: string
+}
+
 export interface CustomerFull {
   id: number
   name: string
   company_name?: string
   cgc?: string
   active: boolean
+  executive_id?: number | null
+  executive?: Executive
   created_at: string
 }
 

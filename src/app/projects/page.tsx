@@ -190,10 +190,12 @@ export default function ProjectsPage() {
   const [filterCustomer, setFilterCustomer] = useState('')
   const [filterContractType, setFilterContractType] = useState('')
   const [filterApprover, setFilterApprover] = useState('')
+  const [filterExecutive, setFilterExecutive] = useState('')
   // Opções de filtro de lista
   const [filterCustomers, setFilterCustomers] = useState<SelectOption[]>([])
   const [filterContractTypes, setFilterContractTypes] = useState<ContractType[]>([])
   const [filterApprovers, setFilterApprovers] = useState<SelectOption[]>([])
+  const [filterExecutives, setFilterExecutives] = useState<SelectOption[]>([])
 
   const [data, setData] = useState<PaginatedResponse<Project> | null>(null)
   const [loading, setLoading] = useState(true)
@@ -242,8 +244,9 @@ export default function ProjectsPage() {
     if (filterCustomer) p.set('customer_id', filterCustomer)
     if (filterContractType) p.set('contract_type_id', filterContractType)
     if (filterApprover) p.set('approver_id', filterApprover)
+    if (filterExecutive) p.set('executive_id', filterExecutive)
     return p.toString()
-  }, [page, statusFilter, search, filterCustomer, filterContractType, filterApprover])
+  }, [page, statusFilter, search, filterCustomer, filterContractType, filterApprover, filterExecutive])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -263,10 +266,12 @@ export default function ProjectsPage() {
       api.get<any>('/customers?pageSize=1000'),
       api.get<any>('/contract-types?pageSize=200'),
       api.get<any>('/users?pageSize=200&enabled=1'),
-    ]).then(([c, ct, u]) => {
+      api.get<any>('/executives?pageSize=1000'),
+    ]).then(([c, ct, u, ex]) => {
       setFilterCustomers(items(c))
       setFilterContractTypes(items(ct))
       setFilterApprovers(items(u))
+      setFilterExecutives(items(ex))
     }).catch(() => {})
   }, [])
 
@@ -555,9 +560,20 @@ export default function ProjectsPage() {
               <option value="">Todos os aprovadores</option>
               {filterApprovers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
-            {(filterCustomer || filterContractType || filterApprover || search) && (
+            {filterExecutives.length > 0 && (
+              <select
+                value={filterExecutive}
+                onChange={e => { setFilterExecutive(e.target.value); setPage(1) }}
+                className="px-3 py-2 rounded-xl text-sm outline-none appearance-none min-w-36"
+                style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: filterExecutive ? 'var(--brand-text)' : 'var(--brand-subtle)' }}
+              >
+                <option value="">Todos os executivos</option>
+                {filterExecutives.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+            )}
+            {(filterCustomer || filterContractType || filterApprover || filterExecutive || search) && (
               <button
-                onClick={() => { setFilterCustomer(''); setFilterContractType(''); setFilterApprover(''); setSearch(''); setPage(1) }}
+                onClick={() => { setFilterCustomer(''); setFilterContractType(''); setFilterApprover(''); setFilterExecutive(''); setSearch(''); setPage(1) }}
                 className="px-3 py-2 rounded-xl text-xs font-medium transition-colors hover:bg-white/5"
                 style={{ color: 'var(--brand-danger)', border: '1px solid var(--brand-border)' }}
               >Limpar</button>

@@ -12,9 +12,9 @@ import { toast } from 'sonner'
 import {
   Settings, FileType, Wrench, Users, Shield, UserCheck,
   Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Check, Search,
-  RefreshCw, CheckCircle, XCircle, Clock,
+  RefreshCw, CheckCircle, XCircle, Clock, Star,
 } from 'lucide-react'
-import type { ContractType, ServiceType, CustomerFull, Role, Permission, ConsultantGroup, SystemSettings } from '@/types'
+import type { ContractType, ServiceType, CustomerFull, Role, Permission, ConsultantGroup, SystemSettings, Executive } from '@/types'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -122,12 +122,13 @@ const GROUP_LABELS: Record<string, string> = {
 // ─── TABS ────────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'general',    label: 'Geral',               icon: Settings },
-  { id: 'contracts',  label: 'Tipos de Contrato',   icon: FileType },
-  { id: 'services',   label: 'Tipos de Serviço',    icon: Wrench },
-  { id: 'customers',  label: 'Clientes',            icon: Users },
-  { id: 'roles',      label: 'Perfis de Acesso',    icon: Shield },
-  { id: 'groups',     label: 'Grupos de Consultor', icon: UserCheck },
+  { id: 'general',     label: 'Geral',               icon: Settings },
+  { id: 'contracts',   label: 'Tipos de Contrato',   icon: FileType },
+  { id: 'services',    label: 'Tipos de Serviço',    icon: Wrench },
+  { id: 'customers',   label: 'Clientes',            icon: Users },
+  { id: 'executives',  label: 'Executivos',          icon: Star },
+  { id: 'roles',       label: 'Perfis de Acesso',    icon: Shield },
+  { id: 'groups',      label: 'Grupos de Consultor', icon: UserCheck },
 ]
 
 // ─── TAB: GENERAL SETTINGS ───────────────────────────────────────────────────
@@ -473,35 +474,49 @@ function CustomersTab() {
   const [items, setItems] = useState<CustomerFull[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [filterExecutive, setFilterExecutive] = useState('')
+  const [executives, setExecutives] = useState<Executive[]>([])
   const [page, setPage] = useState(1)
   const [hasNext, setHasNext] = useState(false)
   const [modal, setModal] = useState<{ open: boolean; item?: CustomerFull }>({ open: false })
-  const [form, setForm] = useState({ name: '', company_name: '', cgc: '', active: true })
+  const [form, setForm] = useState({ name: '', company_name: '', cgc: '', active: true, executive_id: '' })
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<number | null>(null)
+
+  useEffect(() => {
+    api.get<any>('/executives?pageSize=1000').then(r => {
+      const arr = Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
+      setExecutives(arr)
+    }).catch(() => {})
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const p = new URLSearchParams({ page: String(page), per_page: '15' })
       if (search) p.set('search', search)
+      if (filterExecutive) p.set('executive_id', filterExecutive)
       const r = await api.get<{ items?: CustomerFull[]; data?: CustomerFull[]; hasNext?: boolean; meta?: { last_page: number } }>(`/customers?${p}`)
       setItems(Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : [])
       setHasNext(!!(r?.hasNext || (r?.meta && page < r.meta.last_page)))
     } catch { toast.error('Erro ao carregar clientes') }
     finally { setLoading(false) }
-  }, [page, search])
+  }, [page, search, filterExecutive])
 
   useEffect(() => { load() }, [load])
 
-  const openCreate = () => { setForm({ name: '', company_name: '', cgc: '', active: true }); setModal({ open: true }) }
-  const openEdit = (item: CustomerFull) => { setForm({ name: item.name, company_name: item.company_name ?? '', cgc: item.cgc ?? '', active: item.active }); setModal({ open: true, item }) }
+  const openCreate = () => { setForm({ name: '', company_name: '', cgc: '', active: true, executive_id: '' }); setModal({ open: true }) }
+  const openEdit = (item: CustomerFull) => {
+    setForm({ name: item.name, company_name: item.company_name ?? '', cgc: item.cgc ?? '', active: item.active, executive_id: item.executive_id ? String(item.executive_id) : '' })
+    setModal({ open: true, item })
+  }
 
   const save = async () => {
     setSaving(true)
     try {
-      if (modal.item) await api.put(`/customers/${modal.item.id}`, form)
-      else await api.post('/customers', form)
+      const payload = { ...form, executive_id: form.executive_id ? Number(form.executive_id) : null }
+      if (modal.item) await api.put(`/customers/${modal.item.id}`, payload)
+      else await api.post('/customers', payload)
       toast.success(modal.item ? 'Cliente atualizado' : 'Cliente criado')
       setModal({ open: false })
       load()
@@ -522,12 +537,20 @@ function CustomersTab() {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
         <div className="relative flex-1 min-w-48">
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
           <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
             placeholder="Buscar cliente..." className="pl-8 bg-zinc-800 border-zinc-700 text-white h-8 text-xs" />
         </div>
+        <select
+          value={filterExecutive}
+          onChange={e => { setFilterExecutive(e.target.value); setPage(1) }}
+          className="px-3 py-1.5 rounded-lg text-xs outline-none appearance-none bg-zinc-800 border border-zinc-700 text-zinc-300 min-w-36"
+        >
+          <option value="">Todos os executivos</option>
+          {executives.map(ex => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+        </select>
         <Button onClick={openCreate} className="bg-blue-600 hover:bg-blue-500 text-white h-8 text-xs gap-1.5">
           <Plus size={13} /> Novo
         </Button>
@@ -540,18 +563,20 @@ function CustomersTab() {
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden md:table-cell">Razão Social</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">CPF/CNPJ</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden lg:table-cell">Executivo</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
               <th className="px-3 py-2.5 w-16"></th>
             </tr>
           </thead>
           <tbody>
-            {loading ? <TableSkeleton cols={5} /> : items.length === 0 ? (
-              <tr><td colSpan={5} className="px-3 py-8 text-center text-zinc-500">Nenhum cliente</td></tr>
+            {loading ? <TableSkeleton cols={6} /> : items.length === 0 ? (
+              <tr><td colSpan={6} className="px-3 py-8 text-center text-zinc-500">Nenhum cliente</td></tr>
             ) : items.map(item => (
               <tr key={item.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
                 <td className="px-3 py-2.5 text-zinc-200">{item.name}</td>
                 <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell">{item.company_name || '—'}</td>
                 <td className="px-3 py-2.5 text-zinc-400 font-mono hidden sm:table-cell">{item.cgc || '—'}</td>
+                <td className="px-3 py-2.5 text-zinc-400 hidden lg:table-cell">{item.executive?.name || '—'}</td>
                 <td className="px-3 py-2.5"><ActiveBadge active={item.active} /></td>
                 <td className="px-3 py-2.5">
                   <div className="flex items-center gap-1 justify-end">
@@ -592,6 +617,20 @@ function CustomersTab() {
                 <Label className="text-xs text-zinc-400">CPF/CNPJ</Label>
                 <Input value={form.cgc} onChange={e => setForm(f => ({ ...f, cgc: e.target.value }))}
                   className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs font-mono" />
+              </div>
+              <div>
+                <Label className="text-xs text-zinc-400">Executivo</Label>
+                <select
+                  value={form.executive_id}
+                  onChange={e => setForm(f => ({ ...f, executive_id: e.target.value }))}
+                  className="mt-1 w-full px-3 py-2 rounded-lg text-xs outline-none appearance-none bg-zinc-800 border border-zinc-700 text-white"
+                >
+                  <option value="">Sem executivo</option>
+                  {executives.map(ex => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+                </select>
+                {executives.length === 0 && (
+                  <p className="text-[11px] text-zinc-500 mt-1">Nenhum executivo cadastrado. Acesse a aba Executivos para cadastrar.</p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => setForm(f => ({ ...f, active: !f.active }))}
@@ -987,6 +1026,155 @@ function ConsultantGroupsTab() {
   )
 }
 
+// ─── TAB: EXECUTIVOS ─────────────────────────────────────────────────────────
+
+interface ExecutiveUser {
+  id: number
+  name: string
+  email: string
+  is_executive: boolean
+}
+
+function ExecutivesTab() {
+  const [executives, setExecutives] = useState<ExecutiveUser[]>([])
+  const [loading, setLoading] = useState(true)
+  const [toggling, setToggling] = useState<number | null>(null)
+  // Modal para adicionar novo executivo
+  const [addModal, setAddModal] = useState(false)
+  const [candidates, setCandidates] = useState<ExecutiveUser[]>([])
+  const [loadingCandidates, setLoadingCandidates] = useState(false)
+  const [searchCandidates, setSearchCandidates] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await api.get<{ items?: ExecutiveUser[] }>('/executives?pageSize=500')
+      setExecutives(Array.isArray(r?.items) ? r.items : [])
+    } catch { toast.error('Erro ao carregar executivos') }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const loadCandidates = useCallback(async (filter = '') => {
+    setLoadingCandidates(true)
+    try {
+      const qs = new URLSearchParams({ pageSize: '50' })
+      if (filter) qs.set('filter', filter)
+      const r = await api.get<{ items?: ExecutiveUser[] }>(`/executives/all?${qs}`)
+      setCandidates(Array.isArray(r?.items) ? r.items : [])
+    } catch { toast.error('Erro ao carregar usuários') }
+    finally { setLoadingCandidates(false) }
+  }, [])
+
+  const openAdd = () => {
+    setSearchCandidates('')
+    setCandidates([])
+    setAddModal(true)
+    loadCandidates()
+  }
+
+  const toggle = async (user: ExecutiveUser) => {
+    setToggling(user.id)
+    try {
+      await api.patch(`/executives/${user.id}`, {})
+      toast.success(user.is_executive ? `${user.name} removido dos executivos` : `${user.name} definido como executivo`)
+      setAddModal(false)
+      load()
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao alterar executivo') }
+    finally { setToggling(null) }
+  }
+
+  const filtered = candidates.filter(c =>
+    !searchCandidates || c.name.toLowerCase().includes(searchCandidates.toLowerCase()) || c.email.toLowerCase().includes(searchCandidates.toLowerCase())
+  )
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs text-zinc-500">Usuários marcados como executivos ficam disponíveis para vincular a clientes.</p>
+        <Button onClick={openAdd} className="bg-blue-600 hover:bg-blue-500 text-white h-8 text-xs gap-1.5">
+          <Plus size={13} /> Adicionar
+        </Button>
+      </div>
+
+      <div className="rounded-lg border border-zinc-800 overflow-hidden">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-zinc-800 bg-zinc-900">
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">E-mail</th>
+              <th className="px-3 py-2.5 w-16"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? <TableSkeleton cols={3} /> : executives.length === 0 ? (
+              <tr><td colSpan={3} className="px-3 py-8 text-center text-zinc-500">Nenhum executivo cadastrado</td></tr>
+            ) : executives.map(ex => (
+              <tr key={ex.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
+                <td className="px-3 py-2.5 text-zinc-200 flex items-center gap-2">
+                  <Star size={11} className="text-yellow-500 shrink-0" />
+                  {ex.name}
+                </td>
+                <td className="px-3 py-2.5 text-zinc-400 hidden sm:table-cell">{ex.email}</td>
+                <td className="px-3 py-2.5">
+                  <button
+                    onClick={() => toggle(ex)}
+                    disabled={toggling === ex.id}
+                    className="p-1 text-zinc-500 hover:text-red-400 transition-colors"
+                    title="Remover executivo"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {addModal && (
+        <ModalOverlay onClose={() => setAddModal(false)}>
+          <div className="p-5">
+            <h3 className="text-sm font-semibold text-white mb-1">Adicionar Executivo</h3>
+            <p className="text-xs text-zinc-500 mb-4">Selecione um usuário interno para torná-lo executivo.</p>
+            <div className="relative mb-3">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <Input
+                value={searchCandidates}
+                onChange={e => setSearchCandidates(e.target.value)}
+                placeholder="Buscar por nome ou e-mail..."
+                className="pl-8 bg-zinc-800 border-zinc-700 text-white h-8 text-xs"
+              />
+            </div>
+            <div className="max-h-72 overflow-y-auto space-y-1">
+              {loadingCandidates ? (
+                <div className="py-6 text-center text-xs text-zinc-500">Carregando...</div>
+              ) : filtered.length === 0 ? (
+                <div className="py-6 text-center text-xs text-zinc-500">Nenhum usuário encontrado</div>
+              ) : filtered.map(c => (
+                <div key={c.id} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors">
+                  <div>
+                    <p className="text-xs text-zinc-200">{c.name}</p>
+                    <p className="text-[11px] text-zinc-500">{c.email}</p>
+                  </div>
+                  <Button
+                    onClick={() => toggle(c)}
+                    disabled={toggling === c.id}
+                    className="h-7 text-xs bg-blue-600 hover:bg-blue-500 text-white px-3"
+                  >
+                    {toggling === c.id ? '...' : 'Definir'}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+    </div>
+  )
+}
+
 // ─── PAGE ────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
@@ -1043,12 +1231,13 @@ export default function SettingsPage() {
             {active.label}
           </h2>
 
-          {activeTab === 'general'   && <GeneralTab />}
-          {activeTab === 'contracts' && <CrudTab endpoint="contract-types" label="Tipo de Contrato" />}
-          {activeTab === 'services'  && <CrudTab endpoint="service-types"  label="Tipo de Serviço" />}
-          {activeTab === 'customers' && <CustomersTab />}
-          {activeTab === 'roles'     && <RolesTab />}
-          {activeTab === 'groups'    && <ConsultantGroupsTab />}
+          {activeTab === 'general'    && <GeneralTab />}
+          {activeTab === 'contracts'  && <CrudTab endpoint="contract-types" label="Tipo de Contrato" />}
+          {activeTab === 'services'   && <CrudTab endpoint="service-types"  label="Tipo de Serviço" />}
+          {activeTab === 'customers'  && <CustomersTab />}
+          {activeTab === 'executives' && <ExecutivesTab />}
+          {activeTab === 'roles'      && <RolesTab />}
+          {activeTab === 'groups'     && <ConsultantGroupsTab />}
         </div>
       </div>
     </AppLayout>
