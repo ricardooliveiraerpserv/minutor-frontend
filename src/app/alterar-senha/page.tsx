@@ -12,11 +12,10 @@ import { Label } from '@/components/ui/label'
 export default function AlterarSenhaPage() {
   const router = useRouter()
   const { logout } = useAuth()
-  const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [showCurrent, setShowCurrent] = useState(false)
   const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -37,11 +36,9 @@ export default function AlterarSenhaPage() {
     setLoading(true)
     try {
       await api.post('/auth/change-temporary-password', {
-        current_password: currentPassword,
         new_password: newPassword,
         new_password_confirmation: confirmPassword,
       })
-      // Após trocar senha, todos os tokens são revogados — fazer logout limpo
       await logout()
       router.replace('/login?senha_alterada=1')
     } catch (err) {
@@ -65,25 +62,6 @@ export default function AlterarSenhaPage() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="current" className="text-zinc-300 text-xs">Senha temporária</Label>
-            <div className="relative">
-              <Input
-                id="current"
-                type={showCurrent ? 'text' : 'password'}
-                value={currentPassword}
-                onChange={e => setCurrentPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-9 pr-9"
-              />
-              <button type="button" onClick={() => setShowCurrent(v => !v)} tabIndex={-1}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 transition-colors">
-                {showCurrent ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
             <Label htmlFor="new" className="text-zinc-300 text-xs">Nova senha</Label>
             <div className="relative">
               <Input
@@ -104,15 +82,21 @@ export default function AlterarSenhaPage() {
 
           <div className="space-y-1.5">
             <Label htmlFor="confirm" className="text-zinc-300 text-xs">Confirmar nova senha</Label>
-            <Input
-              id="confirm"
-              type={showNew ? 'text' : 'password'}
-              value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-9"
-            />
+            <div className="relative">
+              <Input
+                id="confirm"
+                type={showConfirm ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-9 pr-9"
+              />
+              <button type="button" onClick={() => setShowConfirm(v => !v)} tabIndex={-1}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 transition-colors">
+                {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
           </div>
 
           {error && (
