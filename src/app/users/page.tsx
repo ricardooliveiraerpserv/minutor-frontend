@@ -131,13 +131,14 @@ function ConsultantTypeCard({
   return (
     <div>
       <Label className="text-xs text-zinc-400 mb-1 block">Tipo de Consultor *</Label>
-      <div className="rounded-lg border border-zinc-700 overflow-hidden">
+      <div className="rounded-lg border border-zinc-700 bg-zinc-800 overflow-hidden">
+        {/* Cabeçalho: mostra selecionado + toggle */}
         <button
           type="button"
           onClick={() => setOpen(o => !o)}
-          className="w-full flex items-center justify-between px-3 h-9 bg-zinc-800 text-xs text-left hover:bg-zinc-700/50 transition-colors"
+          className="w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-zinc-700/40 transition-colors"
         >
-          <span className={selected ? 'text-zinc-200 font-medium' : 'text-zinc-500'}>
+          <span className={selected ? 'text-zinc-300 font-medium' : 'text-zinc-500'}>
             {selected ? selected.label : 'Selecione o tipo...'}
             {selected && (
               <span className="ml-1.5 text-[10px] text-zinc-500 font-normal">
@@ -145,21 +146,21 @@ function ConsultantTypeCard({
               </span>
             )}
           </span>
-          <ChevronDown size={13} className={`text-zinc-500 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
+          <ChevronDown size={12} className={`text-zinc-500 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
         </button>
+
+        {/* Opções dentro do mesmo card */}
         {open && (
-          <div className="border-t border-zinc-700">
-            {CONSULTANT_OPTIONS.map((opt, i) => (
+          <div className="border-t border-zinc-700/60 px-2 pb-2 pt-1.5 space-y-1">
+            {CONSULTANT_OPTIONS.map(opt => (
               <button key={opt.value} type="button"
                 onClick={() => { onChange(opt.value); setOpen(false) }}
-                className={`w-full flex items-center gap-2 px-3 h-9 text-xs text-left transition-colors ${
-                  i > 0 ? 'border-t border-zinc-700/60' : ''
-                } ${
+                className={`w-full flex items-center gap-2 px-2.5 h-8 rounded-md text-xs text-left transition-colors ${
                   value === opt.value
-                    ? 'bg-blue-600/15 text-blue-300'
-                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700/50 hover:text-zinc-200'
+                    ? 'bg-blue-600/20 text-blue-300'
+                    : 'text-zinc-400 hover:bg-zinc-700/60 hover:text-zinc-200'
                 }`}>
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${value === opt.value ? 'bg-blue-400' : 'bg-transparent'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${value === opt.value ? 'bg-blue-400' : 'bg-zinc-600'}`} />
                 {opt.label}
                 <span className="text-[10px] text-zinc-500">
                   {opt.value === 'horista' ? '(por hora)' : '(fixo)'}
