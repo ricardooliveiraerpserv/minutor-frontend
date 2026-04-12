@@ -9,14 +9,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
-import Link from 'next/link'
 import {
   Settings, Shield,
-  Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Check, Search,
-  RefreshCw, CheckCircle, XCircle, History, TrendingUp, ExternalLink,
-  Eye,
+  Plus, Pencil, Trash2, X, Check, Search,
+  RefreshCw, CheckCircle, XCircle, TrendingUp, Users,
 } from 'lucide-react'
-import type { Role, Permission, SystemSettings, UserHourlyRateLog } from '@/types'
+import type { Role, Permission, SystemSettings } from '@/types'
+import { UserManagementTab } from './UserManagementTab'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -124,9 +123,9 @@ const GROUP_LABELS: Record<string, string> = {
 // ─── TABS ────────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'general',     label: 'Geral',            icon: Settings },
-  { id: 'users',       label: 'Usuários',         icon: TrendingUp },
-  { id: 'roles',       label: 'Perfis de Acesso', icon: Shield },
+  { id: 'general', label: 'Geral',            icon: Settings },
+  { id: 'users',   label: 'Usuários',         icon: Users },
+  { id: 'roles',   label: 'Perfis de Acesso', icon: Shield },
 ]
 
 // ─── TAB: GENERAL SETTINGS ───────────────────────────────────────────────────
@@ -474,227 +473,6 @@ function RolesTab() {
 
 
 
-// ─── USERS TAB ───────────────────────────────────────────────────────────────
-
-interface UserItem { id: number; name: string; email: string; enabled?: boolean; roles?: { id: number; name: string }[]; hourly_rate?: number | null; rate_type?: 'hourly' | 'monthly' | null; daily_hours?: number | null }
-
-function UsersTab() {
-  const [users, setUsers] = useState<UserItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [historyUser, setHistoryUser] = useState<UserItem | null>(null)
-  const [rateHistory, setRateHistory] = useState<UserHourlyRateLog[]>([])
-  const [rateHistoryLoading, setRateHistoryLoading] = useState(false)
-  const [viewUser, setViewUser] = useState<UserItem | null>(null)
-  const [deleting, setDeleting] = useState<number | null>(null)
-
-  const load = useCallback(() => {
-    setLoading(true)
-    api.get<{ items?: UserItem[]; data?: UserItem[] }>('/users?pageSize=200')
-      .then(r => setUsers(r.items ?? r.data ?? []))
-      .catch(() => toast.error('Erro ao carregar usuários'))
-      .finally(() => setLoading(false))
-  }, [])
-
-  useEffect(() => { load() }, [load])
-
-  const openRateHistory = async (user: UserItem) => {
-    setHistoryUser(user)
-    setRateHistory([])
-    setRateHistoryLoading(true)
-    try {
-      const r = await api.get<{ items?: UserHourlyRateLog[]; data?: UserHourlyRateLog[] }>(`/users/${user.id}/hourly-rate-history?pageSize=50`)
-      setRateHistory(r.items ?? r.data ?? [])
-    } catch { toast.error('Erro ao carregar histórico') }
-    finally { setRateHistoryLoading(false) }
-  }
-
-  const remove = async (u: UserItem) => {
-    if (!confirm(`Excluir "${u.name}"? Esta ação não pode ser desfeita.`)) return
-    setDeleting(u.id)
-    try {
-      await api.delete(`/users/${u.id}`)
-      toast.success('Usuário excluído')
-      load()
-    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao excluir') }
-    finally { setDeleting(null) }
-  }
-
-  const formatRateType = (t: string | null | undefined) => t === 'hourly' ? 'Por hora' : t === 'monthly' ? 'Fixo/mês' : '—'
-  const filtered = users.filter(u => !search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()))
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-bold" style={{ color: 'var(--brand-text)' }}>Usuários do Sistema</h2>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--brand-subtle)' }} />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..." className="pl-7 pr-3 py-1.5 rounded-xl text-xs outline-none" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)', width: '180px' }} />
-          </div>
-          <Link href="/users" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style={{ background: 'rgba(0,245,255,0.1)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.2)' }}>
-            <ExternalLink size={11} /> Cadastro completo
-          </Link>
-        </div>
-      </div>
-
-      {loading && <p className="text-xs text-center py-8" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p>}
-
-      {!loading && (
-        <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
-          <table className="w-full text-sm" style={{ background: 'var(--brand-surface)' }}>
-            <thead style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--brand-border)' }}>
-              <tr>
-                {['Usuário', 'E-mail', 'Perfis', 'Taxa/Hora', ''].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(u => (
-                <tr key={u.id} style={{ borderBottom: '1px solid var(--brand-border)' }}>
-                  <td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--brand-text)' }}>
-                    <span className="flex items-center gap-2">
-                      {u.name}
-                      {u.enabled === false && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-700 text-zinc-400">Inativo</span>}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--brand-muted)' }}>{u.email}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {(u.roles ?? []).map(r => (
-                        <span key={r.id} className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.15)' }}>{r.name}</span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-xs tabular-nums" style={{ color: 'var(--brand-muted)' }}>
-                    {u.hourly_rate != null ? `R$ ${Number(u.hourly_rate).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} · ${formatRateType(u.rate_type)}` : '—'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 justify-end">
-                      <button onClick={() => setViewUser(u)} title="Visualizar" className="p-1.5 rounded-lg hover:bg-white/5 transition-colors" style={{ color: 'var(--brand-subtle)' }}><Eye size={13} /></button>
-                      <button onClick={() => openRateHistory(u)} title="Histórico de Taxa" className="p-1.5 rounded-lg hover:bg-white/5 transition-colors" style={{ color: 'var(--brand-subtle)' }}><History size={13} /></button>
-                      <Link href="/users" title="Editar (abre cadastro)" className="p-1.5 rounded-lg hover:bg-white/5 transition-colors inline-flex" style={{ color: 'var(--brand-subtle)' }}><Pencil size={13} /></Link>
-                      <button onClick={() => remove(u)} disabled={deleting === u.id} title="Excluir" className="p-1.5 rounded-lg hover:bg-white/5 transition-colors" style={{ color: deleting === u.id ? 'var(--brand-subtle)' : '#f87171' }}><Trash2 size={13} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-xs" style={{ color: 'var(--brand-subtle)' }}>Nenhum usuário encontrado.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Modal visualizar usuário */}
-      {viewUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
-          <div className="w-full max-w-sm rounded-2xl shadow-2xl" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-              <h3 className="text-sm font-bold" style={{ color: 'var(--brand-text)' }}>Detalhes do Usuário</h3>
-              <button onClick={() => setViewUser(null)} className="p-1.5 rounded-lg hover:bg-white/5" style={{ color: 'var(--brand-muted)' }}><X size={14} /></button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold shrink-0" style={{ background: 'rgba(0,245,255,0.12)', color: 'var(--brand-primary)' }}>
-                  {viewUser.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--brand-text)' }}>{viewUser.name}</p>
-                  <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>{viewUser.email}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="rounded-lg p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
-                  <p className="text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--brand-subtle)' }}>Status</p>
-                  <p style={{ color: viewUser.enabled === false ? '#f87171' : '#4ade80' }}>{viewUser.enabled === false ? 'Inativo' : 'Ativo'}</p>
-                </div>
-                <div className="rounded-lg p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
-                  <p className="text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--brand-subtle)' }}>Taxa/hora</p>
-                  <p style={{ color: 'var(--brand-text)' }}>{viewUser.hourly_rate != null ? `R$ ${Number(viewUser.hourly_rate).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}</p>
-                </div>
-                {viewUser.daily_hours != null && (
-                  <div className="rounded-lg p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
-                    <p className="text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--brand-subtle)' }}>Horas/dia útil</p>
-                    <p style={{ color: 'var(--brand-text)' }}>{viewUser.daily_hours}h</p>
-                  </div>
-                )}
-                <div className="rounded-lg p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
-                  <p className="text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--brand-subtle)' }}>Tipo</p>
-                  <p style={{ color: 'var(--brand-text)' }}>{formatRateType(viewUser.rate_type)}</p>
-                </div>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: 'var(--brand-subtle)' }}>Perfis</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {(viewUser.roles ?? []).length === 0
-                    ? <span className="text-xs" style={{ color: 'var(--brand-subtle)' }}>Nenhum</span>
-                    : (viewUser.roles ?? []).map(r => (
-                        <span key={r.id} className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.15)' }}>{r.name}</span>
-                      ))}
-                </div>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button onClick={() => setViewUser(null)} className="flex-1 py-2 rounded-lg text-xs font-medium transition-colors hover:bg-white/5" style={{ border: '1px solid var(--brand-border)', color: 'var(--brand-muted)' }}>Fechar</button>
-                <Link href="/users" className="flex-1 py-2 rounded-lg text-xs font-medium text-center transition-colors hover:opacity-80" style={{ background: 'rgba(0,245,255,0.1)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.2)' }}>
-                  Editar no Cadastro
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal histórico taxa/hora */}
-      {historyUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
-          <div className="w-full max-w-2xl rounded-2xl shadow-2xl max-h-[80vh] flex flex-col" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-            <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-              <div>
-                <h3 className="text-sm font-bold" style={{ color: 'var(--brand-text)' }}>Histórico de Taxa/Hora</h3>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--brand-muted)' }}>{historyUser.name}</p>
-              </div>
-              <button onClick={() => setHistoryUser(null)} className="p-1.5 rounded-lg hover:bg-white/5" style={{ color: 'var(--brand-muted)' }}><X size={14} /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-5">
-              {rateHistoryLoading && <p className="text-xs text-center py-6" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p>}
-              {!rateHistoryLoading && rateHistory.length === 0 && <p className="text-xs text-center py-8" style={{ color: 'var(--brand-subtle)' }}>Nenhuma alteração registrada.</p>}
-              {!rateHistoryLoading && rateHistory.length > 0 && (
-                <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
-                  <table className="w-full text-xs">
-                    <thead style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--brand-border)' }}>
-                      <tr>
-                        {['Data', 'Alterado por', 'Valor Anterior', 'Novo Valor', 'Tipo Ant.', 'Novo Tipo', 'Motivo'].map(h => (
-                          <th key={h} className="px-3 py-2.5 text-left font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rateHistory.map(log => (
-                        <tr key={log.id} style={{ borderBottom: '1px solid var(--brand-border)' }}>
-                          <td className="px-3 py-2.5 tabular-nums whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>{new Date(log.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-                          <td className="px-3 py-2.5 whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>{log.changed_by_user?.name ?? '—'}</td>
-                          <td className="px-3 py-2.5 tabular-nums" style={{ color: 'var(--brand-muted)' }}>{log.old_hourly_rate != null ? `R$ ${Number(log.old_hourly_rate).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}</td>
-                          <td className="px-3 py-2.5 tabular-nums font-semibold" style={{ color: 'var(--brand-text)' }}>{log.new_hourly_rate != null ? `R$ ${Number(log.new_hourly_rate).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}</td>
-                          <td className="px-3 py-2.5 whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>{formatRateType(log.old_rate_type)}</td>
-                          <td className="px-3 py-2.5 whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>{formatRateType(log.new_rate_type)}</td>
-                          <td className="px-3 py-2.5 max-w-[120px] truncate" style={{ color: 'var(--brand-muted)' }} title={log.reason ?? ''}>{log.reason ?? '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ─── PAGE ────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
@@ -752,7 +530,7 @@ export default function SettingsPage() {
           </h2>
 
           {activeTab === 'general'    && <GeneralTab />}
-          {activeTab === 'users'      && <UsersTab />}
+          {activeTab === 'users'      && <UserManagementTab />}
           {activeTab === 'roles'      && <RolesTab />}
         </div>
       </div>
