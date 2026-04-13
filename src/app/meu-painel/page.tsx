@@ -1492,9 +1492,7 @@ export default function MeuPainelPage() {
                 <SummaryCard
                   label="Total Geral"
                   value={hbBeforeStart ? '—' : formatBRL(hbTotalGeral)}
-                  sub={expTotal > 0
-                    ? `Serviço${hbExtraHours > 0 ? ' + extras' : ''} + despesas`
-                    : 'Sem despesas no período'}
+                  sub={`DEBUG sal=${hbServiceVal} exp=${expTotal} tot=${hbTotalGeral}`}
                   icon={DollarSign}
                   accent="bg-cyan-500/15 text-cyan-400"
                 />
