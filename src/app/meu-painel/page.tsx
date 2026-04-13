@@ -1449,7 +1449,7 @@ export default function MeuPainelPage() {
         <div className="space-y-5">
 
           {/* Summary cards */}
-          <div className={`grid gap-3 ${isHBConsultant ? 'grid-cols-2 lg:grid-cols-5' : 'grid-cols-2 lg:grid-cols-6'}`}>
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-6">
             <SummaryCard
               label="Horas no Período"
               value={minutesToHours(tsTotalMin)}
@@ -1469,17 +1469,30 @@ export default function MeuPainelPage() {
               const totalExtra    = extraHours * valorHoraExt
               const total         = fixedSalary + totalExtra + expTotal
               return (
-                <SummaryCard
-                  label="Total a Receber"
-                  value={beforeStart ? '—' : fixedSalary > 0 ? formatBRL(total) : '—'}
-                  sub={beforeStart
-                    ? `Inicia em ${startYM ? fmtYearMonth(startYM) : '—'}`
-                    : extraHours > 0 || expTotal > 0
-                      ? `Valor do serviço${extraHours > 0 ? ' + extras' : ''}${expTotal > 0 ? ' + despesas' : ''}`
-                      : 'Sem extras ou despesas'}
-                  icon={TrendingUp}
-                  accent="bg-green-500/15 text-green-400"
-                />
+                <>
+                  <SummaryCard
+                    label="Total a Receber"
+                    value={beforeStart ? '—' : fixedSalary > 0 ? formatBRL(fixedSalary + totalExtra) : '—'}
+                    sub={beforeStart
+                      ? `Inicia em ${startYM ? fmtYearMonth(startYM) : '—'}`
+                      : extraHours > 0
+                        ? `Salário base + ${extraHours.toFixed(1)}h extras`
+                        : 'Salário base mensal'}
+                    icon={TrendingUp}
+                    accent="bg-green-500/15 text-green-400"
+                  />
+                  <SummaryCard
+                    label="Total Geral"
+                    value={beforeStart ? '—' : fixedSalary > 0 ? formatBRL(total) : expTotal > 0 ? formatBRL(expTotal) : '—'}
+                    sub={beforeStart
+                      ? '—'
+                      : expTotal > 0
+                        ? `Serviço${extraHours > 0 ? ' + extras' : ''} + despesas`
+                        : 'Sem despesas no período'}
+                    icon={DollarSign}
+                    accent="bg-cyan-500/15 text-cyan-400"
+                  />
+                </>
               )
             })() : (
               <>
