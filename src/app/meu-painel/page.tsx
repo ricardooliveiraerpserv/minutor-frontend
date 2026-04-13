@@ -843,8 +843,10 @@ export default function MeuPainelPage() {
     : null
 
   const approvedTs  = timesheets.filter(t => t.status === 'approved').length
+  const rejectedTs  = timesheets.filter(t => t.status === 'rejected').length
   const notApprTs   = timesheets.length - approvedTs
   const approvedExp = expenses.filter(e => e.status === 'approved').length
+  const rejectedExp = expenses.filter(e => e.status === 'rejected').length
   const notApprExp  = expenses.length - approvedExp
 
   // ── Tabs config ────────────────────────────────────────────────────────────
@@ -1024,14 +1026,14 @@ export default function MeuPainelPage() {
             <SummaryCard
               label="Apontamentos Pendentes"
               value={String(notApprTs)}
-              sub={`${approvedTs} aprovado${approvedTs !== 1 ? 's' : ''} de ${timesheets.length}`}
+              sub={`${approvedTs} aprov. · ${rejectedTs} reprov. de ${timesheets.length}`}
               icon={BarChart2}
               accent="bg-purple-500/15 text-purple-400"
             />
             <SummaryCard
               label="Despesas Pendentes"
               value={String(notApprExp)}
-              sub={`${approvedExp} aprovada${approvedExp !== 1 ? 's' : ''} de ${expenses.length}`}
+              sub={`${approvedExp} aprov. · ${rejectedExp} reprov. de ${expenses.length}`}
               icon={Receipt}
               accent="bg-yellow-500/15 text-yellow-400"
             />
