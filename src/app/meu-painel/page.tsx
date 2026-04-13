@@ -1271,6 +1271,9 @@ export default function MeuPainelPage() {
   const rejectedExp = expenses.filter(e => e.status === 'rejected').length
   const notApprExp  = expenses.length - approvedExp
 
+  // ── HB total geral (calculado fora da IIFE para garantir closure correta) ───
+  const hbTotalGeral = hourlyRate + expTotal
+
   // ── Indicadores computados ─────────────────────────────────────────────────
 
   // Horas faturáveis: projetos que têm cliente (cobram); internas: sem cliente
@@ -1492,7 +1495,7 @@ export default function MeuPainelPage() {
                   />
                   <SummaryCard
                     label="Total Geral"
-                    value={beforeStart ? '—' : formatBRL(totalGeral)}
+                    value={beforeStart ? '—' : formatBRL(hbTotalGeral + totalExtra)}
                     sub={expTotal > 0
                       ? `Serviço${extraHours > 0 ? ' + extras' : ''} + despesas`
                       : 'Sem despesas no período'}
