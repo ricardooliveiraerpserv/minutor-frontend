@@ -71,17 +71,21 @@ export default function ApprovalsPage() {
   const [tab, setTab] = useState<'timesheets' | 'expenses'>('timesheets')
 
   // Filters
-  const [dateFrom,    setDateFrom]    = useState('')
-  const [dateTo,      setDateTo]      = useState('')
-  const [userId,      setUserId]      = useState('')
-  const [projectId,   setProjectId]   = useState('')
-  const [customerId,  setCustomerId]  = useState('')
-  const [showFilters, setShowFilters] = useState(false)
+  const [dateFrom,       setDateFrom]       = useState('')
+  const [dateTo,         setDateTo]         = useState('')
+  const [userId,         setUserId]         = useState('')
+  const [coordinatorId,  setCoordinatorId]  = useState('')
+  const [executiveId,    setExecutiveId]    = useState('')
+  const [projectId,      setProjectId]      = useState('')
+  const [customerId,     setCustomerId]     = useState('')
+  const [showFilters,    setShowFilters]    = useState(true)
 
   // Support data for filters
-  const [users,     setUsers]     = useState<UserOption[]>([])
-  const [projects,  setProjects]  = useState<ProjectOption[]>([])
-  const [customers, setCustomers] = useState<CustomerOption[]>([])
+  const [users,        setUsers]        = useState<UserOption[]>([])
+  const [coordinators, setCoordinators] = useState<UserOption[]>([])
+  const [executives,   setExecutives]   = useState<UserOption[]>([])
+  const [projects,     setProjects]     = useState<ProjectOption[]>([])
+  const [customers,    setCustomers]    = useState<CustomerOption[]>([])
 
   // List state
   const [tsItems,   setTsItems]   = useState<TSItem[]>([])
@@ -102,9 +106,20 @@ export default function ApprovalsPage() {
 
   // Load support data
   useEffect(() => {
-    api.get<any>('/users?pageSize=200&role=Consultor').then(r => {
+    // Todos os usuários (colaboradores)
+    api.get<any>('/users?pageSize=500').then(r => {
       const list = Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
       setUsers(list.map((u: any) => ({ id: u.id, name: u.name })))
+    }).catch(() => {})
+    // Coordenadores
+    api.get<any>('/users?pageSize=500&role=Coordenador').then(r => {
+      const list = Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
+      setCoordinators(list.map((u: any) => ({ id: u.id, name: u.name })))
+    }).catch(() => {})
+    // Executivos (is_executive = true)
+    api.get<any>('/users?pageSize=500&is_executive=true').then(r => {
+      const list = Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
+      setExecutives(list.map((u: any) => ({ id: u.id, name: u.name })))
     }).catch(() => {})
     api.get<any>('/projects?pageSize=500').then(r => {
       const list = Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
@@ -119,13 +134,15 @@ export default function ApprovalsPage() {
   // Build filter params
   const filterParams = useMemo(() => {
     const p = new URLSearchParams()
-    if (dateFrom)   p.set('date_from',   dateFrom)
-    if (dateTo)     p.set('date_to',     dateTo)
-    if (userId)     p.set('user_id',     userId)
-    if (projectId)  p.set('project_id',  projectId)
-    if (customerId) p.set('customer_id', customerId)
+    if (dateFrom)      p.set('date_from',      dateFrom)
+    if (dateTo)        p.set('date_to',        dateTo)
+    if (userId)        p.set('user_id',        userId)
+    if (coordinatorId) p.set('coordinator_id', coordinatorId)
+    if (executiveId)   p.set('executive_id',   executiveId)
+    if (projectId)     p.set('project_id',     projectId)
+    if (customerId)    p.set('customer_id',    customerId)
     return p.toString()
-  }, [dateFrom, dateTo, userId, projectId, customerId])
+  }, [dateFrom, dateTo, userId, coordinatorId, executiveId, projectId, customerId])
 
   // Load timesheets
   const loadTs = useCallback(async () => {
@@ -162,9 +179,10 @@ export default function ApprovalsPage() {
   useEffect(() => { setTsPage(1); setExpPage(1); setSelected([]) }, [filterParams])
 
   const clearFilters = () => {
-    setDateFrom(''); setDateTo(''); setUserId(''); setProjectId(''); setCustomerId('')
+    setDateFrom(''); setDateTo(''); setUserId(''); setCoordinatorId('')
+    setExecutiveId(''); setProjectId(''); setCustomerId('')
   }
-  const hasFilters = !!(dateFrom || dateTo || userId || projectId || customerId)
+  const hasFilters = !!(dateFrom || dateTo || userId || coordinatorId || executiveId || projectId || customerId)
 
   // Current tab data
   const currentItems   = tab === 'timesheets' ? tsItems   : expItems
@@ -251,26 +269,31 @@ export default function ApprovalsPage() {
     <AppLayout title="Aprovações">
 
       {/* ── Tabs ── */}
-      <div className="flex items-center gap-0.5 border-b border-zinc-800 mb-5">
+      <div className="flex items-center gap-2 mb-5">
         {([
-          { id: 'timesheets' as const, icon: Clock,    label: 'Apontamentos', count: tsPag?.total ?? 0 },
-          { id: 'expenses'   as const, icon: Receipt,  label: 'Despesas',     count: expPag?.total ?? 0 },
-        ]).map(({ id, icon: Icon, label, count }) => (
-          <button key={id} onClick={() => handleTabChange(id)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
-              tab === id
-                ? 'border-blue-500 text-white'
-                : 'border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'
-            }`}>
-            <Icon size={14} />
-            {label}
-            {count > 0 && (
-              <span className="bg-blue-500 text-white rounded-full px-1.5 py-0.5 text-[10px] leading-none">
-                {count}
-              </span>
-            )}
-          </button>
-        ))}
+          { id: 'timesheets' as const, icon: Clock,   label: 'Apontamentos', count: tsPag?.total ?? 0 },
+          { id: 'expenses'   as const, icon: Receipt, label: 'Despesas',     count: expPag?.total ?? 0 },
+        ]).map(({ id, icon: Icon, label, count }) => {
+          const active = tab === id
+          return (
+            <button key={id} onClick={() => handleTabChange(id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
+                active
+                  ? 'bg-cyan-400 border-cyan-400 text-zinc-900'
+                  : 'bg-transparent border-cyan-500/40 text-cyan-400 hover:border-cyan-400'
+              }`}>
+              <Icon size={14} />
+              {label}
+              {count > 0 && (
+                <span className={`rounded-full px-1.5 py-0.5 text-[10px] leading-none font-bold ${
+                  active ? 'bg-zinc-900/30 text-zinc-900' : 'bg-cyan-400/20 text-cyan-300'
+                }`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
       {/* ── Filters ── */}
@@ -293,7 +316,7 @@ export default function ApprovalsPage() {
 
         {showFilters && (
           <div className="border-t border-zinc-800 px-4 py-3">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
 
               {/* Data de */}
               <div>
@@ -316,6 +339,26 @@ export default function ApprovalsPage() {
                   className="w-full h-8 text-xs bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-md px-2 outline-none">
                   <option value="">Todos</option>
                   {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+
+              {/* Coordenador */}
+              <div>
+                <Label className="text-[11px] text-zinc-500 mb-1 block">Coordenador</Label>
+                <select value={coordinatorId} onChange={e => setCoordinatorId(e.target.value)}
+                  className="w-full h-8 text-xs bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-md px-2 outline-none">
+                  <option value="">Todos</option>
+                  {coordinators.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+
+              {/* Executivo */}
+              <div>
+                <Label className="text-[11px] text-zinc-500 mb-1 block">Executivo</Label>
+                <select value={executiveId} onChange={e => setExecutiveId(e.target.value)}
+                  className="w-full h-8 text-xs bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-md px-2 outline-none">
+                  <option value="">Todos</option>
+                  {executives.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
               </div>
 
