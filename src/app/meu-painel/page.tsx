@@ -558,7 +558,7 @@ export default function MeuPainelPage() {
       const list = Array.isArray(r?.data) ? r.data : Array.isArray(r?.items) ? r.items : []
       if (list.length > 0) {
         setPaymentMethods(list.map((pm: any) => ({
-          value: pm.id ?? pm.code ?? pm.value,
+          value: pm.code ?? pm.value,
           label: pm.name ?? pm.label,
         })))
       }
@@ -756,7 +756,12 @@ export default function MeuPainelPage() {
       const res = await fetch(url, { method, headers: { Authorization: `Bearer ${token}` }, body: fd })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.message ?? 'Erro ao salvar')
+        const details = err.details ?? err.errors
+        const detailMsg = Array.isArray(details) ? details.join('; ')
+          : typeof details === 'object' && details !== null
+            ? Object.values(details).flat().join('; ')
+            : undefined
+        throw new Error(detailMsg ?? err.detailMessage ?? err.message ?? 'Erro ao salvar')
       }
       toast.success(expModal.item ? 'Despesa atualizada' : 'Despesa criada')
       setExpModal({ open: false })
