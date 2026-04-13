@@ -224,21 +224,31 @@ function ReceiptLink({ url }: { url: string }) {
 // ─── Modal: visualizar / aprovar despesa ─────────────────────────────────────
 
 function ExpApproveModal({
-  item, onClose, onApprove, onReject, approving,
+  item, onClose, onApprove, onReject, onRequestAdjustment, approving,
 }: {
   item: ExpItem
   onClose: () => void
   onApprove: (chargeClient: boolean) => void
   onReject: () => void
+  onRequestAdjustment: (reason: string) => void
   approving: boolean
 }) {
   const [chargeClient, setChargeClient] = useState<boolean | null>(null)
-  const [submitted, setSubmitted] = useState(false)
+  const [submitted,    setSubmitted]    = useState(false)
+  const [mode,         setMode]         = useState<'approve' | 'adjust'>('approve')
+  const [adjReason,    setAdjReason]    = useState('')
+  const [adjSubmitted, setAdjSubmitted] = useState(false)
 
   const handleApprove = () => {
     setSubmitted(true)
     if (chargeClient === null) return
     onApprove(chargeClient)
+  }
+
+  const handleAdjustment = () => {
+    setAdjSubmitted(true)
+    if (!adjReason.trim()) return
+    onRequestAdjustment(adjReason.trim())
   }
 
   return (
@@ -260,53 +270,82 @@ function ExpApproveModal({
             <span className="text-zinc-500 block mb-1">Descrição</span>
             <p className="text-zinc-200 bg-zinc-800 rounded-lg p-3 leading-relaxed">{item.description || '—'}</p>
           </div>
-          {item.receipt_url && (
-            <ReceiptLink url={item.receipt_url} />
+          {item.receipt_url && <ReceiptLink url={item.receipt_url} />}
+
+          {mode === 'approve' && (
+            <div className="pt-2 border-t border-zinc-800">
+              <Label className={`text-xs mb-2 block font-semibold ${submitted && chargeClient === null ? 'text-red-400' : 'text-zinc-300'}`}>
+                Cobrar do cliente? *
+              </Label>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setChargeClient(true)}
+                  className={`flex-1 py-2.5 rounded-lg border text-xs font-medium transition-all ${
+                    chargeClient === true ? 'bg-green-600/20 border-green-500 text-green-300' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                  }`}>
+                  Sim — cobrar do cliente
+                </button>
+                <button type="button" onClick={() => setChargeClient(false)}
+                  className={`flex-1 py-2.5 rounded-lg border text-xs font-medium transition-all ${
+                    chargeClient === false ? 'bg-orange-600/20 border-orange-500 text-orange-300' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                  }`}>
+                  Não — absorver internamente
+                </button>
+              </div>
+              {submitted && chargeClient === null && (
+                <p className="text-red-400 text-[11px] mt-1.5">Selecione uma opção antes de aprovar</p>
+              )}
+            </div>
           )}
 
-          {/* Campo obrigatório: cobrar do cliente */}
-          <div className="pt-2 border-t border-zinc-800">
-            <Label className={`text-xs mb-2 block font-semibold ${submitted && chargeClient === null ? 'text-red-400' : 'text-zinc-300'}`}>
-              Cobrar do cliente? *
-            </Label>
-            <div className="flex gap-3">
-              <button type="button"
-                onClick={() => setChargeClient(true)}
-                className={`flex-1 py-2.5 rounded-lg border text-xs font-medium transition-all ${
-                  chargeClient === true
-                    ? 'bg-green-600/20 border-green-500 text-green-300'
-                    : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500'
-                }`}>
-                Sim — cobrar do cliente
-              </button>
-              <button type="button"
-                onClick={() => setChargeClient(false)}
-                className={`flex-1 py-2.5 rounded-lg border text-xs font-medium transition-all ${
-                  chargeClient === false
-                    ? 'bg-orange-600/20 border-orange-500 text-orange-300'
-                    : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500'
-                }`}>
-                Não — absorver internamente
-              </button>
+          {mode === 'adjust' && (
+            <div className="pt-2 border-t border-zinc-800">
+              <Label className={`text-xs mb-2 block font-semibold ${adjSubmitted && !adjReason.trim() ? 'text-red-400' : 'text-blue-300'}`}>
+                O que precisa ser ajustado? *
+              </Label>
+              <textarea
+                autoFocus
+                value={adjReason}
+                onChange={e => setAdjReason(e.target.value)}
+                placeholder="Descreva o que o colaborador deve corrigir..."
+                rows={3}
+                className="w-full bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-blue-500 resize-none placeholder:text-zinc-600"
+              />
+              {adjSubmitted && !adjReason.trim() && (
+                <p className="text-red-400 text-[11px] mt-1">Informe o motivo do ajuste</p>
+              )}
             </div>
-            {submitted && chargeClient === null && (
-              <p className="text-red-400 text-[11px] mt-1.5">Selecione uma opção antes de aprovar</p>
-            )}
-          </div>
+          )}
         </div>
 
-        <div className="px-5 py-3 border-t border-zinc-800 flex gap-2 justify-end">
-          <Button variant="outline" onClick={onReject}
-            className="h-8 text-xs border-red-700/50 text-red-400 hover:bg-red-400/10">
-            <XCircle size={12} className="mr-1" /> Rejeitar
-          </Button>
-          <Button variant="outline" onClick={onClose}
-            className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
-          <Button onClick={handleApprove} disabled={approving}
-            className="h-8 text-xs bg-green-600 hover:bg-green-500 text-white">
-            <Check size={12} className="mr-1" />
-            {approving ? 'Aprovando...' : 'Aprovar'}
-          </Button>
+        <div className="px-5 py-3 border-t border-zinc-800 flex gap-2 justify-end flex-wrap">
+          {mode === 'approve' ? (
+            <>
+              <Button variant="outline" onClick={onReject} disabled={approving}
+                className="h-8 text-xs border-red-700/50 text-red-400 hover:bg-red-400/10">
+                <XCircle size={12} className="mr-1" /> Rejeitar
+              </Button>
+              <Button variant="outline" onClick={() => setMode('adjust')} disabled={approving}
+                className="h-8 text-xs border-blue-700/50 text-blue-400 hover:bg-blue-400/10">
+                Solicitar Ajuste
+              </Button>
+              <Button variant="outline" onClick={onClose} disabled={approving}
+                className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
+              <Button onClick={handleApprove} disabled={approving}
+                className="h-8 text-xs bg-green-600 hover:bg-green-500 text-white">
+                <Check size={12} className="mr-1" />
+                {approving ? 'Aprovando...' : 'Aprovar'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => { setMode('approve'); setAdjReason(''); setAdjSubmitted(false) }} disabled={approving}
+                className="h-8 text-xs border-zinc-700 text-zinc-300">Voltar</Button>
+              <Button onClick={handleAdjustment} disabled={approving}
+                className="h-8 text-xs bg-blue-600 hover:bg-blue-500 text-white">
+                {approving ? 'Enviando...' : 'Enviar Solicitação'}
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -469,6 +508,19 @@ export default function ApprovalsPage() {
       setExpApprove(null)
       loadExp()
     } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao aprovar') }
+    finally { setApproving(false) }
+  }
+
+  // Request adjustment on expense
+  const requestAdjustmentExp = async (reason: string) => {
+    if (!expApprove) return
+    setApproving(true)
+    try {
+      await api.post(`/expenses/${expApprove.id}/request-adjustment`, { reason })
+      toast.success('Ajuste solicitado ao colaborador')
+      setExpApprove(null)
+      loadExp()
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao solicitar ajuste') }
     finally { setApproving(false) }
   }
 
@@ -784,6 +836,7 @@ export default function ApprovalsPage() {
           approving={approving}
           onClose={() => setExpApprove(null)}
           onApprove={approveExp}
+          onRequestAdjustment={requestAdjustmentExp}
           onReject={() => {
             setRejectModal({ open: true, ids: [expApprove.id] })
             setRejectReason('')
