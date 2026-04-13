@@ -52,7 +52,7 @@ interface ExpenseItem {
   receipt_url?: string
 }
 
-interface ProjectOption { id: number; name: string; code: string; customer?: { id: number; name: string } }
+interface ProjectOption { id: number; name: string; code: string; customer?: { id: number; name: string }; service_type?: { id: number; name: string; code: string } }
 interface CategoryOption { id: number; name: string; parent_id?: number | null }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -446,6 +446,10 @@ function hoursToHHMM(hours: number): string {
   const m = Math.round((hours - h) * 60)
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
+function isSustentacao(serviceTypeName?: string): boolean {
+  if (!serviceTypeName) return false
+  return serviceTypeName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes('sustentacao')
+}
 
 const EMPTY_TS = {
   customer_id: '',
@@ -663,6 +667,15 @@ export default function MeuPainelPage() {
     const hasTotal = !isNaN(totalVal) && totalVal > 0
     const hasStart = !!tsForm.start_time
     if (!hasTotal && !hasStart) { toast.error('Informe o horário ou o total de horas'); return }
+    if (!tsForm.observation || tsForm.observation.trim().length < 20) {
+      toast.error('Descrição obrigatória com no mínimo 20 caracteres'); return
+    }
+    const selectedProject = projects.find(p => p.id === Number(tsForm.project_id))
+    const projectIsSustentacao = isSustentacao(selectedProject?.service_type?.name)
+    if (projectIsSustentacao) {
+      if (!tsForm.ticket || !tsForm.ticket.trim()) { toast.error('Informe o número do ticket'); return }
+      if (!/^\d+$/.test(tsForm.ticket.trim()))    { toast.error('O ticket deve ser numérico'); return }
+    }
     setTsSaving(true)
     try {
       const payload: Record<string, unknown> = {
@@ -1522,6 +1535,27 @@ export default function MeuPainelPage() {
               {tsProjectOptions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </SelectField>
 
+            {(() => {
+              const selProj = projects.find(p => p.id === Number(tsForm.project_id))
+              const stName = selProj?.service_type?.name
+              if (!stName) return null
+              const colorMap: Record<string, string> = {
+                default: 'bg-zinc-700/60 text-zinc-300',
+                sustentacao: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
+                projeto: 'bg-purple-500/20 text-purple-300 border border-purple-500/30',
+              }
+              const normalized = stName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+              const colorKey = normalized.includes('sustentacao') ? 'sustentacao'
+                : normalized.includes('projeto') ? 'projeto'
+                : 'default'
+              return (
+                <div className="flex items-center gap-2 -mt-1">
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Tipo de serviço:</span>
+                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${colorMap[colorKey]}`}>{stName}</span>
+                </div>
+              )
+            })()}
+
             <div>
               <Label className="text-xs text-zinc-400">Data *</Label>
               <Input type="date" value={tsForm.date}
@@ -1580,21 +1614,33 @@ export default function MeuPainelPage() {
             </div>
 
             <div>
-              <Label className="text-xs text-zinc-400">Observação</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-zinc-400">Descrição *</Label>
+                <span className={`text-[10px] ${(tsForm.observation?.length ?? 0) < 20 ? 'text-zinc-500' : 'text-green-500'}`}>
+                  {tsForm.observation?.length ?? 0}/20 mín.
+                </span>
+              </div>
               <textarea value={tsForm.observation}
                 onChange={e => setTsForm(f => ({ ...f, observation: e.target.value }))}
                 rows={3}
-                placeholder="Descreva o que foi feito..."
+                placeholder="Descreva o que foi feito (mínimo 20 caracteres)..."
                 className="mt-1.5 w-full bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded-lg px-3 py-2.5 outline-none resize-none focus:border-zinc-500 transition-colors" />
             </div>
 
-            <div>
-              <Label className="text-xs text-zinc-400">Ticket / Chamado</Label>
-              <Input value={tsForm.ticket}
-                onChange={e => setTsForm(f => ({ ...f, ticket: e.target.value }))}
-                placeholder="#1234"
-                className="mt-1.5 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
-            </div>
+            {(() => {
+              const selProj = projects.find(p => p.id === Number(tsForm.project_id))
+              if (!isSustentacao(selProj?.service_type?.name)) return null
+              return (
+                <div>
+                  <Label className="text-xs text-zinc-400">Ticket / Chamado *</Label>
+                  <Input value={tsForm.ticket}
+                    onChange={e => setTsForm(f => ({ ...f, ticket: e.target.value.replace(/\D/g, '') }))}
+                    placeholder="Ex: 123456"
+                    inputMode="numeric"
+                    className="mt-1.5 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
+                </div>
+              )
+            })()}
 
             <div className="flex gap-2 justify-end pt-2">
               <Button variant="outline" onClick={() => setTsModal({ open: false })}
