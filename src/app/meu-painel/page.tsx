@@ -149,11 +149,11 @@ function HBPaymentSection({ data, fixedSalary, expTotal }: { data: HourBankMonth
         Remuneração — {fmtYearMonth(data.year_month)}
       </p>
 
-      {/* Linha 1: Salário */}
+      {/* Linha 1: Valor do Serviço */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-        {/* Salário Fixo */}
+        {/* Valor Base Mensal */}
         <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
-          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Salário Fixo</p>
+          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Valor Base Mensal</p>
           <p className="text-lg font-bold" style={{ color: 'var(--brand-text)' }}>
             {fixedSalary > 0 ? formatBRL(fixedSalary) : '—'}
           </p>
@@ -178,9 +178,9 @@ function HBPaymentSection({ data, fixedSalary, expTotal }: { data: HourBankMonth
           <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>fixo ÷ 180</p>
         </div>
 
-        {/* Total Salário */}
+        {/* Total do Serviço */}
         <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
-          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Total Salário</p>
+          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Total do Serviço</p>
           <p className="text-lg font-bold" style={{ color: 'var(--brand-text)' }}>
             {fixedSalary > 0 ? formatBRL(totalSalario) : '—'}
           </p>
@@ -209,7 +209,7 @@ function HBPaymentSection({ data, fixedSalary, expTotal }: { data: HourBankMonth
             {fixedSalary > 0 ? formatBRL(totalGeral) : '—'}
           </p>
           <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>
-            salário{hasExtra ? ' + extras' : ''}{expTotal > 0 ? ' + despesas' : ''}
+            valor do serviço{hasExtra ? ' + extras' : ''}{expTotal > 0 ? ' + despesas' : ''}
           </p>
         </div>
       </div>
@@ -599,7 +599,7 @@ export default function MeuPainelPage() {
       const list: ExpenseItem[] = Array.isArray(r?.items) ? r.items : []
       setExpenses(list)
       setExpHasNext(!!r?.hasNext)
-      setExpTotal(list.reduce((acc, e) => acc + (e.amount ?? 0), 0))
+      setExpTotal(list.reduce((acc, e) => acc + (parseFloat(String(e.amount)) || 0), 0))
     } catch { toast.error('Erro ao carregar despesas') }
     finally   { setExpLoading(false) }
   }, [expPage, startDate, endDate, expSearch, expProject, expStatus])
@@ -923,7 +923,7 @@ export default function MeuPainelPage() {
         <div className="space-y-5">
 
           {/* Summary cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className={`grid gap-3 ${isHBConsultant ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-5'}`}>
             <SummaryCard
               label="Horas no Período"
               value={minutesToHours(tsTotalMin)}
@@ -948,32 +948,52 @@ export default function MeuPainelPage() {
                   sub={beforeStart
                     ? `Inicia em ${startYM ? fmtYearMonth(startYM) : '—'}`
                     : extraHours > 0 || expTotal > 0
-                      ? `Salário${extraHours > 0 ? ' + extras' : ''}${expTotal > 0 ? ' + despesas' : ''}`
+                      ? `Valor do serviço${extraHours > 0 ? ' + extras' : ''}${expTotal > 0 ? ' + despesas' : ''}`
                       : 'Sem extras ou despesas'}
                   icon={TrendingUp}
                   accent="bg-green-500/15 text-green-400"
                 />
               )
             })() : (
+              <>
+                <SummaryCard
+                  label="Valor Total do Serviço"
+                  value={estimatedValue !== null ? formatBRL(estimatedValue) : '—'}
+                  sub={estimatedValue !== null
+                    ? guaranteedHours !== null && workedHours < Number(guaranteedHours)
+                      ? `${formatBRL(hourlyRate)}/h × ${Number(guaranteedHours)}h (garantido)`
+                      : `${formatBRL(hourlyRate)}/h × ${workedHours.toFixed(1)}h`
+                    : 'Taxa não configurada'}
+                  icon={TrendingUp}
+                  accent="bg-green-500/15 text-green-400"
+                />
+                <SummaryCard
+                  label="Total Despesas"
+                  value={formatBRL(expTotal)}
+                  sub={`${expenses.length} lançamento${expenses.length !== 1 ? 's' : ''}`}
+                  icon={Receipt}
+                  accent="bg-orange-500/15 text-orange-400"
+                />
+                <SummaryCard
+                  label="Total Geral"
+                  value={estimatedValue !== null ? formatBRL(estimatedValue + expTotal) : expTotal > 0 ? formatBRL(expTotal) : '—'}
+                  sub={estimatedValue !== null
+                    ? expTotal > 0 ? 'Serviço + despesas' : 'Somente serviço'
+                    : expTotal > 0 ? 'Somente despesas' : 'Sem lançamentos'}
+                  icon={TrendingUp}
+                  accent="bg-cyan-500/15 text-cyan-400"
+                />
+              </>
+            )}
+            {isHBConsultant && (
               <SummaryCard
-                label="Valor Estimado"
-                value={estimatedValue !== null ? formatBRL(estimatedValue) : '—'}
-                sub={estimatedValue !== null
-                  ? guaranteedHours !== null && workedHours < Number(guaranteedHours)
-                    ? `${formatBRL(hourlyRate)}/h × ${Number(guaranteedHours)}h (garantido)`
-                    : `${formatBRL(hourlyRate)}/h × ${workedHours.toFixed(1)}h`
-                  : 'Taxa não configurada'}
-                icon={TrendingUp}
-                accent="bg-green-500/15 text-green-400"
+                label="Total Despesas"
+                value={formatBRL(expTotal)}
+                sub={`${expenses.length} lançamento${expenses.length !== 1 ? 's' : ''}`}
+                icon={Receipt}
+                accent="bg-orange-500/15 text-orange-400"
               />
             )}
-            <SummaryCard
-              label="Total Despesas"
-              value={formatBRL(expTotal)}
-              sub={`${expenses.length} lançamento${expenses.length !== 1 ? 's' : ''}`}
-              icon={Receipt}
-              accent="bg-orange-500/15 text-orange-400"
-            />
             <SummaryCard
               label="Aprovações"
               value={`${approvedTs} / ${timesheets.length}`}
