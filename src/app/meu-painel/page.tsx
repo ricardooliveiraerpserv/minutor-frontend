@@ -625,41 +625,49 @@ function StatusBadge({ status, display }: { status: string; display?: string }) 
 interface RowMenuItem { label: string; icon: React.ReactNode; onClick: () => void; danger?: boolean }
 
 function RowMenu({ items }: { items: RowMenuItem[] }) {
-  const [open, setOpen]       = useState(false)
-  const [openUp, setOpenUp]   = useState(false)
+  const [pos, setPos] = useState<{ top: number; left: number; up: boolean } | null>(null)
   const ref    = useRef<HTMLDivElement>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
 
+  const open = pos !== null
+
   useEffect(() => {
     if (!open) return
-    // Decide se abre para cima ou para baixo
-    if (btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect()
-      setOpenUp(rect.bottom + 130 > window.innerHeight)
-    }
     function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (ref.current && !ref.current.contains(e.target as Node)) setPos(null)
     }
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    window.addEventListener('scroll', () => setPos(null), { passive: true })
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      window.removeEventListener('scroll', () => setPos(null))
+    }
   }, [open])
 
   if (items.length === 0) return null
 
+  function toggle(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (open) { setPos(null); return }
+    if (!btnRef.current) return
+    const r = btnRef.current.getBoundingClientRect()
+    const dropH = items.length * 36 + 8
+    const up = r.bottom + dropH > window.innerHeight
+    setPos({ left: r.right - 144, top: up ? r.top - dropH : r.bottom + 4, up })
+  }
+
   return (
-    <div ref={ref} className="relative flex justify-end">
-      <button ref={btnRef}
-        onClick={e => { e.stopPropagation(); setOpen(o => !o) }}
+    <div ref={ref} className="flex justify-end">
+      <button ref={btnRef} onClick={toggle}
         className={`p-1.5 rounded transition-colors ${open ? 'text-zinc-200 bg-zinc-700' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'}`}
       >
         <MoreVertical size={14} />
       </button>
-      {open && (
-        <div className={`absolute right-0 z-50 min-w-[140px] bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl py-1 overflow-hidden ${
-          openUp ? 'bottom-full mb-1' : 'top-full mt-1'
-        }`}>
+      {pos && (
+        <div style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
+          className="min-w-[144px] bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl py-1 overflow-hidden">
           {items.map((item, i) => (
-            <button key={i} onClick={() => { item.onClick(); setOpen(false) }}
+            <button key={i} onClick={() => { item.onClick(); setPos(null) }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors text-left ${
                 item.danger
                   ? 'text-red-400 hover:bg-red-500/10'
