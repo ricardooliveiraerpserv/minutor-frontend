@@ -831,6 +831,16 @@ export default function MeuPainelPage() {
     finally   { setExpLoading(false) }
   }, [expPage, startDate, endDate, expSearch, expCustomer, expProject, expStatus, expDateFrom, expDateTo])
 
+  const hasTsFilters = !!(tsSearch || tsCustomer || tsProject || tsStatus || tsDateFrom || tsDateTo)
+  const hasExpFilters = !!(expSearch || expCustomer || expProject || expStatus || expDateFrom || expDateTo)
+
+  function clearTsFilters() {
+    setTsSearch(''); setTsCustomer(''); setTsProject(''); setTsStatus(''); setTsDateFrom(''); setTsDateTo(''); setTsPage(1)
+  }
+  function clearExpFilters() {
+    setExpSearch(''); setExpCustomer(''); setExpProject(''); setExpStatus(''); setExpDateFrom(''); setExpDateTo(''); setExpPage(1)
+  }
+
   useEffect(() => { loadTimesheets() }, [loadTimesheets])
   useEffect(() => { loadExpenses() },  [loadExpenses])
 
@@ -1359,6 +1369,12 @@ export default function MeuPainelPage() {
               from={tsDateFrom} to={tsDateTo}
               onChange={(f, t) => { setTsDateFrom(f); setTsDateTo(t); setTsPage(1) }}
             />
+            {hasTsFilters && (
+              <button onClick={clearTsFilters}
+                className="flex items-center gap-1 h-9 px-3 text-xs text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-lg hover:border-zinc-500 transition-colors shrink-0">
+                <X size={11} /> Limpar
+              </button>
+            )}
             <Button onClick={openCreateTs}
               className="bg-blue-600 hover:bg-blue-500 text-white h-9 px-4 text-xs gap-1.5 shrink-0">
               <Plus size={13} /> Novo
@@ -1494,6 +1510,12 @@ export default function MeuPainelPage() {
               from={expDateFrom} to={expDateTo}
               onChange={(f, t) => { setExpDateFrom(f); setExpDateTo(t); setExpPage(1) }}
             />
+            {hasExpFilters && (
+              <button onClick={clearExpFilters}
+                className="flex items-center gap-1 h-9 px-3 text-xs text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-lg hover:border-zinc-500 transition-colors shrink-0">
+                <X size={11} /> Limpar
+              </button>
+            )}
             <Button onClick={openCreateExp}
               className="bg-blue-600 hover:bg-blue-500 text-white h-9 px-4 text-xs gap-1.5 shrink-0">
               <Plus size={13} /> Nova
