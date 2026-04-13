@@ -518,7 +518,7 @@ export default function MeuPainelPage() {
 
   // Load support data once
   useEffect(() => {
-    api.get<any>('/projects?pageSize=200').then(r =>
+    api.get<any>('/my-projects?pageSize=200').then(r =>
       setProjects(Array.isArray(r?.items) ? r.items : [])
     ).catch(() => {})
 
