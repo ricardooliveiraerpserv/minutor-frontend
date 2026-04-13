@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import {
   ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, Lock,
   Clock, Receipt, BarChart2, LayoutDashboard, TrendingUp, TrendingDown, Minus, Eye,
-  CalendarDays, RefreshCw, ChevronDown, ChevronUp,
+  CalendarDays, RefreshCw, ChevronDown, ChevronUp, MoreVertical,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -615,6 +615,51 @@ function StatusBadge({ status, display }: { status: string; display?: string }) 
     <Badge variant="outline" className={`text-[10px] font-medium border ${STATUS_COLORS[status] ?? 'text-zinc-400 border-zinc-700'}`}>
       {STATUS_LABELS[status] ?? display ?? status}
     </Badge>
+  )
+}
+
+// ─── RowMenu ──────────────────────────────────────────────────────────────────
+
+interface RowMenuItem { label: string; icon: React.ReactNode; onClick: () => void; danger?: boolean }
+
+function RowMenu({ items }: { items: RowMenuItem[] }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  if (items.length === 0) return null
+
+  useEffect(() => {
+    if (!open) return
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  return (
+    <div ref={ref} className="relative flex justify-end">
+      <button
+        onClick={e => { e.stopPropagation(); setOpen(o => !o) }}
+        className={`p-1.5 rounded transition-colors ${open ? 'text-zinc-200 bg-zinc-700' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'}`}
+      >
+        <MoreVertical size={14} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[140px] bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl py-1 overflow-hidden">
+          {items.map((item, i) => (
+            <button key={i} onClick={() => { item.onClick(); setOpen(false) }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors text-left ${
+                item.danger
+                  ? 'text-red-400 hover:bg-red-500/10'
+                  : 'text-zinc-300 hover:bg-zinc-700'
+              }`}>
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -1434,25 +1479,14 @@ export default function MeuPainelPage() {
                       <td className="px-4 py-3.5">
                         <StatusBadge status={ts.status} display={ts.status_display} />
                       </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-0.5 justify-end">
-                          <button onClick={() => setTsViewItem(ts)}
-                            className="p-1.5 text-zinc-600 hover:text-blue-400 transition-colors rounded">
-                            <Eye size={12} />
-                          </button>
-                          {!locked && (
-                            <>
-                              <button onClick={() => openEditTs(ts)}
-                                className="p-1.5 text-zinc-600 hover:text-zinc-200 transition-colors rounded">
-                                <Pencil size={12} />
-                              </button>
-                              <button onClick={() => deleteTs(ts.id)}
-                                className="p-1.5 text-zinc-600 hover:text-red-400 transition-colors rounded">
-                                <Trash2 size={12} />
-                              </button>
-                            </>
-                          )}
-                        </div>
+                      <td className="px-4 py-3.5 w-10">
+                        <RowMenu items={[
+                          { label: 'Visualizar', icon: <Eye size={12} />, onClick: () => setTsViewItem(ts) },
+                          ...(!locked ? [
+                            { label: 'Editar', icon: <Pencil size={12} />, onClick: () => openEditTs(ts) },
+                            { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => deleteTs(ts.id), danger: true },
+                          ] : []),
+                        ]} />
                       </td>
                     </tr>
                   )
@@ -1572,19 +1606,13 @@ export default function MeuPainelPage() {
                       <td className="px-4 py-3.5">
                         <StatusBadge status={exp.status} display={exp.status_display} />
                       </td>
-                      <td className="px-4 py-3.5">
-                        {!locked && (
-                          <div className="flex items-center gap-0.5 justify-end">
-                            <button onClick={() => openEditExp(exp)}
-                              className="p-1.5 text-zinc-600 hover:text-zinc-200 transition-colors rounded">
-                              <Pencil size={12} />
-                            </button>
-                            <button onClick={() => deleteExp(exp.id)}
-                              className="p-1.5 text-zinc-600 hover:text-red-400 transition-colors rounded">
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        )}
+                      <td className="px-4 py-3.5 w-10">
+                        <RowMenu items={[
+                          ...(!locked ? [
+                            { label: 'Editar', icon: <Pencil size={12} />, onClick: () => openEditExp(exp) },
+                            { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => deleteExp(exp.id), danger: true },
+                          ] : []),
+                        ]} />
                       </td>
                     </tr>
                   )
