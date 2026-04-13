@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import {
   CheckSquare, Clock, Receipt, ChevronLeft, ChevronRight,
-  Check, XCircle, X, Filter, ChevronDown, Eye, Pencil,
+  Check, XCircle, X, Filter, ChevronDown, Eye, Pencil, RotateCcw,
 } from 'lucide-react'
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { api, ApiError } from '@/lib/api'
@@ -399,6 +399,9 @@ export default function ApprovalsPage() {
   const [actioning,    setActioning]    = useState<number | null>(null)
   const [rejectModal,  setRejectModal]  = useState<{ open: boolean; ids: number[] }>({ open: false, ids: [] })
   const [rejectReason, setRejectReason] = useState('')
+  const [adjModal,     setAdjModal]     = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
+  const [adjReason,    setAdjReason]    = useState('')
+  const [adjLoading,   setAdjLoading]   = useState(false)
 
   // View / approve-expense modals
   const [tsView,       setTsView]       = useState<TSItem | null>(null)
@@ -511,7 +514,7 @@ export default function ApprovalsPage() {
     finally { setApproving(false) }
   }
 
-  // Request adjustment on expense
+  // Request adjustment on expense (from modal)
   const requestAdjustmentExp = async (reason: string) => {
     if (!expApprove) return
     setApproving(true)
@@ -522,6 +525,19 @@ export default function ApprovalsPage() {
       loadExp()
     } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao solicitar ajuste') }
     finally { setApproving(false) }
+  }
+
+  // Request adjustment on expense (from row button)
+  const handleAdjustment = async () => {
+    if (!adjModal.id || !adjReason.trim()) return
+    setAdjLoading(true)
+    try {
+      await api.post(`/expenses/${adjModal.id}/request-adjustment`, { reason: adjReason.trim() })
+      toast.success('Ajuste solicitado ao colaborador')
+      setAdjModal({ open: false, id: null }); setAdjReason('')
+      loadExp()
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao solicitar ajuste') }
+    finally { setAdjLoading(false) }
   }
 
   // Bulk approve timesheets only
@@ -786,6 +802,10 @@ export default function ApprovalsPage() {
                       className="w-6 h-6 flex items-center justify-center rounded text-zinc-500 hover:text-green-400 hover:bg-green-400/10 transition-colors">
                       <Check size={13} />
                     </button>
+                    <button onClick={() => { setAdjModal({ open: true, id: exp.id }); setAdjReason('') }} title="Solicitar ajuste"
+                      className="w-6 h-6 flex items-center justify-center rounded text-zinc-500 hover:text-blue-400 hover:bg-blue-400/10 transition-colors">
+                      <RotateCcw size={12} />
+                    </button>
                     <button onClick={() => { setRejectModal({ open: true, ids: [exp.id] }); setRejectReason('') }} title="Rejeitar"
                       className="w-6 h-6 flex items-center justify-center rounded text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-colors">
                       <XCircle size={13} />
@@ -843,6 +863,34 @@ export default function ApprovalsPage() {
             setExpApprove(null)
           }}
         />
+      )}
+
+      {/* ── Modal: solicitar ajuste ── */}
+      {adjModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-sm p-5 shadow-xl">
+            <h3 className="text-sm font-semibold text-white mb-1">Solicitar Ajuste</h3>
+            <p className="text-xs text-zinc-400 mb-3">Descreva o que o colaborador deve corrigir antes da aprovação.</p>
+            <Label className="text-xs text-zinc-400">Motivo do ajuste *</Label>
+            <textarea
+              autoFocus
+              value={adjReason}
+              onChange={e => setAdjReason(e.target.value)}
+              placeholder="Ex: Comprovante ilegível, valor incorreto, descrição incompleta..."
+              rows={3}
+              className="mt-1 w-full bg-zinc-800 border border-zinc-700 text-white text-xs rounded-lg px-3 py-2 outline-none focus:border-blue-500 resize-none placeholder:text-zinc-600"
+            />
+            <div className="flex gap-2 mt-4 justify-end">
+              <Button variant="outline" onClick={() => { setAdjModal({ open: false, id: null }); setAdjReason('') }}
+                className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
+              <Button onClick={handleAdjustment} disabled={adjLoading || !adjReason.trim()}
+                className="h-8 text-xs bg-blue-600 hover:bg-blue-500 text-white">
+                <RotateCcw size={12} className="mr-1" />
+                {adjLoading ? 'Enviando...' : 'Solicitar ajuste'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Modal: rejeição ── */}
