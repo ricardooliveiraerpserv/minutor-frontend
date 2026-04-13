@@ -2172,11 +2172,16 @@ export default function MeuPainelPage() {
 
           {/* ── Histórico: últimos 12 meses ───────────────────────────────────── */}
           {(() => {
-            const hasRate   = hourlyRate > 0 && rateType === 'hourly'
-            const avgRevenue = history.length > 0
+            const hasRate    = hourlyRate > 0 && rateType === 'hourly'
+            const hasExpHist = history.some(p => p.expenses > 0)
+            const hasMonetary = hasRate || hasExpHist
+            const avgRevenue  = history.length > 0
               ? history.reduce((a, p) => a + p.revenue, 0) / history.filter(p => p.revenue > 0 || p.isCurrent).length
               : 0
-            const avgHours  = history.length > 0
+            const avgExpenses = history.length > 0
+              ? history.reduce((a, p) => a + p.expenses, 0) / history.filter(p => p.expenses > 0 || p.isCurrent).length
+              : 0
+            const avgHours   = history.length > 0
               ? history.reduce((a, p) => a + p.hours, 0) / history.filter(p => p.hours > 0 || p.isCurrent).length
               : 0
             // Tendência: últimos 3 vs 3 anteriores
@@ -2208,7 +2213,7 @@ export default function MeuPainelPage() {
                 <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
                   <div>
                     <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Evolução — Últimos 12 Meses</h3>
-                    <p className="text-[11px] text-zinc-600">Horas aprovadas{hasRate ? ' e receita' : ''} por mês</p>
+                    <p className="text-[11px] text-zinc-600">Horas{hasRate ? ', receita' : ''}{hasExpHist ? ' e despesas' : ''} aprovadas por mês</p>
                   </div>
                   <div className="flex items-center gap-4 flex-wrap">
                     <div className="text-right">
@@ -2219,6 +2224,12 @@ export default function MeuPainelPage() {
                       <div className="text-right">
                         <div className="text-[10px] text-zinc-500 mb-0.5">Receita média</div>
                         <div className="text-sm font-bold text-cyan-400">{formatBRL(avgRevenue)}</div>
+                      </div>
+                    )}
+                    {hasExpHist && (
+                      <div className="text-right">
+                        <div className="text-[10px] text-zinc-500 mb-0.5">Despesas médias</div>
+                        <div className="text-sm font-bold text-orange-400">{formatBRL(avgExpenses)}</div>
                       </div>
                     )}
                     <div className="text-right">
@@ -2241,7 +2252,7 @@ export default function MeuPainelPage() {
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
-                    <ComposedChart data={history} margin={{ top: 4, right: hasRate ? 16 : 4, left: 0, bottom: 0 }}>
+                    <ComposedChart data={history} margin={{ top: 4, right: hasMonetary ? 16 : 4, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
                       <XAxis dataKey="label" tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={false} tickLine={false} />
                       <YAxis
@@ -2254,9 +2265,9 @@ export default function MeuPainelPage() {
                         domain={[0, Math.ceil(maxHours * 1.15)]}
                         width={36}
                       />
-                      {hasRate && (
+                      {hasMonetary && (
                         <YAxis
-                          yAxisId="revenue"
+                          yAxisId="money"
                           orientation="right"
                           tick={{ fill: '#6B7280', fontSize: 11 }}
                           axisLine={false}
@@ -2269,15 +2280,23 @@ export default function MeuPainelPage() {
                       {/* Média de horas */}
                       <ReferenceLine yAxisId="hours" y={avgHours} stroke="rgba(255,255,255,0.12)" strokeDasharray="4 4" />
                       {/* Barras de horas */}
-                      <Bar yAxisId="hours" dataKey="hours" name="Horas" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                      <Bar yAxisId="hours" dataKey="hours" name="Horas" radius={[4, 4, 0, 0]} maxBarSize={hasExpHist ? 28 : 40}>
                         {history.map((p, i) => (
                           <rect key={i} fill={p.isCurrent ? '#00F5FF' : 'rgba(0,245,255,0.25)'} />
                         ))}
                       </Bar>
+                      {/* Barras de despesas */}
+                      {hasExpHist && (
+                        <Bar yAxisId="money" dataKey="expenses" name="Despesas" radius={[4, 4, 0, 0]} maxBarSize={28}>
+                          {history.map((p, i) => (
+                            <rect key={i} fill={p.isCurrent ? '#fb923c' : 'rgba(251,146,60,0.25)'} />
+                          ))}
+                        </Bar>
+                      )}
                       {/* Linha de receita */}
                       {hasRate && (
                         <Line
-                          yAxisId="revenue"
+                          yAxisId="money"
                           dataKey="revenue"
                           name="Receita"
                           type="monotone"
@@ -2297,7 +2316,7 @@ export default function MeuPainelPage() {
                 )}
 
                 {/* Legend */}
-                <div className="flex items-center gap-5 mt-4 justify-center">
+                <div className="flex items-center gap-5 mt-4 justify-center flex-wrap">
                   <div className="flex items-center gap-2 text-[11px] text-zinc-500">
                     <div className="w-3 h-3 rounded-sm bg-cyan-400/30" />
                     Horas (meses anteriores)
@@ -2306,6 +2325,12 @@ export default function MeuPainelPage() {
                     <div className="w-3 h-3 rounded-sm bg-cyan-400" />
                     Horas (mês atual)
                   </div>
+                  {hasExpHist && (
+                    <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+                      <div className="w-3 h-3 rounded-sm bg-orange-400" />
+                      Despesas aprovadas
+                    </div>
+                  )}
                   {hasRate && (
                     <div className="flex items-center gap-2 text-[11px] text-zinc-500">
                       <div className="w-6 h-0.5 bg-violet-400" />
