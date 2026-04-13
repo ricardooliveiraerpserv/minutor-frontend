@@ -539,7 +539,6 @@ export default function MeuPainelPage() {
 
   // ── Support data ───────────────────────────────────────────────────────────
   const [projects,       setProjects]       = useState<ProjectOption[]>([])
-  const [customers,      setCustomers]      = useState<{ id: number; name: string }[]>([])
   const [categories,     setCategories]     = useState<CategoryOption[]>([])
   const [paymentMethods, setPaymentMethods] = useState<{ value: string; label: string }[]>([])
 
@@ -547,10 +546,6 @@ export default function MeuPainelPage() {
   useEffect(() => {
     api.get<any>('/my-projects?pageSize=200').then(r =>
       setProjects(Array.isArray(r?.items) ? r.items : [])
-    ).catch(() => {})
-
-    api.get<any>('/customers?pageSize=1000').then(r =>
-      setCustomers(Array.isArray(r?.items) ? r.items : [])
     ).catch(() => {})
 
     api.get<any>('/expense-categories?per_page=200').then(r => {
@@ -1078,7 +1073,7 @@ export default function MeuPainelPage() {
               onChange={e => { setTsCustomer(e.target.value); setTsPage(1) }}
               className="bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs rounded-lg h-9 px-2.5 outline-none">
               <option value="">Todos os clientes</option>
-              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {consultantCustomers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <select value={tsProject}
               onChange={e => { setTsProject(e.target.value); setTsPage(1) }}
