@@ -425,12 +425,35 @@ function SelectField({ label, value, onChange, children, required }: {
 
 const todayISO = () => new Date().toISOString().split('T')[0]
 
+// ── Time helpers ─────────────────────────────────────────────────────────────
+function addHoursToTime(timeStr: string, hours: number): string {
+  const [h, m] = timeStr.split(':').map(Number)
+  const totalMin = h * 60 + m + Math.round(hours * 60)
+  const newH = Math.floor(totalMin / 60) % 24
+  const newM = totalMin % 60
+  return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`
+}
+function timeDiffHours(start: string, end: string): number {
+  const [sh, sm] = start.split(':').map(Number)
+  const [eh, em] = end.split(':').map(Number)
+  const startMin = sh * 60 + sm
+  let endMin = eh * 60 + em
+  if (endMin <= startMin) endMin += 24 * 60
+  return (endMin - startMin) / 60
+}
+function hoursToHHMM(hours: number): string {
+  const h = Math.floor(hours)
+  const m = Math.round((hours - h) * 60)
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
 const EMPTY_TS = {
   customer_id: '',
   project_id:  '',
   date:        todayISO(),
   start_time:  '09:00',
   end_time:    '18:00',
+  total_hours: '',   // decimal string e.g. "3" or "3.5"
   observation: '',
   ticket:      '',
 }
@@ -617,12 +640,16 @@ export default function MeuPainelPage() {
 
   const openEditTs = (item: TimesheetItem) => {
     const proj = projects.find(p => p.id === item.project_id)
+    const derivedTotal = item.start_time && item.end_time
+      ? String(Math.round(timeDiffHours(item.start_time, item.end_time) * 10) / 10)
+      : item.effort_hours ? String(Math.round(parseFloat(item.effort_hours) * 10) / 10) : ''
     setTsForm({
       customer_id: proj?.customer ? String(proj.customer.id) : '',
       project_id:  String(item.project_id),
       date:        item.date,
       start_time:  item.start_time,
       end_time:    item.end_time,
+      total_hours: derivedTotal,
       observation: item.observation ?? '',
       ticket:      item.ticket ?? '',
     })
@@ -632,15 +659,26 @@ export default function MeuPainelPage() {
   const saveTs = async () => {
     if (!tsForm.project_id) { toast.error('Selecione um projeto'); return }
     if (!tsForm.date)        { toast.error('Informe a data'); return }
+    const totalVal = parseFloat(tsForm.total_hours)
+    const hasTotal = !isNaN(totalVal) && totalVal > 0
+    const hasStart = !!tsForm.start_time
+    if (!hasTotal && !hasStart) { toast.error('Informe o horário ou o total de horas'); return }
     setTsSaving(true)
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         project_id:  Number(tsForm.project_id),
         date:        tsForm.date,
-        start_time:  tsForm.start_time,
-        end_time:    tsForm.end_time,
         observation: tsForm.observation || undefined,
         ticket:      tsForm.ticket      || undefined,
+      }
+      if (hasTotal && !hasStart) {
+        // Total informado sem início/fim — envia total_hours diretamente
+        payload.total_hours = hoursToHHMM(totalVal)
+        payload.start_time  = null
+        payload.end_time    = null
+      } else {
+        payload.start_time = tsForm.start_time
+        payload.end_time   = tsForm.end_time
       }
       if (tsModal.item) await api.put(`/timesheets/${tsModal.item.id}`, payload)
       else              await api.post('/timesheets', payload)
@@ -1491,17 +1529,52 @@ export default function MeuPainelPage() {
                 className="mt-1.5 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <Label className="text-xs text-zinc-400">Início</Label>
                 <Input type="time" value={tsForm.start_time}
-                  onChange={e => setTsForm(f => ({ ...f, start_time: e.target.value }))}
+                  onChange={e => {
+                    const start = e.target.value
+                    setTsForm(f => {
+                      const hours = parseFloat(f.total_hours)
+                      const end = !isNaN(hours) && hours > 0 && start
+                        ? addHoursToTime(start, hours)
+                        : f.end_time
+                      return { ...f, start_time: start, end_time: end }
+                    })
+                  }}
                   className="mt-1.5 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
               </div>
               <div>
                 <Label className="text-xs text-zinc-400">Fim</Label>
                 <Input type="time" value={tsForm.end_time}
-                  onChange={e => setTsForm(f => ({ ...f, end_time: e.target.value }))}
+                  onChange={e => {
+                    const end = e.target.value
+                    setTsForm(f => {
+                      const total = f.start_time && end
+                        ? String(Math.round(timeDiffHours(f.start_time, end) * 10) / 10)
+                        : f.total_hours
+                      return { ...f, end_time: end, total_hours: total }
+                    })
+                  }}
+                  className="mt-1.5 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
+              </div>
+              <div>
+                <Label className="text-xs text-zinc-400">Total (h)</Label>
+                <Input
+                  type="number" min="0.5" max="24" step="0.5"
+                  value={tsForm.total_hours}
+                  onChange={e => {
+                    const val = e.target.value
+                    setTsForm(f => {
+                      const hours = parseFloat(val)
+                      const end = !isNaN(hours) && hours > 0 && f.start_time
+                        ? addHoursToTime(f.start_time, hours)
+                        : f.end_time
+                      return { ...f, total_hours: val, end_time: end }
+                    })
+                  }}
+                  placeholder="0"
                   className="mt-1.5 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
               </div>
             </div>
