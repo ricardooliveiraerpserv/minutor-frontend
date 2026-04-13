@@ -170,6 +170,34 @@ function CurrencyInput({ value, onChange, placeholder, className }: {
   )
 }
 
+function GroupsSelector({ roles, selected, onChange }: {
+  roles: RoleOption[]; selected: number[]; onChange: (ids: number[]) => void
+}) {
+  const groups = roles.filter(r => !PRIMARY_ROLE_NAMES.includes(r.name))
+  if (groups.length === 0) return (
+    <p className="text-[10px] text-zinc-500 italic">Nenhum grupo de permissão cadastrado.</p>
+  )
+  return (
+    <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+      {groups.map(g => {
+        const checked = selected.includes(g.id)
+        return (
+          <button key={g.id} type="button"
+            onClick={() => onChange(checked ? selected.filter(id => id !== g.id) : [...selected, g.id])}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs text-left transition-colors ${
+              checked ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30' : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:border-zinc-500 hover:text-zinc-200'
+            }`}>
+            <span className={`w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 border ${checked ? 'bg-blue-600 border-blue-500' : 'border-zinc-600'}`}>
+              {checked && <Check size={9} className="text-white" />}
+            </span>
+            {g.name}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function TableSkeleton() {
   return (
     <>
@@ -186,6 +214,9 @@ function TableSkeleton() {
 
 // ─── Form state ───────────────────────────────────────────────────────────────
 
+// Roles que representam o perfil primário — não aparecem como "grupos extras"
+const PRIMARY_ROLE_NAMES = ['Administrador', 'Administrator', 'Consultor', 'Coordenador', 'Parceiro ADM', 'Cliente']
+
 const EMPTY_FORM = {
   name: '', email: '', password: '', enabled: true,
   hourly_rate: '', rate_type: 'hourly' as 'hourly' | 'monthly',
@@ -196,6 +227,7 @@ const EMPTY_FORM = {
   is_partner_adm: false,
   customer_id: '' as number | '',
   partner_id:  '' as number | '',
+  extra_role_ids: [] as number[],
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -256,9 +288,12 @@ export function UserManagementTab() {
   const openEdit = (item: UserItem) => {
     const roleNames = item.roles?.map(r => r.name) ?? []
     const { profile } = resolveProfileFromRoles(roleNames)
-    // Prefer stored consultant_type; fall back to deriving from rate_type
     const consultant_type = (item.consultant_type as ConsultantType | undefined)
       ?? (item.rate_type === 'hourly' ? 'horista' : item.rate_type === 'monthly' ? 'bh_fixo' : '')
+    // Grupos extras = roles que não são perfis primários
+    const extraRoleIds = (item.roles ?? [])
+      .filter(r => !PRIMARY_ROLE_NAMES.includes(r.name))
+      .map(r => r.id)
     setForm({
       name: item.name, email: item.email, password: '',
       enabled: item.enabled,
@@ -271,6 +306,7 @@ export function UserManagementTab() {
       is_partner_adm: item.is_executive ?? false,
       customer_id: item.customer_id ?? '',
       partner_id:  item.partner_id  ?? '',
+      extra_role_ids: extraRoleIds,
     })
     setModal({ open: true, item })
   }
@@ -284,7 +320,7 @@ export function UserManagementTab() {
     try {
       const payload: Record<string, unknown> = {
         name: form.name, email: form.email, enabled: form.enabled,
-        roles: [role.id],
+        roles: [role.id, ...form.extra_role_ids],
         customer_id: form.profile === 'cliente' && form.customer_id ? form.customer_id : null,
         partner_id:  form.profile === 'parceiro_adm' && form.partner_id ? form.partner_id : null,
         is_executive: form.profile === 'parceiro_adm' ? form.is_partner_adm : false,
@@ -561,6 +597,17 @@ export function UserManagementTab() {
                     <Toggle value={form.is_partner_adm}
                       onChange={() => setForm(f => ({ ...f, is_partner_adm: !f.is_partner_adm }))}
                       label="É administrador do parceiro" />
+                  </div>
+                )}
+                {/* Grupos de permissão extras — disponível para todos os perfis exceto Administrador */}
+                {form.profile && form.profile !== 'cliente' && (
+                  <div>
+                    <Label className="text-xs text-zinc-400 mb-1.5 block">Grupos de Permissão</Label>
+                    <GroupsSelector
+                      roles={roles}
+                      selected={form.extra_role_ids}
+                      onChange={ids => setForm(f => ({ ...f, extra_role_ids: ids }))}
+                    />
                   </div>
                 )}
                 <Toggle value={form.enabled} onChange={() => setForm(f => ({ ...f, enabled: !f.enabled }))} label="Ativo" />
