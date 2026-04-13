@@ -317,6 +317,9 @@ function RolesTab() {
   const [permModal, setPermModal] = useState<Role | null>(null)
   const [allPerms, setAllPerms] = useState<{ group: string; permissions: Permission[] }[]>([])
   const [selectedPerms, setSelectedPerms] = useState<string[]>([])
+  const [allUsers, setAllUsers] = useState<{ id: number; name: string; email: string }[]>([])
+  const [selectedUserIds, setSelectedUserIds] = useState<number[]>([])
+  const [userSearch, setUserSearch] = useState('')
   const [form, setForm] = useState({ name: '' })
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<number | null>(null)
@@ -335,20 +338,34 @@ function RolesTab() {
   const openPerms = async (role: Role) => {
     setPermModal(role)
     setSelectedPerms(role.permissions?.map(p => p.id) ?? [])
+    setUserSearch('')
+    // Carrega permissões disponíveis (só uma vez)
     if (allPerms.length === 0) {
       try {
         const r = await api.get<{ data: { group: string; permissions: Permission[] }[] }>('/permissions/grouped')
         setAllPerms(Array.isArray(r?.data) ? r.data : Array.isArray(r) ? (r as unknown as { group: string; permissions: Permission[] }[]) : [])
       } catch { toast.error('Erro ao carregar permissões') }
     }
+    // Carrega usuários disponíveis e pré-seleciona os já vinculados ao role
+    try {
+      const [usersRes, roleUsersRes] = await Promise.all([
+        api.get<{ items: { id: number; name: string; email: string }[] }>('/users?pageSize=500'),
+        api.get<{ items: { id: number; name: string; email: string }[] }>(`/roles/${role.id}/users`),
+      ])
+      setAllUsers(Array.isArray(usersRes?.items) ? usersRes.items : [])
+      setSelectedUserIds((roleUsersRes?.items ?? []).map((u: { id: number }) => u.id))
+    } catch { toast.error('Erro ao carregar usuários') }
   }
 
   const savePerms = async () => {
     if (!permModal) return
     setSaving(true)
     try {
-      await api.post(`/roles/${permModal.id}/permissions`, { permissions: selectedPerms })
-      toast.success('Permissões atualizadas')
+      await Promise.all([
+        api.post(`/roles/${permModal.id}/permissions`, { permissions: selectedPerms }),
+        api.post(`/roles/${permModal.id}/sync-users`, { user_ids: selectedUserIds }),
+      ])
+      toast.success('Permissões e consultores atualizados')
       setPermModal(null)
       load()
     } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao salvar') }
@@ -458,6 +475,39 @@ function RolesTab() {
                 </div>
               ))}
             </div>
+            {/* Seção: Consultores vinculados */}
+            <div className="mt-2">
+              <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wide mb-2 border-b border-zinc-800 pb-1">Consultores vinculados</p>
+              <input
+                type="text"
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                placeholder="Buscar consultor..."
+                className="w-full bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded-md h-8 px-2.5 outline-none mb-2 focus:border-zinc-500"
+              />
+              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+                {allUsers
+                  .filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.email.toLowerCase().includes(userSearch.toLowerCase()))
+                  .map(u => {
+                    const checked = selectedUserIds.includes(u.id)
+                    return (
+                      <label key={u.id} className="flex items-center gap-2 cursor-pointer group">
+                        <div
+                          onClick={() => setSelectedUserIds(ids => checked ? ids.filter(id => id !== u.id) : [...ids, u.id])}
+                          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${checked ? 'bg-blue-600 border-blue-600' : 'border-zinc-600 hover:border-zinc-400'}`}
+                        >
+                          {checked && <Check size={10} className="text-white" />}
+                        </div>
+                        <span className="text-xs text-zinc-300 group-hover:text-white transition-colors leading-tight">
+                          {u.name} <span className="text-zinc-500">{u.email}</span>
+                        </span>
+                      </label>
+                    )
+                  })}
+                {allUsers.length === 0 && <p className="text-xs text-zinc-500 italic">Nenhum usuário encontrado.</p>}
+              </div>
+            </div>
+
             <div className="flex gap-2 mt-5 justify-end sticky bottom-0 bg-zinc-900 pt-3 border-t border-zinc-800">
               <Button variant="outline" onClick={() => setPermModal(null)} className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
               <Button onClick={savePerms} disabled={saving} className="h-8 text-xs bg-blue-600 hover:bg-blue-500 text-white">
