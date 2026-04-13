@@ -17,6 +17,10 @@ import {
   CalendarDays, RefreshCw, ChevronDown, ChevronUp, MoreVertical,
   AlertTriangle, Zap, Users, DollarSign, Target, Activity,
 } from 'lucide-react'
+import {
+  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, ReferenceLine,
+} from 'recharts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -986,6 +990,67 @@ export default function MeuPainelPage() {
 
   // Reset pages when period changes
   useEffect(() => { setTsPage(1); setExpPage(1) }, [startDate, endDate])
+
+  // ── History: últimos 12 meses ──────────────────────────────────────────────
+
+  interface MonthPoint {
+    ym: string        // 'YYYY-MM'
+    label: string     // 'Jan', 'Fev' ...
+    hours: number     // horas aprovadas
+    revenue: number   // R$ (approved hours × rate)
+    expenses: number  // R$ despesas aprovadas
+    isCurrent: boolean
+  }
+
+  const [history,        setHistory]        = useState<MonthPoint[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+
+  useEffect(() => {
+    if (!user?.id) return
+    const rate = (user as any)?.hourly_rate ?? 0
+    const rType = (user as any)?.rate_type ?? 'hourly'
+
+    async function load() {
+      setHistoryLoading(true)
+      try {
+        const now   = new Date()
+        const end12 = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`
+        const start = new Date(now.getFullYear(), now.getMonth() - 11, 1)
+        const start12 = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-01`
+
+        const [tsRes, expRes] = await Promise.all([
+          api.get<any>(`/timesheets?start_date=${start12}&end_date=${end12}&per_page=2000&status=approved`),
+          api.get<any>(`/expenses?start_date=${start12}&end_date=${end12}&per_page=2000&status=approved`),
+        ])
+
+        const tsList: TimesheetItem[] = Array.isArray(tsRes?.items) ? tsRes.items : []
+        const expList: ExpenseItem[]  = Array.isArray(expRes?.items) ? expRes.items : []
+
+        // Build month buckets
+        const MONTH_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+        const points: MonthPoint[] = []
+        for (let i = 11; i >= 0; i--) {
+          const d   = new Date(now.getFullYear(), now.getMonth() - i, 1)
+          const ym  = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+          const isCurrent = i === 0
+
+          const monthTs  = tsList.filter(t => t.date?.startsWith(ym))
+          const monthExp = expList.filter(e => e.expense_date?.startsWith(ym))
+
+          const totalMin = monthTs.reduce((a, t) => a + (t.effort_minutes ?? 0), 0)
+          const hours    = totalMin / 60
+          const revenue  = rate > 0 && rType === 'hourly' ? hours * rate : 0
+          const expenses = monthExp.reduce((a, e) => a + (parseFloat(String(e.amount)) || 0), 0)
+
+          points.push({ ym, label: MONTH_SHORT[d.getMonth()], hours, revenue, expenses, isCurrent })
+        }
+        setHistory(points)
+      } catch { /* silent */ }
+      finally { setHistoryLoading(false) }
+    }
+
+    load()
+  }, [user])
 
   // ── Load Banco de Horas (only for bh_fixo / bh_mensal consultants) ─────────
   useEffect(() => {
@@ -2104,6 +2169,153 @@ export default function MeuPainelPage() {
               </div>
             )}
           </div>
+
+          {/* ── Histórico: últimos 12 meses ───────────────────────────────────── */}
+          {(() => {
+            const hasRate   = hourlyRate > 0 && rateType === 'hourly'
+            const avgRevenue = history.length > 0
+              ? history.reduce((a, p) => a + p.revenue, 0) / history.filter(p => p.revenue > 0 || p.isCurrent).length
+              : 0
+            const avgHours  = history.length > 0
+              ? history.reduce((a, p) => a + p.hours, 0) / history.filter(p => p.hours > 0 || p.isCurrent).length
+              : 0
+            // Tendência: últimos 3 vs 3 anteriores
+            const last3   = history.slice(-3).reduce((a, p) => a + p.hours, 0) / 3
+            const prev3   = history.slice(-6, -3).reduce((a, p) => a + p.hours, 0) / 3
+            const trend   = prev3 > 0 ? ((last3 - prev3) / prev3) * 100 : 0
+            const maxHours = Math.max(...history.map(p => p.hours), 1)
+
+            // Custom tooltip
+            const CustomTooltip = ({ active, payload, label }: any) => {
+              if (!active || !payload?.length) return null
+              return (
+                <div style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#E5E7EB' }}>
+                  <p className="font-semibold mb-2 text-zinc-300">{label}</p>
+                  {payload.map((p: any) => (
+                    <div key={p.name} className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full" style={{ background: p.color ?? p.fill }} />
+                      <span className="text-zinc-400">{p.name}:</span>
+                      <span className="font-semibold text-white">{p.name === 'Horas' ? `${Number(p.value).toFixed(1)}h` : formatBRL(Number(p.value))}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            }
+
+            return (
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+                {/* Header */}
+                <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+                  <div>
+                    <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Evolução — Últimos 12 Meses</h3>
+                    <p className="text-[11px] text-zinc-600">Horas aprovadas{hasRate ? ' e receita' : ''} por mês</p>
+                  </div>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div className="text-right">
+                      <div className="text-[10px] text-zinc-500 mb-0.5">Média mensal</div>
+                      <div className="text-sm font-bold text-white font-mono">{avgHours.toFixed(1)}h</div>
+                    </div>
+                    {hasRate && (
+                      <div className="text-right">
+                        <div className="text-[10px] text-zinc-500 mb-0.5">Receita média</div>
+                        <div className="text-sm font-bold text-cyan-400">{formatBRL(avgRevenue)}</div>
+                      </div>
+                    )}
+                    <div className="text-right">
+                      <div className="text-[10px] text-zinc-500 mb-0.5">Tendência (3m)</div>
+                      <div className={`text-sm font-bold flex items-center gap-1 justify-end ${trend > 0 ? 'text-green-400' : trend < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
+                        {trend > 0 ? <TrendingUp size={13} /> : trend < 0 ? <TrendingDown size={13} /> : <Minus size={13} />}
+                        {Math.abs(trend).toFixed(0)}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {historyLoading ? (
+                  <div className="h-56 flex items-center justify-center">
+                    <div className="text-xs text-zinc-600 animate-pulse">Carregando histórico…</div>
+                  </div>
+                ) : history.every(p => p.hours === 0) ? (
+                  <div className="h-56 flex items-center justify-center">
+                    <p className="text-sm text-zinc-600">Nenhum apontamento aprovado nos últimos 12 meses</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <ComposedChart data={history} margin={{ top: 4, right: hasRate ? 16 : 4, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis
+                        yAxisId="hours"
+                        orientation="left"
+                        tick={{ fill: '#6B7280', fontSize: 11 }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={v => `${v}h`}
+                        domain={[0, Math.ceil(maxHours * 1.15)]}
+                        width={36}
+                      />
+                      {hasRate && (
+                        <YAxis
+                          yAxisId="revenue"
+                          orientation="right"
+                          tick={{ fill: '#6B7280', fontSize: 11 }}
+                          axisLine={false}
+                          tickLine={false}
+                          tickFormatter={v => `${(v / 1000).toFixed(0)}k`}
+                          width={36}
+                        />
+                      )}
+                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                      {/* Média de horas */}
+                      <ReferenceLine yAxisId="hours" y={avgHours} stroke="rgba(255,255,255,0.12)" strokeDasharray="4 4" />
+                      {/* Barras de horas */}
+                      <Bar yAxisId="hours" dataKey="hours" name="Horas" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                        {history.map((p, i) => (
+                          <rect key={i} fill={p.isCurrent ? '#00F5FF' : 'rgba(0,245,255,0.25)'} />
+                        ))}
+                      </Bar>
+                      {/* Linha de receita */}
+                      {hasRate && (
+                        <Line
+                          yAxisId="revenue"
+                          dataKey="revenue"
+                          name="Receita"
+                          type="monotone"
+                          stroke="#a78bfa"
+                          strokeWidth={2}
+                          dot={(props: any) => {
+                            const { cx, cy, payload } = props
+                            return payload.isCurrent
+                              ? <circle key={`dot-${cx}`} cx={cx} cy={cy} r={4} fill="#a78bfa" stroke="#a78bfa" />
+                              : <circle key={`dot-${cx}`} cx={cx} cy={cy} r={2.5} fill="#a78bfa" stroke="transparent" />
+                          }}
+                          activeDot={{ r: 5, fill: '#a78bfa' }}
+                        />
+                      )}
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                )}
+
+                {/* Legend */}
+                <div className="flex items-center gap-5 mt-4 justify-center">
+                  <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+                    <div className="w-3 h-3 rounded-sm bg-cyan-400/30" />
+                    Horas (meses anteriores)
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+                    <div className="w-3 h-3 rounded-sm bg-cyan-400" />
+                    Horas (mês atual)
+                  </div>
+                  {hasRate && (
+                    <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+                      <div className="w-6 h-0.5 bg-violet-400" />
+                      Receita
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
 
         </div>
       )}
