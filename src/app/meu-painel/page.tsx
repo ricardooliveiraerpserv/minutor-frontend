@@ -503,7 +503,7 @@ function DateRangePicker({ from, to, onChange }: {
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-4 left-0">
+        <div className="absolute z-50 mt-1 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-4 right-0">
           <div className="flex items-center gap-4">
             <button type="button" onClick={prevMonth}
               className="text-zinc-500 hover:text-zinc-200 p-1 shrink-0">
