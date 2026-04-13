@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, ReferenceLine,
+  Tooltip, ResponsiveContainer, ReferenceLine, Cell,
 } from 'recharts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -2172,71 +2172,103 @@ export default function MeuPainelPage() {
 
           {/* ── Histórico: últimos 12 meses ───────────────────────────────────── */}
           {(() => {
-            const hasRate    = hourlyRate > 0 && rateType === 'hourly'
-            const hasExpHist = history.some(p => p.expenses > 0)
+            const hasRate     = hourlyRate > 0 && rateType === 'hourly'
+            const hasExpHist  = history.some(p => p.expenses > 0)
             const hasMonetary = hasRate || hasExpHist
-            const avgRevenue  = history.length > 0
-              ? history.reduce((a, p) => a + p.revenue, 0) / history.filter(p => p.revenue > 0 || p.isCurrent).length
-              : 0
-            const avgExpenses = history.length > 0
-              ? history.reduce((a, p) => a + p.expenses, 0) / history.filter(p => p.expenses > 0 || p.isCurrent).length
-              : 0
-            const avgHours   = history.length > 0
-              ? history.reduce((a, p) => a + p.hours, 0) / history.filter(p => p.hours > 0 || p.isCurrent).length
-              : 0
-            // Tendência: últimos 3 vs 3 anteriores
-            const last3   = history.slice(-3).reduce((a, p) => a + p.hours, 0) / 3
-            const prev3   = history.slice(-6, -3).reduce((a, p) => a + p.hours, 0) / 3
-            const trend   = prev3 > 0 ? ((last3 - prev3) / prev3) * 100 : 0
+
+            const nonEmpty = (arr: typeof history) => arr.filter(p => p.hours > 0)
+            const avgHours    = nonEmpty(history).length > 0
+              ? nonEmpty(history).reduce((a, p) => a + p.hours, 0) / nonEmpty(history).length : 0
+            const avgRevenue  = nonEmpty(history).length > 0 && hasRate
+              ? nonEmpty(history).reduce((a, p) => a + p.revenue, 0) / nonEmpty(history).length : 0
+            const avgExpenses = history.filter(p => p.expenses > 0).length > 0
+              ? history.filter(p => p.expenses > 0).reduce((a, p) => a + p.expenses, 0) / history.filter(p => p.expenses > 0).length : 0
+
+            // Tendência horas: últimos 3 vs 3 anteriores
+            const last3h  = history.slice(-3).reduce((a, p) => a + p.hours, 0) / 3
+            const prev3h  = history.slice(-6, -3).reduce((a, p) => a + p.hours, 0) / 3
+            const trendH  = prev3h > 0 ? ((last3h - prev3h) / prev3h) * 100 : 0
             const maxHours = Math.max(...history.map(p => p.hours), 1)
 
-            // Custom tooltip
+            // Tooltip customizado
             const CustomTooltip = ({ active, payload, label }: any) => {
               if (!active || !payload?.length) return null
+              const hoursEntry   = payload.find((p: any) => p.dataKey === 'hours')
+              const expEntry     = payload.find((p: any) => p.dataKey === 'expenses')
+              const revEntry     = payload.find((p: any) => p.dataKey === 'revenue')
+              // variação vs mês anterior
+              const idx = history.findIndex(p => p.label === label)
+              const prev = idx > 0 ? history[idx - 1].hours : null
+              const varH = prev !== null && prev > 0 ? ((history[idx].hours - prev) / prev) * 100 : null
               return (
-                <div style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#E5E7EB' }}>
-                  <p className="font-semibold mb-2 text-zinc-300">{label}</p>
-                  {payload.map((p: any) => (
-                    <div key={p.name} className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ background: p.color ?? p.fill }} />
-                      <span className="text-zinc-400">{p.name}:</span>
-                      <span className="font-semibold text-white">{p.name === 'Horas' ? `${Number(p.value).toFixed(1)}h` : formatBRL(Number(p.value))}</span>
+                <div style={{
+                  background: '#161618', border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 12, padding: '12px 16px', minWidth: 160,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: '#E4E4E7', marginBottom: 10 }}>{label}</p>
+                  {hoursEntry && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 20, marginBottom: 5 }}>
+                      <span style={{ fontSize: 11, color: '#71717A' }}>Horas</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#00F5FF', fontFamily: 'monospace' }}>
+                        {Number(hoursEntry.value).toFixed(1)}h
+                        {varH !== null && (
+                          <span style={{ marginLeft: 6, fontSize: 10, color: varH >= 0 ? '#4ade80' : '#f87171' }}>
+                            {varH >= 0 ? '+' : ''}{varH.toFixed(0)}%
+                          </span>
+                        )}
+                      </span>
                     </div>
-                  ))}
+                  )}
+                  {expEntry && Number(expEntry.value) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 20, marginBottom: 5 }}>
+                      <span style={{ fontSize: 11, color: '#71717A' }}>Despesas</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#F59E0B' }}>{formatBRL(Number(expEntry.value))}</span>
+                    </div>
+                  )}
+                  {revEntry && Number(revEntry.value) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 20 }}>
+                      <span style={{ fontSize: 11, color: '#71717A' }}>Receita</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#a78bfa' }}>{formatBRL(Number(revEntry.value))}</span>
+                    </div>
+                  )}
                 </div>
               )
             }
 
             return (
               <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-                {/* Header */}
-                <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+
+                {/* ── Header ── */}
+                <div className="flex flex-wrap items-start justify-between gap-6 mb-6">
                   <div>
-                    <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Evolução — Últimos 12 Meses</h3>
-                    <p className="text-[11px] text-zinc-600">Horas{hasRate ? ', receita' : ''}{hasExpHist ? ' e despesas' : ''} aprovadas por mês</p>
+                    <h3 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">Evolução — Últimos 12 Meses</h3>
+                    <p className="text-[11px] text-zinc-600 mt-0.5">Horas aprovadas{hasExpHist ? ' · despesas' : ''}{hasRate ? ' · receita' : ''}</p>
                   </div>
-                  <div className="flex items-center gap-4 flex-wrap">
-                    <div className="text-right">
-                      <div className="text-[10px] text-zinc-500 mb-0.5">Média mensal</div>
-                      <div className="text-sm font-bold text-white font-mono">{avgHours.toFixed(1)}h</div>
+
+                  {/* Stats pills */}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] text-zinc-500">Horas médias</span>
+                      <span className="text-sm font-bold text-white font-mono">{avgHours.toFixed(1)}h</span>
                     </div>
-                    {hasRate && (
-                      <div className="text-right">
-                        <div className="text-[10px] text-zinc-500 mb-0.5">Receita média</div>
-                        <div className="text-sm font-bold text-cyan-400">{formatBRL(avgRevenue)}</div>
+                    {hasRate && avgRevenue > 0 && (
+                      <div className="flex flex-col items-end pl-3 border-l border-zinc-800">
+                        <span className="text-[10px] text-zinc-500">Receita média</span>
+                        <span className="text-sm font-bold text-violet-400">{formatBRL(avgRevenue)}</span>
                       </div>
                     )}
-                    {hasExpHist && (
-                      <div className="text-right">
-                        <div className="text-[10px] text-zinc-500 mb-0.5">Despesas médias</div>
-                        <div className="text-sm font-bold text-orange-400">{formatBRL(avgExpenses)}</div>
+                    {hasExpHist && avgExpenses > 0 && (
+                      <div className="flex flex-col items-end pl-3 border-l border-zinc-800">
+                        <span className="text-[10px] text-zinc-500">Despesas médias</span>
+                        <span className="text-sm font-bold text-amber-400">{formatBRL(avgExpenses)}</span>
                       </div>
                     )}
-                    <div className="text-right">
-                      <div className="text-[10px] text-zinc-500 mb-0.5">Tendência (3m)</div>
-                      <div className={`text-sm font-bold flex items-center gap-1 justify-end ${trend > 0 ? 'text-green-400' : trend < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
-                        {trend > 0 ? <TrendingUp size={13} /> : trend < 0 ? <TrendingDown size={13} /> : <Minus size={13} />}
-                        {Math.abs(trend).toFixed(0)}%
+                    <div className={`flex items-center gap-1.5 pl-3 border-l border-zinc-800 text-sm font-bold ${trendH > 2 ? 'text-green-400' : trendH < -2 ? 'text-red-400' : 'text-zinc-500'}`}>
+                      {trendH > 2 ? <TrendingUp size={14} /> : trendH < -2 ? <TrendingDown size={14} /> : <Minus size={14} />}
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10px] text-zinc-500 font-normal">Tendência 3m</span>
+                        <span>{trendH > 0 ? '+' : ''}{trendH.toFixed(0)}%</span>
                       </div>
                     </div>
                   </div>
@@ -2246,53 +2278,89 @@ export default function MeuPainelPage() {
                   <div className="h-56 flex items-center justify-center">
                     <div className="text-xs text-zinc-600 animate-pulse">Carregando histórico…</div>
                   </div>
-                ) : history.every(p => p.hours === 0) ? (
+                ) : history.every(p => p.hours === 0 && p.expenses === 0) ? (
                   <div className="h-56 flex items-center justify-center">
-                    <p className="text-sm text-zinc-600">Nenhum apontamento aprovado nos últimos 12 meses</p>
+                    <p className="text-sm text-zinc-600">Nenhum dado aprovado nos últimos 12 meses</p>
                   </div>
                 ) : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <ComposedChart data={history} margin={{ top: 4, right: hasMonetary ? 16 : 4, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <ResponsiveContainer width="100%" height={230}>
+                    <ComposedChart data={history} margin={{ top: 8, right: hasMonetary ? 48 : 8, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fill: '#52525B', fontSize: 11 }}
+                        axisLine={{ stroke: 'rgba(255,255,255,0.06)' }}
+                        tickLine={false}
+                      />
+
+                      {/* Eixo esquerdo: horas */}
                       <YAxis
                         yAxisId="hours"
                         orientation="left"
-                        tick={{ fill: '#6B7280', fontSize: 11 }}
+                        tick={{ fill: '#52525B', fontSize: 11 }}
                         axisLine={false}
                         tickLine={false}
-                        tickFormatter={v => `${v}h`}
-                        domain={[0, Math.ceil(maxHours * 1.15)]}
-                        width={36}
+                        tickFormatter={v => v === 0 ? '0h' : `${v}h`}
+                        domain={[0, Math.ceil(maxHours * 1.2)]}
+                        width={40}
                       />
+
+                      {/* Eixo direito: R$ */}
                       {hasMonetary && (
                         <YAxis
                           yAxisId="money"
                           orientation="right"
-                          tick={{ fill: '#6B7280', fontSize: 11 }}
+                          tick={{ fill: '#52525B', fontSize: 11 }}
                           axisLine={false}
                           tickLine={false}
-                          tickFormatter={v => `${(v / 1000).toFixed(0)}k`}
-                          width={36}
+                          tickFormatter={v => v === 0 ? 'R$0' : `R$${(v / 1000).toFixed(v < 1000 ? 1 : 0)}k`}
+                          width={52}
                         />
                       )}
-                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                      {/* Média de horas */}
-                      <ReferenceLine yAxisId="hours" y={avgHours} stroke="rgba(255,255,255,0.12)" strokeDasharray="4 4" />
-                      {/* Barras de horas */}
-                      <Bar yAxisId="hours" dataKey="hours" name="Horas" radius={[4, 4, 0, 0]} maxBarSize={hasExpHist ? 28 : 40}>
-                        {history.map((p, i) => (
-                          <rect key={i} fill={p.isCurrent ? '#00F5FF' : 'rgba(0,245,255,0.25)'} />
+
+                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)', radius: 4 } as any} />
+
+                      {/* Linha de referência: média de horas */}
+                      {avgHours > 0 && (
+                        <ReferenceLine
+                          yAxisId="hours" y={avgHours}
+                          stroke="rgba(0,245,255,0.2)"
+                          strokeDasharray="5 4"
+                          label={{ value: `~${avgHours.toFixed(0)}h`, position: 'insideTopLeft', fill: 'rgba(0,245,255,0.4)', fontSize: 10 }}
+                        />
+                      )}
+
+                      {/* Barras de horas — Cell para cor individual */}
+                      <Bar yAxisId="hours" dataKey="hours" name="Horas" radius={[5, 5, 0, 0]} maxBarSize={36} isAnimationActive>
+                        {history.map((p) => (
+                          <Cell
+                            key={p.ym}
+                            fill={p.isCurrent ? '#00F5FF' : 'rgba(0,245,255,0.22)'}
+                          />
                         ))}
                       </Bar>
-                      {/* Barras de despesas */}
+
+                      {/* Linha de despesas */}
                       {hasExpHist && (
-                        <Bar yAxisId="money" dataKey="expenses" name="Despesas" radius={[4, 4, 0, 0]} maxBarSize={28}>
-                          {history.map((p, i) => (
-                            <rect key={i} fill={p.isCurrent ? '#fb923c' : 'rgba(251,146,60,0.25)'} />
-                          ))}
-                        </Bar>
+                        <Line
+                          yAxisId="money"
+                          dataKey="expenses"
+                          name="Despesas"
+                          type="monotone"
+                          stroke="#F59E0B"
+                          strokeWidth={2}
+                          dot={(props: any) => {
+                            const { cx, cy, payload } = props
+                            if (!payload.expenses) return <g key={`exp-${cx}`} />
+                            return payload.isCurrent
+                              ? <circle key={`exp-${cx}`} cx={cx} cy={cy} r={4} fill="#F59E0B" stroke="#161618" strokeWidth={2} />
+                              : <circle key={`exp-${cx}`} cx={cx} cy={cy} r={2.5} fill="#F59E0B" stroke="transparent" />
+                          }}
+                          activeDot={{ r: 5, fill: '#F59E0B', stroke: '#161618', strokeWidth: 2 }}
+                        />
                       )}
+
                       {/* Linha de receita */}
                       {hasRate && (
                         <Line
@@ -2304,37 +2372,38 @@ export default function MeuPainelPage() {
                           strokeWidth={2}
                           dot={(props: any) => {
                             const { cx, cy, payload } = props
+                            if (!payload.revenue) return <g key={`rev-${cx}`} />
                             return payload.isCurrent
-                              ? <circle key={`dot-${cx}`} cx={cx} cy={cy} r={4} fill="#a78bfa" stroke="#a78bfa" />
-                              : <circle key={`dot-${cx}`} cx={cx} cy={cy} r={2.5} fill="#a78bfa" stroke="transparent" />
+                              ? <circle key={`rev-${cx}`} cx={cx} cy={cy} r={4} fill="#a78bfa" stroke="#161618" strokeWidth={2} />
+                              : <circle key={`rev-${cx}`} cx={cx} cy={cy} r={2.5} fill="#a78bfa" stroke="transparent" />
                           }}
-                          activeDot={{ r: 5, fill: '#a78bfa' }}
+                          activeDot={{ r: 5, fill: '#a78bfa', stroke: '#161618', strokeWidth: 2 }}
                         />
                       )}
                     </ComposedChart>
                   </ResponsiveContainer>
                 )}
 
-                {/* Legend */}
-                <div className="flex items-center gap-5 mt-4 justify-center flex-wrap">
+                {/* ── Legenda ── */}
+                <div className="flex items-center gap-5 mt-5 justify-center flex-wrap">
                   <div className="flex items-center gap-2 text-[11px] text-zinc-500">
-                    <div className="w-3 h-3 rounded-sm bg-cyan-400/30" />
-                    Horas (meses anteriores)
+                    <div className="w-3 h-3 rounded-sm" style={{ background: 'rgba(0,245,255,0.22)' }} />
+                    Horas
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+                  <div className="flex items-center gap-2 text-[11px] text-zinc-400 font-medium">
                     <div className="w-3 h-3 rounded-sm bg-cyan-400" />
                     Horas (mês atual)
                   </div>
                   {hasExpHist && (
                     <div className="flex items-center gap-2 text-[11px] text-zinc-500">
-                      <div className="w-3 h-3 rounded-sm bg-orange-400" />
+                      <div className="w-5 h-0.5 bg-amber-400" />
                       Despesas aprovadas
                     </div>
                   )}
                   {hasRate && (
                     <div className="flex items-center gap-2 text-[11px] text-zinc-500">
-                      <div className="w-6 h-0.5 bg-violet-400" />
-                      Receita
+                      <div className="w-5 h-0.5 bg-violet-400" />
+                      Receita estimada
                     </div>
                   )}
                 </div>
