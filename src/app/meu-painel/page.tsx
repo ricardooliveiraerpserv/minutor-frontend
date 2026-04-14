@@ -873,6 +873,7 @@ export default function MeuPainelPage() {
   const [tsModal,    setTsModal]    = useState<{ open: boolean; item?: TimesheetItem }>({ open: false })
   const [tsViewItem, setTsViewItem] = useState<TimesheetItem | null>(null)
   const [tsForm,     setTsForm]     = useState({ ...EMPTY_TS })
+  const [confirmModal, setConfirmModal] = useState<{ open: boolean; message: string; onConfirm: () => void } | null>(null)
   const [tsSaving,   setTsSaving]   = useState(false)
 
   // ── Expense state ──────────────────────────────────────────────────────────
@@ -1138,13 +1139,19 @@ export default function MeuPainelPage() {
     finally     { setTsSaving(false) }
   }
 
-  const deleteTs = async (id: number) => {
-    if (!confirm('Excluir este apontamento?')) return
-    try {
-      await api.delete(`/timesheets/${id}`)
-      toast.success('Apontamento excluído')
-      loadTimesheets()
-    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao excluir') }
+  const deleteTs = (id: number) => {
+    setConfirmModal({
+      open: true,
+      message: 'Deseja excluir este apontamento? Esta ação não pode ser desfeita.',
+      onConfirm: async () => {
+        setConfirmModal(null)
+        try {
+          await api.delete(`/timesheets/${id}`)
+          toast.success('Apontamento excluído')
+          loadTimesheets()
+        } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao excluir') }
+      },
+    })
   }
 
   // ── Expense CRUD ───────────────────────────────────────────────────────────
@@ -1212,13 +1219,19 @@ export default function MeuPainelPage() {
     finally          { setExpSaving(false) }
   }
 
-  const deleteExp = async (id: number) => {
-    if (!confirm('Excluir esta despesa?')) return
-    try {
-      await api.delete(`/expenses/${id}`)
-      toast.success('Despesa excluída')
-      loadExpenses()
-    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao excluir') }
+  const deleteExp = (id: number) => {
+    setConfirmModal({
+      open: true,
+      message: 'Deseja excluir esta despesa? Esta ação não pode ser desfeita.',
+      onConfirm: async () => {
+        setConfirmModal(null)
+        try {
+          await api.delete(`/expenses/${id}`)
+          toast.success('Despesa excluída')
+          loadExpenses()
+        } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao excluir') }
+      },
+    })
   }
 
   // ── Indicators data ────────────────────────────────────────────────────────
@@ -2515,6 +2528,27 @@ export default function MeuPainelPage() {
       {/* ══════════════════════════════════════════════════════════════════════
           Modal: Novo / Editar Apontamento
       ══════════════════════════════════════════════════════════════════════ */}
+      {/* Modal de Confirmação de Exclusão */}
+      {confirmModal?.open && (
+        <ModalOverlay onClose={() => setConfirmModal(null)}>
+          <div className="p-6 space-y-5 w-full max-w-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
+                <Trash2 size={18} className="text-red-400" />
+              </div>
+              <h3 className="text-base font-semibold text-white">Confirmar exclusão</h3>
+            </div>
+            <p className="text-sm text-zinc-400">{confirmModal.message}</p>
+            <div className="flex gap-3 justify-end pt-1">
+              <Button variant="outline" onClick={() => setConfirmModal(null)}>Cancelar</Button>
+              <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={confirmModal.onConfirm}>
+                Excluir
+              </Button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+
       {tsModal.open && (
         <ModalOverlay onClose={() => setTsModal({ open: false })}>
           <div className="p-6 max-h-[90vh] overflow-y-auto space-y-4">
