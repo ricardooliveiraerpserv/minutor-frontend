@@ -2,8 +2,6 @@ export interface User {
   id: number
   name: string
   email: string
-  roles?: string[]
-  permissions?: string[]
   profile_photo_url?: string | null
   type?: string | null
   consultant_type?: string | null
@@ -118,20 +116,6 @@ export interface CustomerFull {
   executive_id?: number | null
   executive?: Executive
   created_at: string
-}
-
-export interface Role {
-  id: number
-  name: string
-  permissions?: Permission[]
-  created_at: string
-}
-
-export interface Permission {
-  id: string
-  name: string
-  description?: string
-  group?: string
 }
 
 export interface ConsultantGroup {

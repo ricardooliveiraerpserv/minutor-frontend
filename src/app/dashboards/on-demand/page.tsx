@@ -82,8 +82,7 @@ function SkeletonCard() {
 
 export default function OnDemandPage() {
   const { user } = useAuth()
-  const isAdmin = user?.roles?.includes('Administrator') ||
-    user?.permissions?.includes('admin.full_access') || false
+  const isAdmin = user?.type === 'admin'
 
   const now = new Date()
   const isoFirstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`

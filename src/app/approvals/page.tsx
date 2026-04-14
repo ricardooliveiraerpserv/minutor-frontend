@@ -495,7 +495,7 @@ export default function ApprovalsPage() {
       const l = Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
       setUsers(l.map((u: any) => ({ id: u.id, name: u.name })))
     }).catch(() => {})
-    api.get<any>('/users?pageSize=100&role=Coordenador').then(r => {
+    api.get<any>('/users?pageSize=100&role=coordenador').then(r => {
       const l = Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
       setCoordinators(l.map((u: any) => ({ id: u.id, name: u.name })))
     }).catch(() => {})

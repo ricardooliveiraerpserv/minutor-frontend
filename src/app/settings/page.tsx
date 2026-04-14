@@ -10,14 +10,11 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import {
-  Settings, Shield,
-  Plus, Pencil, Trash2, X, Check, Search,
+  Settings,
   RefreshCw, CheckCircle, XCircle, TrendingUp, Users,
 } from 'lucide-react'
-import { RowMenu } from '@/components/ui/row-menu'
-import type { Role, Permission, SystemSettings } from '@/types'
+import type { SystemSettings } from '@/types'
 import { UserManagementTab } from './UserManagementTab'
-import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -58,76 +55,11 @@ function ModalOverlay({ children, onClose }: { children: React.ReactNode; onClos
   )
 }
 
-// ─── TRADUÇÕES DE PERMISSÕES ─────────────────────────────────────────────────
-
-const PERMISSION_LABELS: Record<string, string> = {
-  'admin.full_access': 'Acesso total ao sistema',
-  'roles.view': 'Visualizar perfis de acesso', 'roles.create': 'Criar perfis de acesso',
-  'roles.update': 'Editar perfis de acesso', 'roles.delete': 'Excluir perfis de acesso',
-  'permissions.view': 'Visualizar permissões', 'permissions.create': 'Criar permissões',
-  'permissions.update': 'Editar permissões', 'permissions.delete': 'Excluir permissões',
-  'projects.view': 'Visualizar projetos', 'projects.view_sensitive_data': 'Ver dados sensíveis de projetos',
-  'projects.view_costs': 'Ver custos de projetos', 'projects.create': 'Criar projetos',
-  'projects.update': 'Editar projetos', 'projects.delete': 'Excluir projetos',
-  'projects.assign_people': 'Atribuir pessoas a projetos', 'projects.change_status': 'Alterar status de projetos',
-  'hours.view': 'Visualizar apontamentos', 'hours.view_own': 'Visualizar próprios apontamentos',
-  'hours.view_all': 'Visualizar todos os apontamentos', 'hours.view_sensitive_data': 'Ver dados sensíveis de apontamentos',
-  'hours.create': 'Criar apontamentos', 'hours.update_own': 'Editar próprios apontamentos',
-  'hours.update_all': 'Editar todos os apontamentos', 'hours.delete_own': 'Excluir próprios apontamentos',
-  'hours.delete_all': 'Excluir todos os apontamentos', 'hours.approve': 'Aprovar apontamentos',
-  'hours.reject': 'Rejeitar apontamentos',
-  'expenses.view': 'Visualizar despesas', 'expenses.view_own': 'Visualizar próprias despesas',
-  'expenses.view_all': 'Visualizar todas as despesas', 'expenses.view_sensitive_data': 'Ver dados sensíveis de despesas',
-  'expenses.create': 'Criar despesas', 'expenses.update_own': 'Editar próprias despesas',
-  'expenses.update_all': 'Editar todas as despesas', 'expenses.delete_own': 'Excluir próprias despesas',
-  'expenses.delete_all': 'Excluir todas as despesas', 'expenses.approve': 'Aprovar despesas',
-  'expenses.reject': 'Rejeitar despesas',
-  'reports.view': 'Visualizar relatórios', 'reports.generate': 'Gerar relatórios',
-  'reports.export': 'Exportar relatórios', 'reports.financial': 'Relatórios financeiros',
-  'dashboard.view': 'Visualizar dashboard', 'dashboard.admin': 'Dashboard administrativo',
-  'dashboard.manager': 'Dashboard gerencial', 'dashboard.consultant': 'Dashboard consultor',
-  'dashboards.view': 'Acessar dashboards', 'dashboards.bank_hours_fixed.view': 'Dashboard banco de horas fixo',
-  'dashboards.bank_hours_monthly.view': 'Dashboard banco de horas mensais',
-  'customers.view': 'Visualizar clientes', 'customers.create': 'Criar clientes',
-  'customers.update': 'Editar clientes', 'customers.delete': 'Excluir clientes',
-  'users.view': 'Visualizar usuários', 'users.view_all': 'Visualizar todos os usuários',
-  'users.create': 'Criar usuários', 'users.update': 'Editar usuários',
-  'users.update_own_profile': 'Editar próprio perfil', 'users.delete': 'Excluir usuários',
-  'users.manage_roles': 'Gerenciar perfis de usuários', 'users.reset_password': 'Redefinir senhas',
-  'consultant_groups.view': 'Visualizar grupos de consultores', 'consultant_groups.create': 'Criar grupos de consultores',
-  'consultant_groups.update': 'Editar grupos de consultores', 'consultant_groups.delete': 'Excluir grupos de consultores',
-  'system_settings.view': 'Visualizar configurações do sistema', 'system_settings.update': 'Editar configurações do sistema',
-  'expense_categories.view': 'Visualizar categorias de despesas', 'expense_categories.create': 'Criar categorias de despesas',
-  'expense_categories.update': 'Editar categorias de despesas', 'expense_categories.delete': 'Excluir categorias de despesas',
-  'expense_types.view': 'Visualizar tipos de despesas', 'expense_types.create': 'Criar tipos de despesas',
-  'expense_types.update': 'Editar tipos de despesas', 'expense_types.delete': 'Excluir tipos de despesas',
-  'payment_methods.view': 'Visualizar métodos de pagamento', 'payment_methods.create': 'Criar métodos de pagamento',
-  'payment_methods.update': 'Editar métodos de pagamento', 'payment_methods.delete': 'Excluir métodos de pagamento',
-  'service_types.view': 'Visualizar tipos de serviço', 'service_types.create': 'Criar tipos de serviço',
-  'service_types.update': 'Editar tipos de serviço', 'service_types.delete': 'Excluir tipos de serviço',
-  'contract_types.view': 'Visualizar tipos de contrato', 'contract_types.create': 'Criar tipos de contrato',
-  'contract_types.update': 'Editar tipos de contrato', 'contract_types.delete': 'Excluir tipos de contrato',
-  'project_statuses.view': 'Visualizar status de projetos', 'project_statuses.create': 'Criar status de projetos',
-  'project_statuses.update': 'Editar status de projetos', 'project_statuses.delete': 'Excluir status de projetos',
-}
-
-const GROUP_LABELS: Record<string, string> = {
-  admin: 'Administração', roles: 'Perfis de Acesso', permissions: 'Permissões',
-  projects: 'Projetos', hours: 'Apontamentos', expenses: 'Despesas',
-  reports: 'Relatórios', dashboard: 'Dashboard', dashboards: 'Dashboards',
-  customers: 'Clientes', users: 'Usuários', consultant_groups: 'Grupos de Consultores',
-  system_settings: 'Configurações do Sistema', expense_categories: 'Categorias de Despesas',
-  expense_types: 'Tipos de Despesa', payment_methods: 'Métodos de Pagamento',
-  service_types: 'Tipos de Serviço', contract_types: 'Tipos de Contrato',
-  project_statuses: 'Status de Projetos',
-}
-
 // ─── TABS ────────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'general', label: 'Geral',            icon: Settings },
-  { id: 'users',   label: 'Usuários',         icon: Users },
-  { id: 'roles',   label: 'Perfis de Acesso', icon: Shield },
+  { id: 'general', label: 'Geral',    icon: Settings },
+  { id: 'users',   label: 'Usuários', icon: Users },
 ]
 
 // ─── TAB: GENERAL SETTINGS ───────────────────────────────────────────────────
@@ -310,260 +242,6 @@ function GeneralTab() {
 }
 
 
-// ─── TAB: ROLES ──────────────────────────────────────────────────────────────
-
-function RolesTab() {
-  const [roles, setRoles] = useState<Role[]>([])
-  const [loading, setLoading] = useState(true)
-  const [modal, setModal] = useState<{ open: boolean; item?: Role }>({ open: false })
-  const [permModal, setPermModal] = useState<Role | null>(null)
-  const [allPerms, setAllPerms] = useState<{ group: string; permissions: Permission[] }[]>([])
-  const [selectedPerms, setSelectedPerms] = useState<string[]>([])
-  const [allUsers, setAllUsers] = useState<{ id: number; name: string; email: string }[]>([])
-  const [selectedUserIds, setSelectedUserIds] = useState<number[]>([])
-  const [userSearch, setUserSearch] = useState('')
-  const [userRoleFilter, setUserRoleFilter] = useState('')
-  const [loadingUsers, setLoadingUsers] = useState(false)
-  const [form, setForm] = useState({ name: '' })
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState<number | null>(null)
-  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id?: number }>({ open: false })
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const r = await api.get<{ items?: Role[]; data?: Role[] }>('/roles?with_permissions=true')
-      setRoles(Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : Array.isArray(r) ? (r as unknown as Role[]) : [])
-    } catch { toast.error('Erro ao carregar perfis') }
-    finally { setLoading(false) }
-  }, [])
-
-  useEffect(() => { load() }, [load])
-
-  const loadUsers = useCallback(async (roleFilter: string) => {
-    setLoadingUsers(true)
-    try {
-      const params = new URLSearchParams({ pageSize: '500' })
-      if (roleFilter) params.set('role', roleFilter)
-      const r = await api.get<{ items: { id: number; name: string; email: string }[] }>(`/users?${params}`)
-      setAllUsers(Array.isArray(r?.items) ? r.items : [])
-    } catch { /* silencioso */ }
-    finally { setLoadingUsers(false) }
-  }, [])
-
-  const openPerms = async (role: Role) => {
-    setPermModal(role)
-    setSelectedPerms(role.permissions?.map(p => p.name) ?? [])
-    setUserSearch('')
-    setUserRoleFilter('')
-    // Carrega permissões disponíveis (só uma vez)
-    if (allPerms.length === 0) {
-      try {
-        const r = await api.get<{ data: { group: string; permissions: Permission[] }[] }>('/permissions/grouped')
-        setAllPerms(Array.isArray(r?.data) ? r.data : Array.isArray(r) ? (r as unknown as { group: string; permissions: Permission[] }[]) : [])
-      } catch { toast.error('Erro ao carregar permissões') }
-    }
-    // Carrega usuários e pré-seleciona os já vinculados ao role
-    try {
-      const [usersRes, roleUsersRes] = await Promise.all([
-        api.get<{ items: { id: number; name: string; email: string }[] }>('/users?pageSize=100'),
-        api.get<{ items: { id: number; name: string; email: string }[] }>(`/roles/${role.id}/users`),
-      ])
-      setAllUsers(Array.isArray(usersRes?.items) ? usersRes.items : [])
-      setSelectedUserIds((roleUsersRes?.items ?? []).map((u: { id: number }) => u.id))
-    } catch { toast.error('Erro ao carregar usuários') }
-  }
-
-  const savePerms = async () => {
-    if (!permModal) return
-    setSaving(true)
-    try {
-      await Promise.all([
-        api.post(`/roles/${permModal.id}/permissions`, { permissions: selectedPerms }),
-        api.post(`/roles/${permModal.id}/sync-users`, { user_ids: selectedUserIds }),
-      ])
-      toast.success('Permissões e consultores atualizados')
-      setPermModal(null)
-      load()
-    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao salvar') }
-    finally { setSaving(false) }
-  }
-
-  const save = async () => {
-    setSaving(true)
-    try {
-      if (modal.item) await api.put(`/roles/${modal.item.id}`, form)
-      else await api.post('/roles', form)
-      toast.success(modal.item ? 'Perfil atualizado' : 'Perfil criado')
-      setModal({ open: false })
-      load()
-    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao salvar') }
-    finally { setSaving(false) }
-  }
-
-  const remove = (id: number) => setDeleteConfirm({ open: true, id })
-
-  const confirmDelete = async () => {
-    if (!deleteConfirm.id) return
-    setDeleting(deleteConfirm.id)
-    setDeleteConfirm({ open: false })
-    try {
-      await api.delete(`/roles/${deleteConfirm.id}`)
-      toast.success('Perfil excluído')
-      load()
-    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao excluir') }
-    finally { setDeleting(null) }
-  }
-
-  return (
-    <div>
-      <div className="flex justify-end mb-4">
-        <Button onClick={() => { setForm({ name: '' }); setModal({ open: true }) }} className="bg-blue-600 hover:bg-blue-500 text-white h-8 text-xs gap-1.5">
-          <Plus size={13} /> Novo Perfil
-        </Button>
-      </div>
-
-      <div className="rounded-lg border border-zinc-800 overflow-hidden">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-zinc-800 bg-zinc-900">
-              <th className="px-3 py-2.5 w-10"></th>
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">Permissões</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? <TableSkeleton cols={3} /> : roles.length === 0 ? (
-              <tr><td colSpan={3} className="px-3 py-8 text-center text-zinc-500">Nenhum perfil</td></tr>
-            ) : roles.map(role => (
-              <tr key={role.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
-                <td className="px-2 py-2.5 w-10">
-                  <RowMenu items={[
-                    { label: 'Permissões', icon: <Shield size={12} />, onClick: () => openPerms(role) },
-                    { label: 'Editar', icon: <Pencil size={12} />, onClick: () => { setForm({ name: role.name }); setModal({ open: true, item: role }) } },
-                    { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => remove(role.id), danger: true, disabled: deleting === role.id },
-                  ]} />
-                </td>
-                <td className="px-3 py-2.5 text-zinc-200">{role.name}</td>
-                <td className="px-3 py-2.5 text-zinc-400 hidden sm:table-cell">{role.permissions?.length ?? 0} permissões</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {modal.open && (
-        <ModalOverlay onClose={() => setModal({ open: false })}>
-          <div className="p-5">
-            <h3 className="text-sm font-semibold text-white mb-4">{modal.item ? 'Editar Perfil' : 'Novo Perfil'}</h3>
-            <div>
-              <Label className="text-xs text-zinc-400">Nome *</Label>
-              <Input value={form.name} onChange={e => setForm({ name: e.target.value })}
-                className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
-            </div>
-            <div className="flex gap-2 mt-5 justify-end">
-              <Button variant="outline" onClick={() => setModal({ open: false })} className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
-              <Button onClick={save} disabled={saving || !form.name} className="h-8 text-xs bg-blue-600 hover:bg-blue-500 text-white">
-                {saving ? 'Salvando...' : 'Salvar'}
-              </Button>
-            </div>
-          </div>
-        </ModalOverlay>
-      )}
-
-      {permModal && (
-        <ModalOverlay onClose={() => setPermModal(null)}>
-          <div className="p-5 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-sm font-semibold text-white mb-4">Permissões — {permModal.name}</h3>
-            <div className="space-y-4">
-              {allPerms.map(group => (
-                <div key={(group as any).category ?? (group as any).group}>
-                  <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wide mb-2 border-b border-zinc-800 pb-1">{GROUP_LABELS[(group as any).category ?? (group as any).group] ?? (group as any).category ?? (group as any).group}</p>
-                  <div className="space-y-1">
-                    {(group.permissions ?? []).map(p => (
-                      <label key={p.id} className="flex items-center gap-2 cursor-pointer group">
-                        <div
-                          onClick={() => setSelectedPerms(s => s.includes(p.name) ? s.filter(x => x !== p.name) : [...s, p.name])}
-                          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer ${selectedPerms.includes(p.name) ? 'bg-blue-600 border-blue-600' : 'border-zinc-600 hover:border-zinc-400'}`}
-                        >
-                          {selectedPerms.includes(p.name) && <Check size={10} className="text-white" />}
-                        </div>
-                        <span className="text-xs text-zinc-300 group-hover:text-white transition-colors">{PERMISSION_LABELS[p.name] ?? p.description ?? p.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-            {/* Seção: Consultores vinculados */}
-            <div className="mt-2">
-              <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wide mb-2 border-b border-zinc-800 pb-1">Consultores vinculados</p>
-              <div className="flex gap-2 mb-2">
-                <select
-                  value={userRoleFilter}
-                  onChange={e => { setUserRoleFilter(e.target.value); loadUsers(e.target.value) }}
-                  className="bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs rounded-md h-8 px-2 outline-none focus:border-zinc-500 flex-1"
-                >
-                  <option value="">Todos os perfis</option>
-                  <option value="Consultor">Consultor</option>
-                  <option value="Coordenador">Coordenador</option>
-                  <option value="Parceiro ADM">Parceiro ADM</option>
-                </select>
-                <input
-                  type="text"
-                  value={userSearch}
-                  onChange={e => setUserSearch(e.target.value)}
-                  placeholder="Buscar..."
-                  className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded-md h-8 px-2.5 outline-none focus:border-zinc-500 flex-1"
-                />
-              </div>
-              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
-                {loadingUsers ? (
-                  <p className="text-xs text-zinc-500 italic">Carregando...</p>
-                ) : allUsers
-                  .filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.email.toLowerCase().includes(userSearch.toLowerCase()))
-                  .map(u => {
-                    const checked = selectedUserIds.includes(u.id)
-                    return (
-                      <label key={u.id} className="flex items-center gap-2 cursor-pointer group">
-                        <div
-                          onClick={() => setSelectedUserIds(ids => checked ? ids.filter(id => id !== u.id) : [...ids, u.id])}
-                          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${checked ? 'bg-blue-600 border-blue-600' : 'border-zinc-600 hover:border-zinc-400'}`}
-                        >
-                          {checked && <Check size={10} className="text-white" />}
-                        </div>
-                        <span className="text-xs text-zinc-300 group-hover:text-white transition-colors leading-tight">
-                          {u.name} <span className="text-zinc-500">{u.email}</span>
-                        </span>
-                      </label>
-                    )
-                  })}
-                {!loadingUsers && allUsers.length === 0 && <p className="text-xs text-zinc-500 italic">Nenhum usuário encontrado.</p>}
-              </div>
-            </div>
-
-            <div className="flex gap-2 mt-5 justify-end sticky bottom-0 bg-zinc-900 pt-3 border-t border-zinc-800">
-              <Button variant="outline" onClick={() => setPermModal(null)} className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
-              <Button onClick={savePerms} disabled={saving} className="h-8 text-xs bg-blue-600 hover:bg-blue-500 text-white">
-                {saving ? 'Salvando...' : 'Salvar permissões'}
-              </Button>
-            </div>
-          </div>
-        </ModalOverlay>
-      )}
-
-      <ConfirmDeleteModal
-        open={deleteConfirm.open}
-        message="Deseja excluir este perfil? Esta ação não pode ser desfeita."
-        onClose={() => setDeleteConfirm({ open: false })}
-        onConfirm={confirmDelete}
-      />
-    </div>
-  )
-}
-
-
-
 // ─── PAGE ────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
@@ -620,9 +298,8 @@ export default function SettingsPage() {
             {active.label}
           </h2>
 
-          {activeTab === 'general'    && <GeneralTab />}
-          {activeTab === 'users'      && <UserManagementTab />}
-          {activeTab === 'roles'      && <RolesTab />}
+          {activeTab === 'general' && <GeneralTab />}
+          {activeTab === 'users'   && <UserManagementTab />}
         </div>
       </div>
     </AppLayout>

@@ -31,10 +31,9 @@ interface UserItem {
   customer_id?: number | null
   partner_id?: number | null
   is_executive?: boolean
-  roles?: { id: number; name: string }[]
+  type?: string | null
 }
 
-interface RoleOption     { id: number; name: string }
 interface CustomerOption { id: number; name: string }
 interface PartnerOption  { id: number; name: string }
 
@@ -56,23 +55,17 @@ const CONSULTANT_OPTIONS: { value: ConsultantType; label: string; desc: string }
   { value: 'fixo',      label: 'Fixo',                  desc: 'Valor fixo mensal — sem banco de horas' },
 ]
 
-function resolveRoleName(profile: ProfileType): string {
-  if (profile === 'cliente')       return 'Cliente'
-  if (profile === 'coordenador')   return 'Coordenador'
-  if (profile === 'parceiro_adm')  return 'Parceiro ADM'
-  if (profile === 'administrator') return 'Administrator'
-  return 'Consultor'
+function resolveTypeForBackend(profile: ProfileType): string {
+  if (profile === 'administrator') return 'admin'
+  if (profile === 'parceiro_adm')  return 'parceiro_admin'
+  return profile
 }
 
-// Mapeia TODOS os roles do usuário → array de ProfileType (aditivo)
-function resolveProfilesFromRoles(roleNames: string[]): ProfileType[] {
-  const result: ProfileType[] = []
-  if (roleNames.includes('Administrator')) result.push('administrator')
-  if (roleNames.includes('Cliente'))       result.push('cliente')
-  if (roleNames.includes('Coordenador'))   result.push('coordenador')
-  if (roleNames.includes('Parceiro ADM'))  result.push('parceiro_adm')
-  if (roleNames.includes('Consultor'))     result.push('consultor')
-  return result
+function resolveProfileFromType(type: string | null | undefined): ProfileType | null {
+  if (!type) return null
+  if (type === 'admin')          return 'administrator'
+  if (type === 'parceiro_admin') return 'parceiro_adm'
+  return type as ProfileType
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -182,34 +175,6 @@ function CurrencyInput({ value, onChange, placeholder, className }: {
   )
 }
 
-function GroupsSelector({ roles, selected, onChange }: {
-  roles: RoleOption[]; selected: number[]; onChange: (ids: number[]) => void
-}) {
-  const groups = roles.filter(r => !PRIMARY_ROLE_NAMES.includes(r.name))
-  if (groups.length === 0) return (
-    <p className="text-[10px] text-zinc-500 italic">Nenhum grupo de permissão cadastrado.</p>
-  )
-  return (
-    <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
-      {groups.map(g => {
-        const checked = selected.includes(g.id)
-        return (
-          <button key={g.id} type="button"
-            onClick={() => onChange(checked ? selected.filter(id => id !== g.id) : [...selected, g.id])}
-            className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs text-left transition-colors ${
-              checked ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30' : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:border-zinc-500 hover:text-zinc-200'
-            }`}>
-            <span className={`w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 border ${checked ? 'bg-blue-600 border-blue-500' : 'border-zinc-600'}`}>
-              {checked && <Check size={9} className="text-white" />}
-            </span>
-            {g.name}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
 function TableSkeleton() {
   return (
     <>
@@ -226,9 +191,6 @@ function TableSkeleton() {
 
 // ─── Form state ───────────────────────────────────────────────────────────────
 
-// Roles que representam o perfil primário — não aparecem como "grupos extras"
-const PRIMARY_ROLE_NAMES = ['Administrador', 'Administrator', 'Consultor', 'Coordenador', 'Parceiro ADM', 'Cliente']
-
 const EMPTY_FORM = {
   name: '', email: '', password: '', enabled: true,
   hourly_rate: '', rate_type: 'hourly' as 'hourly' | 'monthly',
@@ -239,14 +201,12 @@ const EMPTY_FORM = {
   is_partner_adm: false,
   customer_id: '' as number | '',
   partner_id:  '' as number | '',
-  extra_role_ids: [] as number[],
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function UserManagementTab() {
   const [users,     setUsers]     = useState<UserItem[]>([])
-  const [roles,     setRoles]     = useState<RoleOption[]>([])
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [partners,  setPartners]  = useState<PartnerOption[]>([])
   const [loading,   setLoading]   = useState(true)
@@ -292,10 +252,8 @@ export function UserManagementTab() {
       } else if (bulkField === 'hourly_rate') {
         await Promise.all(ids.map(id => api.put(`/users/${id}`, { hourly_rate: parseFloat(bulkValue) })))
       } else if (bulkField === 'profile') {
-        const roleName = resolveRoleName(bulkValue as ProfileType)
-        const role = roles.find(r => r.name.toLowerCase() === roleName.toLowerCase())
-        if (!role) { toast.error(`Perfil "${roleName}" não encontrado`); return }
-        await Promise.all(ids.map(id => api.put(`/users/${id}`, { roles: [role.id] })))
+        const type = resolveTypeForBackend(bulkValue as ProfileType)
+        await Promise.all(ids.map(id => api.put(`/users/${id}`, { type })))
       }
       toast.success(`${ids.length} usuário(s) atualizado(s)`)
       clearSelection()
@@ -308,9 +266,6 @@ export function UserManagementTab() {
   }
 
   useEffect(() => {
-    api.get<any>('/roles?pageSize=100').then(r =>
-      setRoles(Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : [])
-    ).catch(() => {})
     api.get<any>('/customers?pageSize=100').then(r =>
       setCustomers(Array.isArray(r?.items) ? r.items : [])
     ).catch(() => {})
@@ -338,14 +293,10 @@ export function UserManagementTab() {
   const openCreate = () => { setForm({ ...EMPTY_FORM }); setModal({ open: true }) }
 
   const openEdit = (item: UserItem) => {
-    const roleNames = item.roles?.map(r => r.name) ?? []
-    const profiles  = resolveProfilesFromRoles(roleNames)
+    const profile = resolveProfileFromType(item.type)
+    const profiles = profile ? [profile] : []
     const consultant_type = (item.consultant_type as ConsultantType | undefined)
       ?? (item.rate_type === 'hourly' ? 'horista' : item.rate_type === 'monthly' ? 'bh_fixo' : '')
-    // Grupos extras = roles que não são perfis primários
-    const extraRoleIds = (item.roles ?? [])
-      .filter(r => !PRIMARY_ROLE_NAMES.includes(r.name))
-      .map(r => r.id)
     setForm({
       name: item.name, email: item.email, password: '',
       enabled: item.enabled,
@@ -358,26 +309,17 @@ export function UserManagementTab() {
       is_partner_adm: item.is_executive ?? false,
       customer_id: item.customer_id ?? '',
       partner_id:  item.partner_id  ?? '',
-      extra_role_ids: extraRoleIds,
     })
     setModal({ open: true, item })
   }
 
   const save = async () => {
     if (form.profiles.length === 0) { toast.error('Selecione ao menos um perfil de acesso'); return }
-    // Resolve role IDs — busca case-insensitive para robustez
-    const primaryRoleIds: number[] = []
-    for (const profile of form.profiles) {
-      const roleName = resolveRoleName(profile)
-      const role = roles.find(r => r.name.toLowerCase() === roleName.toLowerCase())
-      if (!role) { toast.error(`Perfil "${roleName}" não encontrado. Execute o seeder de roles no servidor.`); return }
-      primaryRoleIds.push(role.id)
-    }
     setSaving(true)
     try {
       const payload: Record<string, unknown> = {
         name: form.name, email: form.email, enabled: form.enabled,
-        roles: [...primaryRoleIds, ...form.extra_role_ids],
+        type: resolveTypeForBackend(form.profiles[0]),
         customer_id: form.profiles.includes('cliente') && form.customer_id ? form.customer_id : null,
         partner_id:  form.profiles.includes('parceiro_adm') && form.partner_id ? form.partner_id : null,
         is_executive: form.profiles.includes('parceiro_adm') ? form.is_partner_adm : false,
@@ -442,11 +384,10 @@ export function UserManagementTab() {
     && (!isConsultor   || !!form.consultant_type)
     && (!isParceiroAdm || !!form.partner_id)
 
-  // Toggle de perfil — adiciona se não tem, remove se já tem
+  // Seleciona perfil exclusivo (type é um único valor)
   const toggleProfile = (p: ProfileType) => {
     setForm(f => {
-      const has      = f.profiles.includes(p)
-      const profiles = has ? f.profiles.filter(x => x !== p) : [...f.profiles, p]
+      const profiles = f.profiles[0] === p ? [] : [p]
       return {
         ...f,
         profiles,
@@ -476,11 +417,11 @@ export function UserManagementTab() {
         <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-full px-1.5 py-1">
           {[
             { value: '',              label: 'Todos' },
-            { value: 'Consultor',     label: 'Consultor' },
-            { value: 'Coordenador',   label: 'Coordenador' },
-            { value: 'Cliente',       label: 'Cliente' },
-            { value: 'Parceiro ADM',  label: 'Parceiro' },
-            { value: 'Administrator', label: 'Admin' },
+            { value: 'consultor',     label: 'Consultor' },
+            { value: 'coordenador',   label: 'Coordenador' },
+            { value: 'cliente',       label: 'Cliente' },
+            { value: 'parceiro_admin', label: 'Parceiro' },
+            { value: 'admin',         label: 'Admin' },
           ].map(opt => (
             <button key={opt.value} type="button"
               onClick={() => { setFilterRole(opt.value); setPage(1) }}
@@ -580,9 +521,11 @@ export function UserManagementTab() {
                 <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell">{user.email}</td>
                 <td className="px-3 py-2.5 hidden sm:table-cell">
                   <div className="flex flex-wrap gap-1 items-center">
-                    {user.roles?.map(r => (
-                      <Badge key={r.id} variant="outline" className="text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/20">{r.name}</Badge>
-                    ))}
+                    {user.type && (
+                      <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/20">
+                        {PROFILE_OPTIONS.find(o => resolveTypeForBackend(o.value) === user.type)?.label ?? user.type}
+                      </Badge>
+                    )}
                     {user.consultant_type && (
                       <span className="text-[10px] text-zinc-500">
                         {CONSULTANT_OPTIONS.find(o => o.value === user.consultant_type)?.label ?? user.consultant_type}
@@ -749,17 +692,6 @@ export function UserManagementTab() {
                       label="É administrador do parceiro" />
                   </div>
                 )}
-                {/* Grupos de permissão extras — disponível para todos os perfis exceto apenas Cliente */}
-                {form.profiles.length > 0 && !form.profiles.every(p => p === 'cliente') && (
-                  <div>
-                    <Label className="text-xs text-zinc-400 mb-1.5 block">Grupos de Permissão</Label>
-                    <GroupsSelector
-                      roles={roles}
-                      selected={form.extra_role_ids}
-                      onChange={ids => setForm(f => ({ ...f, extra_role_ids: ids }))}
-                    />
-                  </div>
-                )}
                 <Toggle value={form.enabled} onChange={() => setForm(f => ({ ...f, enabled: !f.enabled }))} label="Ativo" />
               </>
             )}
@@ -824,11 +756,10 @@ export function UserManagementTab() {
       {/* Modal visualizar */}
       {viewUser && (() => {
         const u = viewUser
-        const roleNames = u.roles?.map(r => r.name) ?? []
-        const profiles  = resolveProfilesFromRoles(roleNames)
-        const profileLabel = profiles.length > 0
-          ? profiles.map(p => PROFILE_OPTIONS.find(o => o.value === p)?.label ?? p).join(', ')
-          : (roleNames[0] ?? '—')
+        const profile = resolveProfileFromType(u.type)
+        const profileLabel = profile
+          ? (PROFILE_OPTIONS.find(o => o.value === profile)?.label ?? profile)
+          : (u.type ?? '—')
         const rows: { label: string; value: React.ReactNode }[] = [
           { label: 'Nome',   value: u.name },
           { label: 'E-mail', value: u.email },

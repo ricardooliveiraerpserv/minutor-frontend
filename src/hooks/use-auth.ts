@@ -13,12 +13,7 @@ export function useAuth() {
     if (!token) { setLoading(false); return }
     try {
       const data = await api.get<{ user: any }>('/user')
-      const raw = data.user
-      // Backend now returns roles as string[] directly
-      const roles: string[] = Array.isArray(raw.roles)
-        ? raw.roles.filter((r: any) => typeof r === 'string')
-        : []
-      setUser({ ...raw, roles })
+      setUser(data.user)
     } catch (e) {
       // Só remove o token se for 401 (não autorizado de verdade)
       // Erros de rede/timeout no cold start do Render não devem deslogar o usuário
@@ -38,12 +33,7 @@ export function useAuth() {
       password,
     })
     localStorage.setItem('minutor_token', data.token ?? data.access_token)
-    const raw = data.user
-    // Backend returns roles as string[] directly
-    const roles: string[] = Array.isArray(raw?.roles)
-      ? raw.roles.filter((r: any) => typeof r === 'string')
-      : []
-    const user: User = { ...raw, roles }
+    const user: User = data.user
     setUser(user)
     return { user, requiresPasswordChange: data.requires_password_change === true }
   }
@@ -55,9 +45,7 @@ export function useAuth() {
   }
 
   const hasPermission = (permission: string) =>
-    user?.roles?.includes('Administrator') ||
-    user?.permissions?.includes(permission) ||
-    false
+    user?.type === 'admin' || false
 
   return { user, loading, login, logout, hasPermission }
 }

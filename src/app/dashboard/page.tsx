@@ -133,20 +133,8 @@ export default function DashboardPage() {
   const [recentExp,  setRecentExp]  = useState<ExpItem[]>([])
   const [conLoading, setConLoading] = useState(false)
 
-  const isAdmin = !!(
-    user?.roles?.includes('Administrator') ||
-    user?.roles?.includes('Coordenador') ||
-    user?.roles?.includes('Parceiro ADM') ||
-    user?.permissions?.includes('admin.full_access') ||
-    user?.permissions?.includes('hours.view_all')
-  )
-
-  const isConsultor = !!(
-    user?.roles?.includes('Consultor') &&
-    !user.roles.includes('Administrator') &&
-    !user.roles.includes('Coordenador') &&
-    !user.roles.includes('Parceiro ADM')
-  )
+  const isAdmin     = user?.type === 'admin' || user?.type === 'coordenador' || user?.type === 'parceiro_admin'
+  const isConsultor = user?.type === 'consultor'
 
   // ── Load admin data ──
   useEffect(() => {

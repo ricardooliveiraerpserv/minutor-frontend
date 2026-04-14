@@ -30,11 +30,10 @@ interface UserItem {
   customer_id?: number | null
   partner_id?: number | null
   is_executive?: boolean
-  roles?: { id: number; name: string }[]
+  type?: string | null
   created_at: string
 }
 
-interface RoleOption     { id: number; name: string }
 interface CustomerOption { id: number; name: string }
 interface PartnerOption  { id: number; name: string }
 
@@ -58,24 +57,17 @@ const CONSULTANT_OPTIONS: { value: ConsultantType; label: string; desc: string }
   { value: 'fixo',      label: 'Fixo',                  desc: 'Valor fixo mensal — sem banco de horas' },
 ]
 
-// Map profile → role name to send to backend
-function resolveRoleName(profile: ProfileType): string {
-  if (profile === 'cliente')       return 'Cliente'
-  if (profile === 'coordenador')   return 'Coordenador'
-  if (profile === 'parceiro_adm')  return 'Parceiro ADM'
-  if (profile === 'administrator') return 'Administrator'
-  return 'Consultor'
+function resolveTypeForBackend(profile: ProfileType): string {
+  if (profile === 'administrator') return 'admin'
+  if (profile === 'parceiro_adm')  return 'parceiro_admin'
+  return profile
 }
 
-// Reverse-map all user roles → array of ProfileType (additive)
-function resolveProfilesFromRoles(roleNames: string[]): ProfileType[] {
-  const result: ProfileType[] = []
-  if (roleNames.includes('Administrator')) result.push('administrator')
-  if (roleNames.includes('Cliente'))       result.push('cliente')
-  if (roleNames.includes('Coordenador'))   result.push('coordenador')
-  if (roleNames.includes('Parceiro ADM'))  result.push('parceiro_adm')
-  if (roleNames.includes('Consultor'))     result.push('consultor')
-  return result
+function resolveProfileFromType(type: string | null | undefined): ProfileType | null {
+  if (!type) return null
+  if (type === 'admin')          return 'administrator'
+  if (type === 'parceiro_admin') return 'parceiro_adm'
+  return type as ProfileType
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -216,7 +208,6 @@ const EMPTY_FORM = {
 
 export default function UsersPage() {
   const [users,     setUsers]     = useState<UserItem[]>([])
-  const [roles,     setRoles]     = useState<RoleOption[]>([])
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [partners,  setPartners]  = useState<PartnerOption[]>([])
   const [loading,   setLoading]   = useState(true)
@@ -244,9 +235,6 @@ export default function UsersPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id?: number }>({ open: false })
 
   useEffect(() => {
-    api.get<any>('/roles?pageSize=100').then(r =>
-      setRoles(Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : [])
-    ).catch(() => {})
     api.get<any>('/customers?pageSize=100').then(r =>
       setCustomers(Array.isArray(r?.items) ? r.items : [])
     ).catch(() => {})
@@ -278,8 +266,8 @@ export default function UsersPage() {
   }
 
   const openEdit = (item: UserItem) => {
-    const roleNames = item.roles?.map(r => r.name) ?? []
-    const profiles  = resolveProfilesFromRoles(roleNames)
+    const profile = resolveProfileFromType(item.type)
+    const profiles = profile ? [profile] : []
     // Prefer stored consultant_type; fall back only for horista (hourly)
     const consultant_type = (item.consultant_type as ConsultantType | undefined)
       ?? (item.rate_type === 'hourly' ? 'horista' : '')
@@ -304,15 +292,6 @@ export default function UsersPage() {
   const save = async () => {
     if (form.profiles.length === 0) { toast.error('Selecione ao menos um perfil de acesso'); return }
 
-    // Resolve role IDs — busca case-insensitive para robustez
-    const roleIds: number[] = []
-    for (const profile of form.profiles) {
-      const roleName = resolveRoleName(profile)
-      const role = roles.find(r => r.name.toLowerCase() === roleName.toLowerCase())
-      if (!role) { toast.error(`Perfil "${roleName}" não encontrado. Execute o seeder de roles no servidor.`); return }
-      roleIds.push(role.id)
-    }
-
     const needsPartner = form.profiles.includes('parceiro_adm')
 
     setSaving(true)
@@ -321,7 +300,7 @@ export default function UsersPage() {
         name:        form.name,
         email:       form.email,
         enabled:     form.enabled,
-        roles:       roleIds,
+        type:        resolveTypeForBackend(form.profiles[0]),
         customer_id:  form.profiles.includes('cliente') && form.customer_id ? form.customer_id : null,
         partner_id:   needsPartner && form.partner_id ? form.partner_id : null,
         is_executive: form.profiles.includes('parceiro_adm') ? form.is_partner_adm : false,
@@ -399,8 +378,7 @@ export default function UsersPage() {
   // Toggle de perfil — adiciona se não tem, remove se já tem
   const toggleProfile = (p: ProfileType) => {
     setForm(f => {
-      const has      = f.profiles.includes(p)
-      const profiles = has ? f.profiles.filter(x => x !== p) : [...f.profiles, p]
+      const profiles = f.profiles[0] === p ? [] : [p]
       return {
         ...f,
         profiles,
@@ -432,11 +410,11 @@ export default function UsersPage() {
         <select value={filterRole} onChange={e => { setFilterRole(e.target.value); setPage(1) }}
           className="bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs rounded-md h-8 px-2">
           <option value="">Todos os perfis</option>
-          <option value="Cliente">Cliente</option>
-          <option value="Consultor">Consultor</option>
-          <option value="Coordenador">Coordenador</option>
-          <option value="Parceiro ADM">Parceiro ADM</option>
-          <option value="Administrator">Administrator</option>
+          <option value="cliente">Cliente</option>
+          <option value="consultor">Consultor</option>
+          <option value="coordenador">Coordenador</option>
+          <option value="parceiro_admin">Parceiro ADM</option>
+          <option value="admin">Administrador</option>
         </select>
         <Button onClick={openCreate} className="bg-blue-600 hover:bg-blue-500 text-white h-8 text-xs gap-1.5">
           <Plus size={13} /> Novo
@@ -472,11 +450,11 @@ export default function UsersPage() {
                 <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell">{user.email}</td>
                 <td className="px-3 py-2.5 hidden sm:table-cell">
                   <div className="flex flex-wrap gap-1 items-center">
-                    {user.roles?.map(r => (
-                      <Badge key={r.id} variant="outline" className="text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/20">
-                        {r.name}
+                    {user.type && (
+                      <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/20">
+                        {PROFILE_OPTIONS.find(o => resolveTypeForBackend(o.value) === user.type)?.label ?? user.type}
                       </Badge>
-                    ))}
+                    )}
                     {user.consultant_type && (
                       <span className="text-[10px] text-zinc-500">
                         {CONSULTANT_OPTIONS.find(o => o.value === user.consultant_type)?.label ?? user.consultant_type}
@@ -742,22 +720,20 @@ export default function UsersPage() {
       {/* ── Modal de Visualização ── */}
       {viewUser && (() => {
         const u = viewUser
-        const roleNames = u.roles?.map(r => r.name) ?? []
-        const profiles  = resolveProfilesFromRoles(roleNames)
-        const profileLabel = profiles.length > 0
-          ? profiles.map(p => PROFILE_OPTIONS.find(o => o.value === p)?.label ?? p).join(', ')
-          : (roleNames[0] ?? '—')
+        const profile = resolveProfileFromType(u.type)
+        const profileLabel = profile
+          ? (PROFILE_OPTIONS.find(o => o.value === profile)?.label ?? profile)
+          : (u.type ?? '—')
         const rows: { label: string; value: string | React.ReactNode }[] = [
-          { label: 'Nome',         value: u.name },
-          { label: 'E-mail',       value: u.email },
-          { label: 'Perfil',       value: profileLabel },
-          { label: 'Status',       value: u.enabled
+          { label: 'Nome',   value: u.name },
+          { label: 'E-mail', value: u.email },
+          { label: 'Perfil', value: profileLabel },
+          { label: 'Status', value: u.enabled
               ? <span className="text-green-400 text-xs font-medium">Ativo</span>
               : <span className="text-zinc-400 text-xs">Inativo</span> },
         ]
         if (u.hourly_rate != null) rows.push({ label: 'Remuneração', value: `${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(u.hourly_rate))} ${u.rate_type === 'monthly' ? '/ mês' : '/ hora'}` })
         if (u.daily_hours != null) rows.push({ label: 'Horas/dia útil', value: `${u.daily_hours}h` })
-        if (u.roles && u.roles.length > 0) rows.push({ label: 'Roles', value: u.roles.map(r => r.name).join(', ') })
         return (
           <ModalOverlay onClose={() => setViewUser(null)}>
             <div className="p-5">
