@@ -12,7 +12,8 @@ import { RowMenu } from '@/components/ui/row-menu'
 
 interface ProjectForm {
   name: string
-  code: string
+  codeSeq: string
+  codeYear: string
   description: string
   customer_id: string
   service_type_id: string
@@ -42,12 +43,14 @@ interface ProjectForm {
   consultant_group_ids: number[]
 }
 
-interface SelectOption { id: number; name: string }
+interface SelectOption { id: number; name: string; code_prefix?: string | null }
 interface ContractType { id: number; name: string }
 interface ProjectStatus { code: string; name: string }
 
+const CURRENT_YEAR_2D = new Date().getFullYear().toString().slice(-2)
+
 const EMPTY_FORM: ProjectForm = {
-  name: '', code: '', description: '',
+  name: '', codeSeq: '', codeYear: CURRENT_YEAR_2D, description: '',
   customer_id: '', service_type_id: '', contract_type_id: '',
   status: 'started', start_date: '',
   project_value: '', hourly_rate: '', additional_hourly_rate: '',
@@ -411,7 +414,6 @@ export default function ProjectsPage() {
   const [form, setForm] = useState<ProjectForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<number | null>(null)
-  const [codeManual, setCodeManual] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{
     open: boolean
     type?: 'project' | 'contrib' | 'log'
@@ -444,6 +446,17 @@ export default function ProjectsPage() {
   const isBankHours = selectedContractType?.name.toLowerCase().includes('banco de horas') ?? false
   // Fechado e SaaS: não é On Demand nem Banco de Horas → mostra consultant_hours e save_erpserv
   const isFechado = !!selectedContractType && !isOnDemand && !isBankHours
+
+  // Code generation helpers
+  const selectedCustomerObj = useMemo(
+    () => customers.find(c => String(c.id) === form.customer_id),
+    [customers, form.customer_id]
+  )
+  const codePrefix = selectedCustomerObj?.code_prefix?.toUpperCase() ?? ''
+  const codePreview = useMemo(() => {
+    if (!codePrefix || !form.codeSeq.trim()) return ''
+    return `${codePrefix}${form.codeSeq.padStart(3, '0')}-${form.codeYear}`
+  }, [codePrefix, form.codeSeq, form.codeYear])
 
   // save_erpserv = sold_hours - consultant_hours - (coordinator_hours/100 * consultant_hours)
   const saveErpserv = useMemo(() => {
@@ -586,14 +599,6 @@ export default function ProjectsPage() {
     } catch { setParentProjects([]) }
   }, [])
 
-  // Auto-generate code when customer or name changes
-  useEffect(() => {
-    if (codeManual || modal.item) return
-    const customer = customers.find(c => String(c.id) === form.customer_id)
-    if (customer && form.name.trim()) {
-      setForm(f => ({ ...f, code: generateProjectCode(customer.name, form.name, 1) }))
-    }
-  }, [form.customer_id, form.name, customers, codeManual, modal.item])
 
   // When customer changes, reload parent projects
   useEffect(() => {
@@ -606,7 +611,6 @@ export default function ProjectsPage() {
 
   const openCreate = () => {
     setForm(EMPTY_FORM)
-    setCodeManual(false)
     editedFinancialRef.current = []
     setSearchConsultant('')
     setSearchApprover('')
@@ -621,11 +625,11 @@ export default function ProjectsPage() {
     setForm({
       ...EMPTY_FORM,
       name: item.name ?? '',
-      code: item.code ?? '',
+      codeSeq: item.proj_sequence != null ? String(item.proj_sequence).padStart(3, '0') : '',
+      codeYear: item.proj_year ?? CURRENT_YEAR_2D,
       customer_id: item.customer_id ? String(item.customer_id) : '',
       status: item.status ?? 'started',
     })
-    setCodeManual(true)
     editedFinancialRef.current = []
     setSearchConsultant('')
     setSearchApprover('')
@@ -640,7 +644,8 @@ export default function ProjectsPage() {
 
       const f: ProjectForm = {
         name: d.name ?? item.name ?? '',
-        code: d.code ?? item.code ?? '',
+        codeSeq: d.proj_sequence != null ? String(d.proj_sequence).padStart(3, '0') : '',
+        codeYear: d.proj_year ?? CURRENT_YEAR_2D,
         description: d.description ?? '',
         customer_id: d.customer_id ? String(d.customer_id) : String(item.customer_id ?? ''),
         service_type_id: d.service_type_id ? String(d.service_type_id) : '',
@@ -790,15 +795,20 @@ export default function ProjectsPage() {
   }
 
   const save = async () => {
-    if (!form.name || !form.code || !form.customer_id || !form.contract_type_id || !form.service_type_id) {
+    if (!form.name || !form.customer_id || !form.contract_type_id || !form.service_type_id) {
       toast.error('Preencha os campos obrigatórios')
       return
     }
     setSaving(true)
     try {
+      // Monta o código a enviar: null = auto-gerado no backend
+      let codeToSend: string | null = null
+      if (!form.parent_project_id && codePrefix && form.codeSeq.trim()) {
+        codeToSend = `${codePrefix}${form.codeSeq.padStart(3, '0')}-${form.codeYear}`
+      }
+
       const payload: Record<string, unknown> = {
         name: form.name,
-        code: form.code,
         description: form.description || null,
         customer_id: Number(form.customer_id),
         service_type_id: Number(form.service_type_id),
@@ -809,6 +819,7 @@ export default function ProjectsPage() {
         consultant_group_ids: form.consultant_group_ids,
         allow_manual_timesheets: form.allow_manual_timesheets,
       }
+      if (codeToSend) payload.code = codeToSend
       if (form.start_date) payload.start_date = form.start_date
       if (form.parent_project_id) payload.parent_project_id = Number(form.parent_project_id)
       if (form.project_value) payload.project_value = Number(form.project_value)
@@ -1251,13 +1262,58 @@ export default function ProjectsPage() {
                     <FieldLabel required>Nome do Projeto</FieldLabel>
                     <FieldInput value={form.name} onChange={setF('name')} />
                   </div>
-                  <div>
-                    <FieldLabel required>Código</FieldLabel>
-                    <FieldInput
-                      value={form.code}
-                      onChange={v => { setCodeManual(true); setF('code')(v.toUpperCase()) }}
-                      className="font-mono"
-                    />
+                  <div className="col-span-2">
+                    <FieldLabel>Código</FieldLabel>
+                    {form.parent_project_id ? (
+                      <div className="px-3 py-2.5 rounded-xl text-sm font-mono text-zinc-500 italic" style={inputStyle}>
+                        Gerado automaticamente a partir do projeto pai
+                      </div>
+                    ) : codePrefix ? (
+                      <div className="flex items-center gap-2">
+                        {/* Prefixo (read-only) */}
+                        <div className="px-3 py-2.5 rounded-xl text-sm font-mono tracking-widest text-center select-none" style={{ ...inputStyle, opacity: 0.5, width: '5rem' }}>
+                          {codePrefix}
+                        </div>
+                        {/* Sequência */}
+                        <input
+                          type="text"
+                          maxLength={3}
+                          value={form.codeSeq}
+                          onChange={e => setForm(f => ({ ...f, codeSeq: e.target.value.replace(/\D/g, '').slice(0, 3) }))}
+                          placeholder="001"
+                          className="px-3 py-2.5 rounded-xl text-sm font-mono text-center outline-none w-20"
+                          style={inputStyle}
+                        />
+                        <span className="text-zinc-500 text-sm font-mono">-</span>
+                        {/* Ano */}
+                        <input
+                          type="text"
+                          maxLength={2}
+                          value={form.codeYear}
+                          onChange={e => setForm(f => ({ ...f, codeYear: e.target.value.replace(/\D/g, '').slice(0, 2) }))}
+                          placeholder="26"
+                          className="px-3 py-2.5 rounded-xl text-sm font-mono text-center outline-none w-16"
+                          style={inputStyle}
+                        />
+                        {/* Preview */}
+                        {codePreview && (
+                          <span className="ml-1 text-xs font-mono px-2 py-1 rounded-lg" style={{ background: 'var(--brand-border)', color: 'var(--brand-subtle)' }}>
+                            {codePreview}
+                          </span>
+                        )}
+                        {!form.codeSeq && (
+                          <span className="text-xs text-zinc-500 italic">deixe vazio para gerar automaticamente</span>
+                        )}
+                      </div>
+                    ) : form.customer_id ? (
+                      <div className="px-3 py-2.5 rounded-xl text-xs text-amber-400 italic" style={inputStyle}>
+                        Cliente sem prefixo configurado — cadastre um prefixo no cliente para gerar código automático
+                      </div>
+                    ) : (
+                      <div className="px-3 py-2.5 rounded-xl text-sm text-zinc-500 italic" style={inputStyle}>
+                        Selecione um cliente para ver o código
+                      </div>
+                    )}
                   </div>
                   <div>
                     <FieldLabel>Status</FieldLabel>
@@ -1548,7 +1604,7 @@ export default function ProjectsPage() {
                 >Cancelar</button>
                 <button
                   onClick={save}
-                  disabled={saving || !form.name || !form.code || !form.customer_id || !form.contract_type_id || !form.service_type_id}
+                  disabled={saving || !form.name || !form.customer_id || !form.contract_type_id || !form.service_type_id}
                   className="px-4 py-2 rounded-xl text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
                   style={{ background: 'var(--brand-primary)', color: '#0A0A0B' }}
                 >

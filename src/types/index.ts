@@ -28,6 +28,7 @@ export interface PaginatedResponse<T> {
 export interface Customer {
   id: number
   name: string
+  code_prefix?: string | null
 }
 
 export interface Project {
@@ -49,6 +50,10 @@ export interface Project {
   hour_contribution?: number
   child_projects?: Project[]
   node_state?: 'ACTIVE' | 'DISABLED' | null
+  proj_sequence?: number | null
+  proj_year?: string | null
+  child_sequence?: number | null
+  is_manual_code?: boolean
 }
 
 export interface Timesheet {
