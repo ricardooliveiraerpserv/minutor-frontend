@@ -450,8 +450,8 @@ export default function ApprovalsPage() {
   const [executiveId,   setExecutiveId]   = useState('')
   const [projectId,     setProjectId]     = useState('')
   const [customerId,    setCustomerId]    = useState('')
-  const [tsStatus,      setTsStatus]      = useState('')
-  const [expStatus,     setExpStatus]     = useState('')
+  const tsStatus  = 'pending'
+  const expStatus = 'pending'
   const [showFilters,   setShowFilters]   = useState(true)
 
   // Support data
@@ -551,10 +551,8 @@ export default function ApprovalsPage() {
   const clearFilters = () => {
     setDateFrom(''); setDateTo(''); setUserId(''); setCoordinatorId('')
     setExecutiveId(''); setProjectId(''); setCustomerId('')
-    setTsStatus(''); setExpStatus('')
   }
-  const activeStatus = tab === 'timesheets' ? tsStatus : expStatus
-  const hasFilters = !!(dateFrom || dateTo || userId || coordinatorId || executiveId || projectId || customerId || activeStatus)
+  const hasFilters = !!(dateFrom || dateTo || userId || coordinatorId || executiveId || projectId || customerId)
 
   // Timesheets: bulk allowed
   const currentItems   = tab === 'timesheets' ? tsItems   : expItems
@@ -662,7 +660,6 @@ export default function ApprovalsPage() {
 
   const handleTabChange = (t: 'timesheets' | 'expenses') => {
     setTab(t); setSelected([])
-    setTsStatus(''); setExpStatus('')
   }
 
   return (
@@ -692,14 +689,6 @@ export default function ApprovalsPage() {
             </button>
           )
         })}
-      </div>
-
-      {/* ── Status pills ── */}
-      <div className="mb-4">
-        {tab === 'timesheets'
-          ? <StatusPills value={tsStatus} onChange={v => { setTsStatus(v); setTsPage(1); setSelected([]) }} options={TS_STATUS_OPTS} />
-          : <StatusPills value={expStatus} onChange={v => { setExpStatus(v); setExpPage(1) }} options={EXP_STATUS_OPTS} />
-        }
       </div>
 
       {/* ── Filters ── */}
