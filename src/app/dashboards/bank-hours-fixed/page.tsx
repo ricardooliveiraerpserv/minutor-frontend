@@ -7,6 +7,8 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
 import { BarChart2, Clock, TrendingUp, TrendingDown, AlertCircle, DollarSign, ChevronDown } from 'lucide-react'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
+import { MonthYearPicker } from '@/components/ui/month-year-picker'
+import { SearchSelect } from '@/components/ui/search-select'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -212,25 +214,6 @@ function SkeletonCard() {
   )
 }
 
-// ─── Select filter ────────────────────────────────────────────────────────────
-
-function FilterSelect({ label, value, onChange, children, wide }: {
-  label: string; value: string | number; onChange: (v: string) => void; children: React.ReactNode; wide?: boolean
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{label}</label>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className={`rounded-xl px-4 py-2.5 text-sm appearance-none outline-none cursor-pointer ${wide ? 'min-w-64' : 'min-w-36'}`}
-        style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}
-      >
-        {children}
-      </select>
-    </div>
-  )
-}
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -250,6 +233,8 @@ export default function BankHoursFixedPage() {
   const [selectedProject,   setSelectedProject]   = useState<number | ''>('')
   const [dateFrom, setDateFrom] = useState(isoFirstDay)
   const [dateTo,   setDateTo]   = useState(isoLastDay)
+  const [refMonth, setRefMonth] = useState<number | null>(now.getMonth() + 1)
+  const [refYear,  setRefYear]  = useState<number | null>(now.getFullYear())
 
   const [summary,      setSummary]      = useState<SummaryData | null>(null)
   const [projectsList, setProjectsList] = useState<ProjectItem[]>([])
@@ -284,24 +269,31 @@ export default function BankHoursFixedPage() {
     return p
   }, [selectedCustomer, selectedExecutive, selectedProject])
 
+  const resolveMonthYear = useCallback(() => {
+    const now = new Date()
+    const toM = refMonth ?? (dateTo ? Number(dateTo.split('-')[1]) : now.getMonth() + 1)
+    const toY = refYear  ?? (dateTo ? Number(dateTo.split('-')[0]) : now.getFullYear())
+    return [toM, toY] as const
+  }, [refMonth, refYear, dateTo])
+
   // Summary (Total Geral)
   const fetchSummary = useCallback(() => {
     if (!selectedProject && isAdmin) return
     const p = baseParams()
-    const [toY, toM] = dateTo.split('-').map(Number)
+    const [toM, toY] = resolveMonthYear()
     p.set('month', String(toM)); p.set('year', String(toY))
     setLoadingSummary(true)
     api.get<any>(`/dashboards/bank-hours-fixed?${p}`)
       .then(r => setSummary(r?.data ?? r ?? null))
       .catch(() => setSummary(null))
       .finally(() => setLoadingSummary(false))
-  }, [baseParams, dateTo, isAdmin])
+  }, [baseParams, resolveMonthYear, isAdmin])
 
   // Projects tab data
   const fetchProjects = useCallback(() => {
     if (!selectedProject && isAdmin) return
     const p = baseParams()
-    const [toY, toM] = dateTo.split('-').map(Number)
+    const [toM, toY] = resolveMonthYear()
     p.set('month', String(toM)); p.set('year', String(toY))
     p.set('service_type_name', 'Projeto')
     setLoadingProjects(true)
@@ -309,13 +301,13 @@ export default function BankHoursFixedPage() {
       .then(r => setProjectsList(Array.isArray(r?.data) ? r.data : []))
       .catch(() => setProjectsList([]))
       .finally(() => setLoadingProjects(false))
-  }, [baseParams, dateTo, isAdmin])
+  }, [baseParams, resolveMonthYear, isAdmin])
 
   // Maintenance tab data
   const fetchMaintenance = useCallback(() => {
     if (!selectedProject && isAdmin) return
     const p = baseParams()
-    const [toY, toM] = dateTo.split('-').map(Number)
+    const [toM, toY] = resolveMonthYear()
     p.set('month', String(toM)); p.set('year', String(toY))
     p.set('service_type_name', 'Sustentação')
     setLoadingMaint(true)
@@ -323,7 +315,7 @@ export default function BankHoursFixedPage() {
       .then(r => setMaintList(Array.isArray(r?.data) ? r.data : []))
       .catch(() => setMaintList([]))
       .finally(() => setLoadingMaint(false))
-  }, [baseParams, dateTo, isAdmin])
+  }, [baseParams, resolveMonthYear, isAdmin])
 
   useEffect(() => { fetchSummary() }, [fetchSummary])
   useEffect(() => { if (activeTab === 'projects')    fetchProjects()    }, [fetchProjects, activeTab])
@@ -407,27 +399,51 @@ export default function BankHoursFixedPage() {
         {/* Filters */}
         <div className="flex flex-wrap items-end gap-4 p-5 rounded-2xl" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
           {isAdmin && (
-            <FilterSelect label="Executivo" value={selectedExecutive} onChange={v => { setSelectedExecutive(v === '' ? '' : Number(v)); setSelectedCustomer(''); setSelectedProject('') }} wide>
-              <option value="">Todos os executivos</option>
-              {executives.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-            </FilterSelect>
+            <SearchSelect
+              label="Executivo"
+              value={String(selectedExecutive)}
+              onChange={v => { setSelectedExecutive(v === '' ? '' : Number(v)); setSelectedCustomer(''); setSelectedProject('') }}
+              options={executives}
+              placeholder="Todos os executivos"
+              wide
+            />
           )}
           {isAdmin && (
-            <FilterSelect label="Cliente" value={selectedCustomer} onChange={v => { setSelectedCustomer(v === '' ? '' : Number(v)); setSelectedExecutive(''); setSelectedProject('') }} wide>
-              <option value="">Todos os clientes</option>
-              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </FilterSelect>
+            <SearchSelect
+              label="Cliente"
+              value={String(selectedCustomer)}
+              onChange={v => { setSelectedCustomer(v === '' ? '' : Number(v)); setSelectedExecutive(''); setSelectedProject('') }}
+              options={customers}
+              placeholder="Todos os clientes"
+              wide
+            />
           )}
-          <FilterSelect label="Projeto" value={selectedProject} onChange={v => setSelectedProject(v === '' ? '' : Number(v))} wide>
-            <option value="">Selecione um projeto</option>
-            {projects.map(p => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
-          </FilterSelect>
+          <SearchSelect
+            label="Projeto"
+            value={String(selectedProject)}
+            onChange={v => setSelectedProject(v === '' ? '' : Number(v))}
+            options={projects.map(p => ({ id: p.id, name: `${p.code} — ${p.name}` }))}
+            placeholder="Selecione um projeto"
+            wide
+          />
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Período</label>
             <DateRangePicker
               from={dateFrom}
               to={dateTo}
-              onChange={(f, t) => { setDateFrom(f); setDateTo(t) }}
+              onChange={(f, t) => { setDateFrom(f); setDateTo(t); setRefMonth(null); setRefYear(null) }}
+            />
+          </div>
+          {/* Mês/Ano de referência */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Mês/Ano</label>
+            <MonthYearPicker
+              month={refMonth}
+              year={refYear}
+              onChange={(m, y) => {
+                if (m === 0) { setRefMonth(null); setRefYear(null) }
+                else { setRefMonth(m); setRefYear(y); setDateFrom(''); setDateTo('') }
+              }}
             />
           </div>
         </div>

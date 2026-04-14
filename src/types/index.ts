@@ -107,6 +107,7 @@ export interface CustomerFull {
   name: string
   company_name?: string
   cgc?: string
+  code_prefix?: string | null
   active: boolean
   executive_id?: number | null
   executive?: Executive

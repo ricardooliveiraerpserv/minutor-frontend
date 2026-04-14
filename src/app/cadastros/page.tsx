@@ -234,7 +234,7 @@ function CustomersTab() {
   const [page, setPage] = useState(1)
   const [hasNext, setHasNext] = useState(false)
   const [modal, setModal] = useState<{ open: boolean; item?: CustomerFull }>({ open: false })
-  const [form, setForm] = useState({ name: '', company_name: '', cgc: '', active: true, executive_id: '' })
+  const [form, setForm] = useState({ name: '', company_name: '', cgc: '', code_prefix: '', active: true, executive_id: '' })
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<number | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id?: number }>({ open: false })
@@ -261,16 +261,20 @@ function CustomersTab() {
 
   useEffect(() => { load() }, [load])
 
-  const openCreate = () => { setForm({ name: '', company_name: '', cgc: '', active: true, executive_id: '' }); setModal({ open: true }) }
+  const openCreate = () => { setForm({ name: '', company_name: '', cgc: '', code_prefix: '', active: true, executive_id: '' }); setModal({ open: true }) }
   const openEdit = (item: CustomerFull) => {
-    setForm({ name: item.name, company_name: item.company_name ?? '', cgc: item.cgc ?? '', active: item.active, executive_id: item.executive_id ? String(item.executive_id) : '' })
+    setForm({ name: item.name, company_name: item.company_name ?? '', cgc: item.cgc ?? '', code_prefix: item.code_prefix ?? '', active: item.active, executive_id: item.executive_id ? String(item.executive_id) : '' })
     setModal({ open: true, item })
   }
 
   const save = async () => {
     setSaving(true)
     try {
-      const payload = { ...form, executive_id: form.executive_id ? Number(form.executive_id) : null }
+      const payload = {
+        ...form,
+        executive_id: form.executive_id ? Number(form.executive_id) : null,
+        code_prefix: form.code_prefix || null,
+      }
       if (modal.item) await api.put(`/customers/${modal.item.id}`, payload)
       else await api.post('/customers', payload)
       toast.success(modal.item ? 'Cliente atualizado' : 'Cliente criado')
@@ -319,13 +323,14 @@ function CustomersTab() {
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden md:table-cell">Razão Social</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">CPF/CNPJ</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden xl:table-cell">Prefixo</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden lg:table-cell">Executivo</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
             </tr>
           </thead>
           <tbody>
-            {loading ? <TableSkeleton cols={6} /> : items.length === 0 ? (
-              <tr><td colSpan={6} className="px-3 py-8 text-center text-zinc-500">Nenhum cliente</td></tr>
+            {loading ? <TableSkeleton cols={7} /> : items.length === 0 ? (
+              <tr><td colSpan={7} className="px-3 py-8 text-center text-zinc-500">Nenhum cliente</td></tr>
             ) : items.map(item => (
               <tr key={item.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
                 <td className="px-2 py-2.5 w-10">
@@ -337,6 +342,7 @@ function CustomersTab() {
                 <td className="px-3 py-2.5 text-zinc-200">{item.name}</td>
                 <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell">{item.company_name || '—'}</td>
                 <td className="px-3 py-2.5 text-zinc-400 font-mono hidden sm:table-cell">{item.cgc || '—'}</td>
+                <td className="px-3 py-2.5 text-zinc-400 font-mono hidden xl:table-cell">{item.code_prefix || '—'}</td>
                 <td className="px-3 py-2.5 text-zinc-400 hidden lg:table-cell">{item.executive?.name || '—'}</td>
                 <td className="px-3 py-2.5"><ActiveBadge active={item.active} /></td>
               </tr>
@@ -370,6 +376,16 @@ function CustomersTab() {
                 <Label className="text-xs text-zinc-400">CPF/CNPJ</Label>
                 <Input value={form.cgc} onChange={e => setForm(f => ({ ...f, cgc: e.target.value }))}
                   className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs font-mono" />
+              </div>
+              <div>
+                <Label className="text-xs text-zinc-400">Prefixo de Código (3 letras)</Label>
+                <Input
+                  value={form.code_prefix}
+                  onChange={e => setForm(f => ({ ...f, code_prefix: e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) }))}
+                  placeholder="ex: ABC"
+                  maxLength={3}
+                  className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs font-mono uppercase tracking-widest" />
+                <p className="mt-1 text-[11px] text-zinc-500">Usado para gerar códigos automáticos dos projetos (ex: ABC001-26)</p>
               </div>
               <div>
                 <Label className="text-xs text-zinc-400">Executivo</Label>

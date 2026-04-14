@@ -17,8 +17,11 @@ const PALETTE = [
 
 const CHART_STYLE = {
   background: 'transparent',
+  backgroundColor: 'transparent',
   fontSize: 11,
 }
+
+const CURSOR = { fill: 'rgba(255,255,255,0.06)' }
 
 const AXIS_TICK = { fill: '#6B7280', fontSize: 11 }
 const GRID_COLOR = 'rgba(255,255,255,0.06)'
@@ -188,7 +191,7 @@ export default function DashboardIndicators({ basePath, params, disabled = false
               <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
               <XAxis type="number" tick={AXIS_TICK} tickFormatter={v => `${v}h`} />
               <YAxis type="category" dataKey="requester" tick={AXIS_TICK} width={110} />
-              <Tooltip content={<CustomTooltip valueLabel="Horas" />} />
+              <Tooltip content={<CustomTooltip valueLabel="Horas" />} cursor={CURSOR} />
               <Bar dataKey="total_hours" name="Horas" radius={[0, 6, 6, 0]}>
                 {data.requester.map((_, i) => (
                   <Cell key={i} fill={PALETTE[i % PALETTE.length]} fillOpacity={0.85} />
@@ -208,7 +211,7 @@ export default function DashboardIndicators({ basePath, params, disabled = false
               <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
               <XAxis dataKey="service" tick={AXIS_TICK} angle={-30} textAnchor="end" interval={0} />
               <YAxis tick={AXIS_TICK} tickFormatter={v => `${v}h`} />
-              <Tooltip content={<CustomTooltip valueLabel="Horas" />} />
+              <Tooltip content={<CustomTooltip valueLabel="Horas" />} cursor={CURSOR} />
               <Bar dataKey="total_hours" name="Horas" radius={[6, 6, 0, 0]}>
                 {data.service.map((_, i) => (
                   <Cell key={i} fill={PALETTE[i % PALETTE.length]} fillOpacity={0.85} />
@@ -228,7 +231,7 @@ export default function DashboardIndicators({ basePath, params, disabled = false
               <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
               <XAxis dataKey="status" tick={AXIS_TICK} />
               <YAxis tick={AXIS_TICK} allowDecimals={false} />
-              <Tooltip content={<CustomTooltip valueLabel="Tickets" />} />
+              <Tooltip content={<CustomTooltip valueLabel="Tickets" />} cursor={CURSOR} />
               <Bar dataKey="ticket_count" name="Tickets" radius={[6, 6, 0, 0]}>
                 {data.status.map((_, i) => (
                   <Cell key={i} fill={PALETTE[i % PALETTE.length]} fillOpacity={0.85} />
@@ -258,7 +261,7 @@ export default function DashboardIndicators({ basePath, params, disabled = false
                   <Cell key={i} fill={PALETTE[i % PALETTE.length]} fillOpacity={0.85} />
                 ))}
               </Pie>
-              <Tooltip content={<CustomTooltip valueLabel="Tickets" />} />
+              <Tooltip content={<CustomTooltip valueLabel="Tickets" />} cursor={CURSOR} />
               <Legend
                 formatter={(value) => <span style={{ fontSize: 11, color: '#9CA3AF' }}>{value}</span>}
               />
@@ -276,7 +279,7 @@ export default function DashboardIndicators({ basePath, params, disabled = false
               <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
               <XAxis dataKey="category" tick={AXIS_TICK} angle={-30} textAnchor="end" interval={0} />
               <YAxis tick={AXIS_TICK} allowDecimals={false} />
-              <Tooltip content={<CustomTooltip valueLabel="Tickets" />} />
+              <Tooltip content={<CustomTooltip valueLabel="Tickets" />} cursor={CURSOR} />
               <Bar dataKey="ticket_count" name="Tickets" radius={[6, 6, 0, 0]}>
                 {data.category.map((_, i) => (
                   <Cell key={i} fill={PALETTE[i % PALETTE.length]} fillOpacity={0.85} />
@@ -296,7 +299,7 @@ export default function DashboardIndicators({ basePath, params, disabled = false
               <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
               <XAxis dataKey="ticket_id" tick={AXIS_TICK} angle={-30} textAnchor="end" interval={0} />
               <YAxis tick={AXIS_TICK} tickFormatter={v => `${v}h`} />
-              <Tooltip content={<CustomTooltip valueLabel="Horas" />} />
+              <Tooltip content={<CustomTooltip valueLabel="Horas" />} cursor={CURSOR} />
               <Bar dataKey="total_hours" name="Horas" radius={[6, 6, 0, 0]} fill="#EF4444" fillOpacity={0.8} />
             </BarChart>
           </ResponsiveContainer>
@@ -312,7 +315,7 @@ export default function DashboardIndicators({ basePath, params, disabled = false
               <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
               <XAxis dataKey="month" tick={AXIS_TICK} />
               <YAxis tick={AXIS_TICK} allowDecimals={false} />
-              <Tooltip content={<CustomTooltip valueLabel="Tickets" />} />
+              <Tooltip content={<CustomTooltip valueLabel="Tickets" />} cursor={CURSOR} />
               <Line
                 type="monotone" dataKey="ticket_count" name="Tickets"
                 stroke="#00F5FF" strokeWidth={2} dot={{ fill: '#00F5FF', r: 4 }}
@@ -332,7 +335,7 @@ export default function DashboardIndicators({ basePath, params, disabled = false
               <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
               <XAxis dataKey="month" tick={AXIS_TICK} />
               <YAxis tick={AXIS_TICK} tickFormatter={v => `${v}h`} />
-              <Tooltip content={<CustomTooltip valueLabel="Horas" />} />
+              <Tooltip content={<CustomTooltip valueLabel="Horas" />} cursor={CURSOR} />
               <Line
                 type="monotone" dataKey="consumed_hours" name="Horas consumidas"
                 stroke="#8B5CF6" strokeWidth={2} dot={{ fill: '#8B5CF6', r: 4 }}

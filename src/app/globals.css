@@ -154,6 +154,21 @@
   }
 }
 
+/* ── Recharts ────────────────────────────────────────────────── */
+.recharts-wrapper,
+.recharts-wrapper svg,
+.recharts-surface {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+/* Background rects rendered inside the SVG */
+.recharts-cartesian-grid-bg,
+.recharts-bar-background-rectangle rect,
+svg.recharts-surface > rect,
+svg.recharts-surface > g > rect:first-child {
+  fill: transparent !important;
+}
+
 /* ── Scrollbar ───────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

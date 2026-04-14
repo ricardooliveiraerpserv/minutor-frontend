@@ -6,10 +6,36 @@ import { Timesheet } from '@/types'
 import { PageHeader, Badge, Skeleton } from '@/components/ds'
 import {
   ArrowLeft, Clock, Calendar, User, FolderOpen, Ticket,
-  Globe, Webhook, Building2, Hash, FileText, CheckCircle,
+  Globe, Webhook, Building2, Hash, FileText, CheckCircle, Paperclip,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { useState } from 'react'
+
+function AttachmentLink({ url }: { url: string }) {
+  const [loading, setLoading] = useState(false)
+  const open = async () => {
+    setLoading(true)
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('minutor_token') : null
+      const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      if (!res.ok) { alert('Anexo não encontrado no servidor'); return }
+      const blob = await res.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      window.open(blobUrl, '_blank')
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000)
+    } catch { alert('Erro ao abrir anexo') }
+    finally { setLoading(false) }
+  }
+  return (
+    <button type="button" onClick={open} disabled={loading}
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+      style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.15)' }}>
+      <Paperclip size={12} />
+      {loading ? 'Abrindo...' : 'Visualizar Anexo'}
+    </button>
+  )
+}
 
 function formatDate(d: string | null | undefined) {
   if (!d) return '—'
@@ -169,6 +195,11 @@ export default function TimesheetDetailPage() {
               )}
               {ts.movidesk_appointment_id && (
                 <InfoRow icon={Hash} label="ID Movidesk" value={String(ts.movidesk_appointment_id)} />
+              )}
+              {(ts as any).attachment_url && (
+                <InfoRow icon={Paperclip} label="Anexo">
+                  <AttachmentLink url={(ts as any).attachment_url} />
+                </InfoRow>
               )}
               {/* sem last border */}
             </div>

@@ -7,6 +7,8 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
 import DashboardIndicators from '@/components/dashboard/DashboardIndicators'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
+import { MonthYearPicker } from '@/components/ui/month-year-picker'
+import { SearchSelect } from '@/components/ui/search-select'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -62,23 +64,6 @@ function fmtBRL(v: number | null | undefined) {
 }
 function fmtDate(s: string) { return new Date(s).toLocaleDateString('pt-BR') }
 
-function FilterSelect({ label, value, onChange, children, wide }: {
-  label: string; value: string | number; onChange: (v: string) => void; children: React.ReactNode; wide?: boolean
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{label}</label>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className={`rounded-xl px-4 py-2.5 text-sm appearance-none outline-none cursor-pointer ${wide ? 'min-w-52' : 'min-w-28'}`}
-        style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}
-      >
-        {children}
-      </select>
-    </div>
-  )
-}
 
 function StatCard({ label, value, accent }: { label: string; value: string; accent?: 'success' | 'danger' | 'primary' }) {
   const color = accent === 'success' ? '#10B981' : accent === 'danger' ? '#EF4444' : accent === 'primary' ? '#00F5FF' : 'var(--brand-text)'
@@ -176,6 +161,8 @@ export default function BankHoursMonthlyPage() {
   const [selectedProject,   setSelectedProject]   = useState<number | ''>('')
   const [dateFrom, setDateFrom] = useState(isoFirstDay)
   const [dateTo,   setDateTo]   = useState(isoLastDay)
+  const [refMonth, setRefMonth] = useState<number | null>(now.getMonth() + 1)
+  const [refYear,  setRefYear]  = useState<number | null>(now.getFullYear())
 
   const [summary,      setSummary]      = useState<SummaryData | null>(null)
   const [projectsList, setProjectsList] = useState<ProjectItem[]>([])
@@ -202,7 +189,9 @@ export default function BankHoursMonthlyPage() {
 
   const fetchSummary = useCallback(() => {
     if (!selectedProject && isAdmin) return
-    const [toY, toM] = dateTo.split('-').map(Number)
+    const now = new Date()
+    const toM = refMonth ?? (dateTo ? Number(dateTo.split('-')[1]) : now.getMonth() + 1)
+    const toY = refYear  ?? (dateTo ? Number(dateTo.split('-')[0]) : now.getFullYear())
     const params = new URLSearchParams({ month: String(toM), year: String(toY) })
     if (selectedCustomer)  params.set('customer_id',  String(selectedCustomer))
     if (selectedExecutive) params.set('executive_id', String(selectedExecutive))
@@ -212,21 +201,25 @@ export default function BankHoursMonthlyPage() {
       .then(r => setSummary(r?.data ?? r ?? null))
       .catch(() => setSummary(null))
       .finally(() => setLoadingSummary(false))
-  }, [selectedCustomer, selectedExecutive, selectedProject, dateFrom, dateTo, isAdmin])
+  }, [selectedCustomer, selectedExecutive, selectedProject, dateFrom, dateTo, refMonth, refYear, isAdmin])
 
   const buildParams = useCallback(() => {
-    const [toY,   toM]   = dateTo.split('-').map(Number)
-    const [fromY, fromM] = dateFrom.split('-').map(Number)
+    const now = new Date()
+    const toM = refMonth ?? (dateTo ? Number(dateTo.split('-')[1]) : now.getMonth() + 1)
+    const toY = refYear  ?? (dateTo ? Number(dateTo.split('-')[0]) : now.getFullYear())
     const p = new URLSearchParams({ month: String(toM), year: String(toY) })
-    if (fromM !== toM || fromY !== toY) {
-      p.set('start_month', String(fromM))
-      p.set('start_year',  String(fromY))
+    if (dateFrom) {
+      const [fromY, fromM] = dateFrom.split('-').map(Number)
+      if (fromM !== toM || fromY !== toY) {
+        p.set('start_month', String(fromM))
+        p.set('start_year',  String(fromY))
+      }
     }
     if (selectedCustomer)  p.set('customer_id',  String(selectedCustomer))
     if (selectedExecutive) p.set('executive_id', String(selectedExecutive))
     if (selectedProject)   p.set('project_id',   String(selectedProject))
     return p
-  }, [selectedCustomer, selectedExecutive, selectedProject, dateFrom, dateTo])
+  }, [selectedCustomer, selectedExecutive, selectedProject, dateFrom, dateTo, refMonth, refYear])
 
   const fetchProjectsList = useCallback(() => {
     if (!selectedProject && isAdmin) return
@@ -276,28 +269,52 @@ export default function BankHoursMonthlyPage() {
         {/* Filters */}
         <div className="flex flex-wrap items-end gap-4 p-5 rounded-2xl" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
           {isAdmin && (
-            <FilterSelect label="Executivo" value={selectedExecutive} onChange={v => { setSelectedExecutive(v === '' ? '' : Number(v)); setSelectedCustomer(''); setSelectedProject('') }} wide>
-              <option value="">Todos os executivos</option>
-              {executives.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-            </FilterSelect>
+            <SearchSelect
+              label="Executivo"
+              value={String(selectedExecutive)}
+              onChange={v => { setSelectedExecutive(v === '' ? '' : Number(v)); setSelectedCustomer(''); setSelectedProject('') }}
+              options={executives}
+              placeholder="Todos os executivos"
+              wide
+            />
           )}
           {isAdmin && (
-            <FilterSelect label="Cliente" value={selectedCustomer} onChange={v => { setSelectedCustomer(v === '' ? '' : Number(v)); setSelectedExecutive(''); setSelectedProject('') }} wide>
-              <option value="">Todos os clientes</option>
-              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </FilterSelect>
+            <SearchSelect
+              label="Cliente"
+              value={String(selectedCustomer)}
+              onChange={v => { setSelectedCustomer(v === '' ? '' : Number(v)); setSelectedExecutive(''); setSelectedProject('') }}
+              options={customers}
+              placeholder="Todos os clientes"
+              wide
+            />
           )}
-          <FilterSelect label="Projeto" value={selectedProject} onChange={v => setSelectedProject(v === '' ? '' : Number(v))} wide>
-            <option value="">Selecione um projeto</option>
-            {projects.map(p => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
-          </FilterSelect>
+          <SearchSelect
+            label="Projeto"
+            value={String(selectedProject)}
+            onChange={v => setSelectedProject(v === '' ? '' : Number(v))}
+            options={projects.map(p => ({ id: p.id, name: `${p.code} — ${p.name}` }))}
+            placeholder="Selecione um projeto"
+            wide
+          />
           {/* Período range */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Período</label>
             <DateRangePicker
               from={dateFrom}
               to={dateTo}
-              onChange={(f, t) => { setDateFrom(f); setDateTo(t) }}
+              onChange={(f, t) => { setDateFrom(f); setDateTo(t); setRefMonth(null); setRefYear(null) }}
+            />
+          </div>
+          {/* Mês/Ano de referência */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Mês/Ano</label>
+            <MonthYearPicker
+              month={refMonth}
+              year={refYear}
+              onChange={(m, y) => {
+                if (m === 0) { setRefMonth(null); setRefYear(null) }
+                else { setRefMonth(m); setRefYear(y); setDateFrom(''); setDateTo('') }
+              }}
             />
           </div>
         </div>

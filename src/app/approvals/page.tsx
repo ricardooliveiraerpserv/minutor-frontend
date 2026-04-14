@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { RowMenu } from '@/components/ui/row-menu'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
+import { MonthYearPicker } from '@/components/ui/month-year-picker'
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { api, ApiError } from '@/lib/api'
 import { toast } from 'sonner'
@@ -446,6 +447,8 @@ export default function ApprovalsPage() {
   // Filters
   const [dateFrom,      setDateFrom]      = useState('')
   const [dateTo,        setDateTo]        = useState('')
+  const [refMonth,      setRefMonth]      = useState<number | null>(null)
+  const [refYear,       setRefYear]       = useState<number | null>(null)
   const [userId,        setUserId]        = useState('')
   const [coordinatorId, setCoordinatorId] = useState('')
   const [executiveId,   setExecutiveId]   = useState('')
@@ -708,13 +711,29 @@ export default function ApprovalsPage() {
 
         {showFilters && (
           <div className="border-t border-zinc-800 px-4 py-3">
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+              <div>
+                <Label className="text-[11px] text-zinc-500 mb-1 block">Mês/Ano</Label>
+                <MonthYearPicker
+                  month={refMonth}
+                  year={refYear}
+                  onChange={(m, y) => {
+                    if (m === 0) { setRefMonth(null); setRefYear(null); setDateFrom(''); setDateTo('') }
+                    else {
+                      const mm = String(m).padStart(2, '0')
+                      const last = new Date(y, m, 0).getDate()
+                      setRefMonth(m); setRefYear(y)
+                      setDateFrom(`${y}-${mm}-01`); setDateTo(`${y}-${mm}-${String(last).padStart(2, '0')}`)
+                    }
+                  }}
+                />
+              </div>
               <div>
                 <Label className="text-[11px] text-zinc-500 mb-1 block">Período</Label>
                 <DateRangePicker
                   from={dateFrom}
                   to={dateTo}
-                  onChange={(f, t) => { setDateFrom(f); setDateTo(t) }}
+                  onChange={(f, t) => { setDateFrom(f); setDateTo(t); setRefMonth(null); setRefYear(null) }}
                 />
               </div>
               <SearchableSelect

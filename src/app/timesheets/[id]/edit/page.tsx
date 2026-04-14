@@ -22,7 +22,7 @@ export default function EditTimesheetPage() {
   const { data: raw, loading, error } = useApiQuery<{ success: boolean; data: Timesheet }>(`/timesheets/${id}`)
   const ts = raw?.data ?? (raw as unknown as Timesheet | null)
 
-  const { data: projectsData, error: projectsError } = useApiQuery<ProjectsResponse>('/projects?minimal=1&status=active&pageSize=200')
+  const { data: projectsData, error: projectsError } = useApiQuery<ProjectsResponse>('/projects?minimal=1&status=active&pageSize=50')
   const projects = projectsData?.items ?? []
 
   const [form, setForm] = useState({

@@ -18,6 +18,7 @@ import {
   CreditCard, FileText, Calendar, MoreVertical, CalendarDays, RefreshCw,
 } from 'lucide-react'
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
+import { MonthYearPicker } from '@/components/ui/month-year-picker'
 
 function ReceiptLink({ url, label = 'Visualizar Comprovante' }: { url: string; label?: string }) {
   const [loading, setLoading] = useState(false)
@@ -417,6 +418,8 @@ export default function ExpensesPage() {
   const [viewItem,       setViewItem]       = useState<Expense | null>(null)
   const [dateFrom,       setDateFrom]       = useState('')
   const [dateTo,         setDateTo]         = useState('')
+  const [refMonth,       setRefMonth]       = useState<number | null>(null)
+  const [refYear,        setRefYear]        = useState<number | null>(null)
   const [customerId,     setCustomerId]     = useState('')
   const [projectId,      setProjectId]      = useState('')
   const [userId,         setUserId]         = useState('')
@@ -575,12 +578,26 @@ export default function ExpensesPage() {
             <SearchSelect value={executiveId}   onChange={v => { setExecutiveId(v);   setPage(1) }} options={executives}   placeholder="Todos os executivos"   />
           </div>
           <div className="flex items-center gap-2">
+            <MonthYearPicker
+              month={refMonth}
+              year={refYear}
+              onChange={(m, y) => {
+                if (m === 0) { setRefMonth(null); setRefYear(null); setDateFrom(''); setDateTo('') }
+                else {
+                  const mm = String(m).padStart(2, '0')
+                  const last = new Date(y, m, 0).getDate()
+                  setRefMonth(m); setRefYear(y)
+                  setDateFrom(`${y}-${mm}-01`); setDateTo(`${y}-${mm}-${String(last).padStart(2, '0')}`)
+                }
+                setPage(1)
+              }}
+            />
             <DateRangePicker
               from={dateFrom} to={dateTo}
-              onChange={(f, t) => { setDateFrom(f); setDateTo(t); setPage(1) }}
+              onChange={(f, t) => { setDateFrom(f); setDateTo(t); setRefMonth(null); setRefYear(null); setPage(1) }}
             />
             {(customerId || projectId || userId || coordinatorId || executiveId || dateFrom || dateTo) && (
-              <button onClick={() => { setCustomerId(''); setProjectId(''); setUserId(''); setCoordinatorId(''); setExecutiveId(''); setDateFrom(''); setDateTo(''); setPage(1) }}
+              <button onClick={() => { setCustomerId(''); setProjectId(''); setUserId(''); setCoordinatorId(''); setExecutiveId(''); setDateFrom(''); setDateTo(''); setRefMonth(null); setRefYear(null); setPage(1) }}
                 className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs transition-all hover:bg-white/5"
                 style={{ color: 'var(--brand-danger)', border: '1px solid rgba(239,68,68,0.2)' }}>
                 <X size={11} /> Limpar

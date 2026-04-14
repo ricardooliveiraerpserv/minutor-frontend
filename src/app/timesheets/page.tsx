@@ -14,6 +14,7 @@ import {
   FileText, CheckCircle, User, CalendarDays, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
+import { MonthYearPicker } from '@/components/ui/month-year-picker'
 import {
   PageHeader, Table, Thead, Th, Tbody, Tr, Td,
   Badge, Button, Select, TextInput, Pagination,
@@ -635,6 +636,8 @@ export default function TimesheetsPage() {
   const [userId, setUserId]           = useState('')
   const [startDate, setStartDate]     = useState('')
   const [endDate, setEndDate]         = useState('')
+  const [refMonth, setRefMonth]       = useState<number | null>(null)
+  const [refYear,  setRefYear]        = useState<number | null>(null)
   const [ticket, setTicket]           = useState('')
   const [exporting, setExporting]     = useState(false)
   const [sortField, setSortField]     = useState<SortField | null>('date')
@@ -712,7 +715,8 @@ export default function TimesheetsPage() {
   const clearFilters = useCallback(() => {
     setStatus(''); setOrigin(''); setServiceTypeId(''); setContractTypeId('')
     setCustomerId(''); setExecutiveId(''); setUserId('')
-    setStartDate(''); setEndDate(''); setTicket(''); setPage(1)
+    setStartDate(''); setEndDate(''); setRefMonth(null); setRefYear(null)
+    setTicket(''); setPage(1)
   }, [])
 
   const handleExport = async () => {
@@ -808,10 +812,24 @@ export default function TimesheetsPage() {
 
           {/* Linha 2: datas + limpar */}
           <div className="flex items-center gap-2 flex-wrap">
+            <MonthYearPicker
+              month={refMonth}
+              year={refYear}
+              onChange={(m, y) => {
+                if (m === 0) { setRefMonth(null); setRefYear(null); setStartDate(''); setEndDate('') }
+                else {
+                  const mm = String(m).padStart(2, '0')
+                  const last = new Date(y, m, 0).getDate()
+                  setRefMonth(m); setRefYear(y)
+                  setStartDate(`${y}-${mm}-01`); setEndDate(`${y}-${mm}-${String(last).padStart(2, '0')}`)
+                }
+                resetPage()
+              }}
+            />
             <DateRangePicker
               from={startDate}
               to={endDate}
-              onChange={(f, t) => { setStartDate(f); setEndDate(t); resetPage() }}
+              onChange={(f, t) => { setStartDate(f); setEndDate(t); setRefMonth(null); setRefYear(null); resetPage() }}
             />
             {hasFilters && (
               <button

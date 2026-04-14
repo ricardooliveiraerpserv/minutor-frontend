@@ -6,199 +6,496 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Clock, FolderOpen, Receipt, CheckSquare, Plus, ArrowRight } from 'lucide-react'
+import {
+  Clock, Receipt, CheckSquare, Plus, AlertTriangle,
+  TrendingUp, FolderOpen, Users, X, ChevronRight,
+} from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-interface Widget {
-  label: string
-  value: string
-  icon: React.ReactNode
-  description?: string
-  href?: string
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface TsItem  { effort_minutes: number; status: string; date: string; project?: { name: string }; effort_hours?: string }
+interface ExpItem { amount: number | string; status: string; expense_date?: string; description?: string; project?: { name: string }; formatted_amount?: string }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmtHours(min: number) {
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return m > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`
 }
 
-function getWeekRange() {
-  const today = new Date()
-  const day = today.getDay()
-  const diffToMonday = day === 0 ? -6 : 1 - day
-  const monday = new Date(today)
-  monday.setDate(today.getDate() + diffToMonday)
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
-  return {
-    start: monday.toISOString().split('T')[0],
-    end: sunday.toISOString().split('T')[0],
-  }
+function sumMin(items: TsItem[])  { return items.reduce((a, t) => a + (t.effort_minutes ?? 0), 0) }
+function sumAmt(items: ExpItem[]) { return items.reduce((a, e) => a + (parseFloat(String(e.amount)) || 0), 0) }
+
+function todayISO() { return new Date().toISOString().split('T')[0] }
+
+function fmtDate(d: string) {
+  const [y, m, day] = d.split('-')
+  return `${day}/${m}/${y}`
 }
 
 function getMonthRange() {
-  const today = new Date()
-  const start = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]
-  const end = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0]
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+  const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
   return { start, end }
 }
 
-function fmtHours(minutes: number) {
-  return (minutes / 60).toFixed(1) + 'h'
-}
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-function fmtBRL(value: number) {
-  return formatBRL(value)
-}
-
-function sumMinutes(items: { effort_minutes?: number }[]) {
-  return items.reduce((acc, ts) => acc + (ts.effort_minutes ?? 0), 0)
-}
-
-function sumAmount(items: { amount?: number | string }[]) {
-  return items.reduce((acc, e) => acc + (parseFloat(String(e.amount)) || 0), 0)
-}
-
-function WidgetCard({ label, value, icon, loading, href }: { label: string; value: string; icon: React.ReactNode; loading: boolean; href?: string }) {
-  const inner = (
-    <div className={`bg-zinc-900 border border-zinc-800 rounded-xl p-4 transition-colors ${href ? 'cursor-pointer hover:border-zinc-600 hover:bg-zinc-800/60' : ''}`}>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs text-zinc-400">{label}</span>
-        <span className="text-zinc-500">{icon}</span>
-      </div>
-      {loading ? (
-        <Skeleton className="h-8 w-24" />
-      ) : (
-        <div className="text-2xl font-bold text-zinc-100">{value}</div>
-      )}
+function StatCard({
+  label, value, sub, loading, onClick,
+}: {
+  label: string; value: string; sub?: string; loading: boolean; onClick?: () => void
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className={`rounded-xl p-4 transition-colors ${onClick ? 'cursor-pointer hover:bg-white/[0.03]' : ''}`}
+      style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}
+    >
+      <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--brand-subtle)' }}>{label}</p>
+      {loading
+        ? <Skeleton className="h-6 w-20 mb-1" />
+        : <p className="text-xl font-bold" style={{ color: 'var(--brand-text)' }}>{value}</p>
+      }
+      {sub && <p className="text-[10px] mt-1" style={{ color: 'var(--brand-subtle)' }}>{sub}</p>}
     </div>
   )
-  if (href) return <Link href={href}>{inner}</Link>
-  return inner
 }
 
-function QuickAction({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
+function AlertRow({
+  icon: Icon, color, message, action, href,
+}: {
+  icon: React.ElementType; color: string; message: React.ReactNode; action: string; href: string
+}) {
   return (
-    <Link href={href}>
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 transition-colors cursor-pointer flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-blue-400">{icon}</span>
-          <span className="text-sm text-zinc-300">{label}</span>
-        </div>
-        <ArrowRight size={14} className="text-zinc-500" />
+    <Link href={href} className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-colors group">
+      <div className="flex items-center gap-2.5">
+        <Icon size={13} style={{ color }} className="shrink-0" />
+        <span className="text-sm" style={{ color: 'var(--brand-text)' }}>{message}</span>
       </div>
+      <span className="text-xs font-semibold flex items-center gap-1 group-hover:gap-1.5 transition-all" style={{ color }}>
+        {action} <ChevronRight size={11} />
+      </span>
     </Link>
   )
 }
 
+function RecentRow({ left, leftSub, right, badge }: { left: string; leftSub?: string; right: string; badge: string }) {
+  const badgeColor =
+    badge === 'approved'  ? { bg: 'rgba(34,197,94,0.1)',  text: '#22c55e', label: 'Aprovado' } :
+    badge === 'rejected'  ? { bg: 'rgba(239,68,68,0.1)',  text: '#ef4444', label: 'Reprovado' } :
+    badge === 'pending'   ? { bg: 'rgba(234,179,8,0.1)',  text: '#eab308', label: 'Pendente' } :
+    badge === 'adjustment_requested' ? { bg: 'rgba(249,115,22,0.1)', text: '#f97316', label: 'Ajuste' } :
+                            { bg: 'rgba(113,113,122,0.1)', text: '#71717a', label: badge }
+  return (
+    <div className="flex items-center justify-between px-5 py-3.5 border-b last:border-0" style={{ borderColor: 'var(--brand-border)' }}>
+      <div className="min-w-0">
+        <p className="text-xs font-medium truncate" style={{ color: 'var(--brand-text)' }}>{left}</p>
+        {leftSub && <p className="text-[11px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>{leftSub}</p>}
+      </div>
+      <div className="flex items-center gap-2.5 shrink-0 ml-3">
+        <span className="text-xs font-semibold font-mono" style={{ color: 'var(--brand-muted)' }}>{right}</span>
+        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: badgeColor.bg, color: badgeColor.text }}>
+          {badgeColor.label}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [widgets, setWidgets] = useState<Widget[]>([])
 
-  const isAdmin = user?.roles?.includes('Administrator') ||
+  // ── Admin state ──
+  const [adminPendingTs,  setAdminPendingTs]  = useState(0)
+  const [adminPendingExp, setAdminPendingExp] = useState(0)
+  const [adminTodayMin,   setAdminTodayMin]   = useState(0)
+  const [adminMonthMin,   setAdminMonthMin]   = useState(0)
+  const [adminActiveUsers,setAdminActiveUsers]= useState(0)
+  const [adminRecentTs,   setAdminRecentTs]   = useState<TsItem[]>([])
+  const [adminLoading,    setAdminLoading]    = useState(false)
+
+  // ── Consultant state ──
+  const [todayTs,    setTodayTs]    = useState<TsItem[]>([])
+  const [monthTs,    setMonthTs]    = useState<TsItem[]>([])
+  const [pendingTs,  setPendingTs]  = useState<TsItem[]>([])
+  const [rejectedTs, setRejectedTs] = useState<TsItem[]>([])
+  const [monthExp,   setMonthExp]   = useState<ExpItem[]>([])
+  const [pendingExp, setPendingExp] = useState<ExpItem[]>([])
+  const [recentTs,   setRecentTs]   = useState<TsItem[]>([])
+  const [recentExp,  setRecentExp]  = useState<ExpItem[]>([])
+  const [conLoading, setConLoading] = useState(false)
+
+  const isAdmin = !!(
+    user?.roles?.includes('Administrator') ||
+    user?.roles?.includes('Coordenador') ||
+    user?.roles?.includes('Parceiro ADM') ||
     user?.permissions?.includes('admin.full_access') ||
-    user?.permissions?.includes('projects.view') ||
-    user?.permissions?.includes('hours.view_all') ||
-    user?.permissions?.includes('expenses.view_all') ||
-    false
+    user?.permissions?.includes('hours.view_all')
+  )
 
+  const isConsultor = !!(
+    user?.roles?.includes('Consultor') &&
+    !user.roles.includes('Administrator') &&
+    !user.roles.includes('Coordenador') &&
+    !user.roles.includes('Parceiro ADM')
+  )
+
+  // ── Load admin data ──
   useEffect(() => {
-    if (authLoading || !user) return
-
-    const today = new Date().toISOString().split('T')[0]
-    const week = getWeekRange()
+    if (authLoading || !user || !isAdmin) return
+    const today = todayISO()
     const month = getMonthRange()
-
-    setLoading(true)
-
-    if (isAdmin) {
-      Promise.all([
-        api.get<{ items: { effort_minutes: number }[] }>(`/timesheets?start_date=${today}&end_date=${today}&pageSize=1000`),
-        api.get<{ items: { effort_minutes: number }[] }>(`/timesheets?start_date=${week.start}&end_date=${week.end}&pageSize=1000`),
-        api.get<{ items: unknown[] }>(`/projects?status=active&pageSize=1000`),
-        api.get<{ total_timesheets?: number; total_expenses?: number; data?: { summary?: { total_timesheets: number; total_expenses: number } } }>(`/approvals/pending`),
-      ]).then(([todayTs, weekTs, projs, approvals]) => {
-        const totalTimesheets = (approvals as any)?.data?.summary?.total_timesheets ?? (approvals as any)?.total_timesheets ?? 0
-        const totalExpenses = (approvals as any)?.data?.summary?.total_expenses ?? (approvals as any)?.total_expenses ?? 0
-
-        setWidgets([
-          { label: 'Horas Hoje (todos)',                   value: fmtHours(sumMinutes((todayTs as any)?.items ?? [])), icon: <Clock size={16} />,       href: '/meu-painel' },
-          { label: 'Horas da Semana (todos)',               value: fmtHours(sumMinutes((weekTs as any)?.items ?? [])),  icon: <Clock size={16} />,       href: '/meu-painel' },
-          { label: 'Projetos Ativos',                      value: String((projs as any)?.items?.length ?? 0),          icon: <FolderOpen size={16} />,  href: '/projects' },
-          { label: 'Apontamentos pendentes de aprovação',  value: String(totalTimesheets),                             icon: <CheckSquare size={16} />, href: '/approvals' },
-          { label: 'Despesas pendentes de aprovação',      value: String(totalExpenses),                               icon: <Receipt size={16} />,     href: '/approvals' },
-        ])
-      }).catch(() => {}).finally(() => setLoading(false))
-    } else {
-      const uid = user.id
-      Promise.all([
-        api.get<{ items: { effort_minutes: number }[] }>(`/timesheets?start_date=${today}&end_date=${today}&pageSize=1000&user_id=${uid}`),
-        api.get<{ items: { effort_minutes: number }[] }>(`/timesheets?start_date=${week.start}&end_date=${week.end}&pageSize=1000&user_id=${uid}`),
-        api.get<{ items: { effort_minutes: number }[] }>(`/timesheets?start_date=${month.start}&end_date=${month.end}&pageSize=1000&user_id=${uid}`),
-        api.get<{ items: { status: string }[] }>(`/timesheets?status=pending&pageSize=1000&user_id=${uid}`),
-        api.get<{ items: { amount: number }[] }>(`/expenses?start_date=${today}&end_date=${today}&pageSize=1000&user_id=${uid}`),
-        api.get<{ items: { amount: number }[] }>(`/expenses?start_date=${week.start}&end_date=${week.end}&pageSize=1000&user_id=${uid}`),
-        api.get<{ items: { amount: number }[] }>(`/expenses?start_date=${month.start}&end_date=${month.end}&pageSize=1000&user_id=${uid}`),
-        api.get<{ items: { status: string }[] }>(`/expenses?status=pending&pageSize=1000&user_id=${uid}`),
-      ]).then(([todayTs, weekTs, monthTs, pending, todayExp, weekExp, monthExp, pendingExp]) => {
-        setWidgets([
-          { label: 'Minhas Horas Hoje',             value: fmtHours(sumMinutes((todayTs as any)?.items ?? [])),  icon: <Clock size={16} />,       href: '/meu-painel' },
-          { label: 'Minhas Horas da Semana',        value: fmtHours(sumMinutes((weekTs as any)?.items ?? [])),   icon: <Clock size={16} />,       href: '/meu-painel' },
-          { label: 'Minhas Horas do Mês',           value: fmtHours(sumMinutes((monthTs as any)?.items ?? [])),  icon: <Clock size={16} />,       href: '/meu-painel' },
-          { label: 'Apontamentos Pendentes',        value: String((pending as any)?.items?.length ?? 0),         icon: <CheckSquare size={16} />, href: '/meu-painel' },
-          { label: 'Minhas Despesas Hoje',          value: fmtBRL(sumAmount((todayExp as any)?.items ?? [])),    icon: <Receipt size={16} />,     href: '/meu-painel' },
-          { label: 'Minhas Despesas da Semana',     value: fmtBRL(sumAmount((weekExp as any)?.items ?? [])),     icon: <Receipt size={16} />,     href: '/meu-painel' },
-          { label: 'Minhas Despesas do Mês',        value: fmtBRL(sumAmount((monthExp as any)?.items ?? [])),    icon: <Receipt size={16} />,     href: '/meu-painel' },
-          { label: 'Despesas Pendentes de Aprovação', value: String((pendingExp as any)?.items?.length ?? 0),   icon: <Receipt size={16} />,     href: '/approvals' },
-        ])
-      }).catch(() => {}).finally(() => setLoading(false))
-    }
+    setAdminLoading(true)
+    Promise.allSettled([
+      api.get<any>(`/approvals/pending`),
+      api.get<any>(`/timesheets?start_date=${today}&end_date=${today}&pageSize=50`),
+      api.get<any>(`/timesheets?start_date=${month.start}&end_date=${month.end}&pageSize=30`),
+    ]).then(([approvals, todayTs, monthTs]) => {
+      const a = approvals.status === 'fulfilled' ? approvals.value : null
+      const t = todayTs.status  === 'fulfilled' ? todayTs.value  : null
+      const m = monthTs.status  === 'fulfilled' ? monthTs.value  : null
+      setAdminPendingTs(a?.data?.summary?.total_timesheets ?? a?.total_timesheets ?? 0)
+      setAdminPendingExp(a?.data?.summary?.total_expenses  ?? a?.total_expenses  ?? 0)
+      setAdminTodayMin(sumMin(t?.items ?? []))
+      setAdminMonthMin(sumMin(m?.items ?? []))
+      setAdminRecentTs((m?.items ?? []).slice(0, 6))
+    }).finally(() => setAdminLoading(false))
   }, [user, authLoading, isAdmin])
 
-  const hasPermission = (perm: string) =>
-    user?.roles?.includes('Administrator') || user?.permissions?.includes(perm) || false
+  // ── Load consultant data ──
+  useEffect(() => {
+    if (authLoading || !user || !isConsultor) return
+    const today = todayISO()
+    const month = getMonthRange()
+    const uid   = user.id
+    setConLoading(true)
+    Promise.allSettled([
+      api.get<any>(`/timesheets?start_date=${today}&end_date=${today}&pageSize=30&user_id=${uid}`),
+      api.get<any>(`/timesheets?start_date=${month.start}&end_date=${month.end}&pageSize=50&user_id=${uid}`),
+      api.get<any>(`/timesheets?status=pending&pageSize=30&user_id=${uid}`),
+      api.get<any>(`/timesheets?status=rejected&pageSize=30&user_id=${uid}`),
+      api.get<any>(`/expenses?start_date=${month.start}&end_date=${month.end}&pageSize=50&user_id=${uid}`),
+      api.get<any>(`/expenses?status=pending&pageSize=30&user_id=${uid}`),
+    ]).then(([todayR, monthR, pendR, rejR, expR, pendExpR]) => {
+      const v = (r: PromiseSettledResult<any>) => r.status === 'fulfilled' ? r.value : null
+      setTodayTs(v(todayR)?.items ?? [])
+      setMonthTs(v(monthR)?.items ?? [])
+      setPendingTs(v(pendR)?.items ?? [])
+      setRejectedTs(v(rejR)?.items ?? [])
+      setMonthExp(v(expR)?.items ?? [])
+      setPendingExp(v(pendExpR)?.items ?? [])
+      setRecentTs((v(monthR)?.items ?? []).slice(0, 5))
+      setRecentExp((v(expR)?.items ?? []).slice(0, 5))
+    }).finally(() => setConLoading(false))
+  }, [user, authLoading, isConsultor])
+
+  const loading = authLoading || adminLoading || conLoading
+
+  // ── Computed ──
+  const todayMin    = sumMin(todayTs)
+  const monthMin    = sumMin(monthTs)
+  const monthExpAmt = sumAmt(monthExp)
+  const hasTodayTs  = todayTs.length > 0
+
+  const hasAlerts = isAdmin
+    ? adminPendingTs > 0 || adminPendingExp > 0
+    : pendingTs.length > 0 || rejectedTs.length > 0 || pendingExp.length > 0
+
+  // ── Admin alert row for adjustment_requested ──
+  const adjustmentTs = monthTs.filter(t => t.status === 'adjustment_requested')
 
   return (
     <AppLayout title="Início">
-      <div className="space-y-6">
-        {user && (
+      <div className="space-y-5 max-w-5xl">
+
+        {/* ── Saudação ── */}
+        {user && !loading && (
           <div>
-            <h2 className="text-lg font-semibold text-zinc-100">Bem-vindo, {user.name}!</h2>
-            <p className="text-sm text-zinc-400 mt-0.5">
-              {isAdmin ? 'Visão gerencial do sistema' : 'Seu painel pessoal'}
+            <h2 className="text-base font-semibold" style={{ color: 'var(--brand-text)' }}>
+              Olá, {user.name.split(' ')[0]} 👋
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--brand-subtle)' }}>
+              {isAdmin ? 'Visão operacional do sistema' : `Hoje é ${fmtDate(todayISO())} — veja o que precisa de atenção`}
             </p>
           </div>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {loading || authLoading
-            ? Array.from({ length: isAdmin ? 5 : 8 }).map((_, i) => (
-                <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                  <Skeleton className="h-3 w-32 mb-3" />
-                  <Skeleton className="h-8 w-20" />
+        {/* ══════════════════════════════════════════════════════════ ADMIN ══ */}
+        {isAdmin && (
+          <>
+            {/* ── CTAs ── */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link href="/approvals" className="flex-1">
+                <div
+                  className="flex items-center justify-center gap-2.5 rounded-xl px-5 py-4 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98] w-full"
+                  style={{ background: 'var(--brand-primary)', color: '#0A0A0B' }}
+                >
+                  <CheckSquare size={15} />
+                  Revisar aprovações
+                  {!loading && (adminPendingTs + adminPendingExp) > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-black/20">
+                      {adminPendingTs + adminPendingExp}
+                    </span>
+                  )}
                 </div>
-              ))
-            : widgets.map((w, i) => (
-                <WidgetCard key={i} label={w.label} value={w.value} icon={w.icon} loading={false} href={w.href} />
-              ))
-          }
-        </div>
+              </Link>
+              <Link href="/timesheets" className="flex-1">
+                <div
+                  className="flex items-center justify-center gap-2.5 rounded-xl px-5 py-4 text-sm font-semibold border transition-all hover:bg-white/[0.04] active:scale-[0.98] w-full"
+                  style={{ border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}
+                >
+                  <Clock size={15} />
+                  Ver apontamentos
+                </div>
+              </Link>
+              <Link href="/expenses" className="flex-1">
+                <div
+                  className="flex items-center justify-center gap-2.5 rounded-xl px-5 py-4 text-sm font-semibold border transition-all hover:bg-white/[0.04] active:scale-[0.98] w-full"
+                  style={{ border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}
+                >
+                  <Receipt size={15} />
+                  Ver despesas
+                </div>
+              </Link>
+            </div>
 
-        <div>
-          <h3 className="text-sm font-medium text-zinc-400 mb-3">Ações Rápidas</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {hasPermission('hours.create') && (
-              <QuickAction href="/timesheets" label="Novo Apontamento" icon={<Plus size={16} />} />
+            {/* ── Alertas admin ── */}
+            {!adminLoading && hasAlerts && (
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(234,179,8,0.2)', background: 'rgba(234,179,8,0.03)' }}>
+                <div className="px-4 py-2.5 border-b flex items-center gap-2" style={{ borderColor: 'rgba(234,179,8,0.12)' }}>
+                  <AlertTriangle size={12} className="text-yellow-400" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-yellow-400">Requer atenção</span>
+                </div>
+                {adminPendingTs > 0 && (
+                  <AlertRow
+                    icon={Clock} color="#eab308"
+                    message={<><span className="font-semibold">{adminPendingTs}</span> apontamento{adminPendingTs !== 1 ? 's' : ''} aguardando aprovação</>}
+                    action="Aprovar" href="/approvals"
+                  />
+                )}
+                {adminPendingExp > 0 && (
+                  <AlertRow
+                    icon={Receipt} color="#f97316"
+                    message={<><span className="font-semibold">{adminPendingExp}</span> despesa{adminPendingExp !== 1 ? 's' : ''} aguardando aprovação</>}
+                    action="Aprovar" href="/approvals"
+                  />
+                )}
+              </div>
             )}
-            {hasPermission('expenses.create') && (
-              <QuickAction href="/expenses" label="Nova Despesa" icon={<Plus size={16} />} />
+
+            {/* ── Resumo do dia + mês ── */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <StatCard label="Horas Hoje (total)"      value={adminLoading ? '—' : fmtHours(adminTodayMin)}    loading={adminLoading} />
+              <StatCard label="Horas no Mês (total)"    value={adminLoading ? '—' : fmtHours(adminMonthMin)}    loading={adminLoading} />
+              <StatCard label="Apontamentos Pendentes"  value={adminLoading ? '—' : String(adminPendingTs)}     loading={adminLoading} />
+              <StatCard label="Despesas Pendentes"      value={adminLoading ? '—' : String(adminPendingExp)}    loading={adminLoading} />
+            </div>
+
+            {/* ── Recentes (admin) ── */}
+            {!adminLoading && adminRecentTs.length > 0 && (
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
+                <div className="px-5 py-3.5 border-b flex items-center justify-between" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Apontamentos Recentes</p>
+                  <Link href="/timesheets" className="text-[11px] hover:opacity-80 transition-opacity" style={{ color: 'var(--brand-primary)' }}>Ver todos →</Link>
+                </div>
+                {adminRecentTs.map((ts, i) => (
+                  <RecentRow
+                    key={i}
+                    left={ts.project?.name ?? '—'}
+                    leftSub={fmtDate(ts.date)}
+                    right={ts.effort_hours ? `${ts.effort_hours}h` : fmtHours(ts.effort_minutes)}
+                    badge={ts.status}
+                  />
+                ))}
+              </div>
             )}
-            {hasPermission('projects.view') && (
-              <QuickAction href="/projects" label="Ver Projetos" icon={<FolderOpen size={16} />} />
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════════ CONSULTOR ══ */}
+        {isConsultor && (
+          <>
+            {/* ── CTAs ── */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link href="/meu-painel" className="flex-1">
+                <div
+                  className="flex items-center justify-center gap-2.5 rounded-xl px-5 py-4 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98] w-full"
+                  style={{ background: 'var(--brand-primary)', color: '#0A0A0B' }}
+                >
+                  <Plus size={15} />
+                  Apontar horas
+                </div>
+              </Link>
+              <Link href="/meu-painel" className="flex-1">
+                <div
+                  className="flex items-center justify-center gap-2.5 rounded-xl px-5 py-4 text-sm font-semibold border transition-all hover:bg-white/[0.04] active:scale-[0.98] w-full"
+                  style={{ border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}
+                >
+                  <Receipt size={15} />
+                  Lançar despesa
+                </div>
+              </Link>
+            </div>
+
+            {/* ── Alertas consultor ── */}
+            {!loading && hasAlerts && (
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(234,179,8,0.2)', background: 'rgba(234,179,8,0.03)' }}>
+                <div className="px-4 py-2.5 border-b flex items-center gap-2" style={{ borderColor: 'rgba(234,179,8,0.12)' }}>
+                  <AlertTriangle size={12} className="text-yellow-400" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-yellow-400">Requer atenção</span>
+                </div>
+                {pendingTs.length > 0 && (
+                  <AlertRow
+                    icon={Clock} color="#eab308"
+                    message={<><span className="font-semibold">{pendingTs.length}</span> apontamento{pendingTs.length !== 1 ? 's' : ''} pendente{pendingTs.length !== 1 ? 's' : ''} de aprovação</>}
+                    action="Ver" href="/meu-painel"
+                  />
+                )}
+                {rejectedTs.length > 0 && (
+                  <AlertRow
+                    icon={X} color="#f87171"
+                    message={<><span className="font-semibold text-red-400">{rejectedTs.length}</span> apontamento{rejectedTs.length !== 1 ? 's' : ''} reprovado{rejectedTs.length !== 1 ? 's' : ''}</>}
+                    action="Corrigir" href="/meu-painel"
+                  />
+                )}
+                {pendingExp.length > 0 && (
+                  <AlertRow
+                    icon={Receipt} color="#eab308"
+                    message={<><span className="font-semibold">{pendingExp.length}</span> despesa{pendingExp.length !== 1 ? 's' : ''} pendente{pendingExp.length !== 1 ? 's' : ''} de aprovação</>}
+                    action="Ver" href="/meu-painel"
+                  />
+                )}
+              </div>
             )}
-            {(hasPermission('hours.approve') || isAdmin) && (
-              <QuickAction href="/approvals" label="Aprovações Pendentes" icon={<CheckSquare size={16} />} />
+
+            {/* ── Status de hoje ── */}
+            {!loading && (
+              <div
+                className="rounded-xl px-4 py-3 flex items-center justify-between gap-4"
+                style={{ background: 'var(--brand-surface)', border: `1px solid ${hasTodayTs ? 'rgba(34,197,94,0.2)' : 'var(--brand-border)'}` }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${hasTodayTs ? 'bg-green-500/15' : 'bg-zinc-500/15'}`}>
+                    {hasTodayTs
+                      ? <Clock size={14} className="text-green-400" />
+                      : <AlertTriangle size={14} className="text-zinc-500" />
+                    }
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold" style={{ color: hasTodayTs ? '#22c55e' : 'var(--brand-muted)' }}>
+                      Hoje — {fmtDate(todayISO())}
+                    </p>
+                    <p className="text-[11px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>
+                      {hasTodayTs
+                        ? `${fmtHours(todayMin)} lançadas em ${todayTs.length} apontamento${todayTs.length !== 1 ? 's' : ''}`
+                        : 'Nenhuma hora lançada ainda hoje'
+                      }
+                    </p>
+                  </div>
+                </div>
+                {!hasTodayTs && (
+                  <Link href="/meu-painel">
+                    <div
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg shrink-0 transition-colors hover:opacity-90 cursor-pointer"
+                      style={{ background: 'var(--brand-primary)', color: '#0A0A0B' }}
+                    >
+                      Lançar agora
+                    </div>
+                  </Link>
+                )}
+              </div>
             )}
+
+            {/* ── Resumo do mês (compacto) ── */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <StatCard
+                label="Horas no Mês"
+                value={loading ? '—' : fmtHours(monthMin)}
+                sub={loading ? undefined : `${monthTs.length} apontamento${monthTs.length !== 1 ? 's' : ''}`}
+                loading={loading}
+              />
+              <StatCard
+                label="Total Despesas"
+                value={loading ? '—' : formatBRL(monthExpAmt)}
+                sub={loading ? undefined : `${monthExp.length} lançamento${monthExp.length !== 1 ? 's' : ''}`}
+                loading={loading}
+              />
+              <StatCard
+                label="Pendentes"
+                value={loading ? '—' : String(pendingTs.length + pendingExp.length)}
+                sub={loading ? undefined : `${pendingTs.length} apontamentos · ${pendingExp.length} despesas`}
+                loading={loading}
+              />
+              <StatCard
+                label="Reprovados"
+                value={loading ? '—' : String(rejectedTs.length)}
+                sub={loading ? undefined : rejectedTs.length > 0 ? 'precisam de correção' : 'tudo ok'}
+                loading={loading}
+              />
+            </div>
+
+            {/* ── Recentes consultor ── */}
+            {!loading && (recentTs.length > 0 || recentExp.length > 0) && (
+              <div className="grid md:grid-cols-2 gap-4">
+                {recentTs.length > 0 && (
+                  <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
+                    <div className="px-5 py-3.5 border-b flex items-center justify-between" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
+                      <p className="text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Apontamentos Recentes</p>
+                      <Link href="/meu-painel" className="text-[11px] hover:opacity-80 transition-opacity" style={{ color: 'var(--brand-primary)' }}>Ver todos →</Link>
+                    </div>
+                    {recentTs.map((ts, i) => (
+                      <RecentRow
+                        key={i}
+                        left={ts.project?.name ?? '—'}
+                        leftSub={fmtDate(ts.date)}
+                        right={ts.effort_hours ? `${ts.effort_hours}h` : fmtHours(ts.effort_minutes)}
+                        badge={ts.status}
+                      />
+                    ))}
+                  </div>
+                )}
+                {recentExp.length > 0 && (
+                  <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
+                    <div className="px-5 py-3.5 border-b flex items-center justify-between" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
+                      <p className="text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Despesas Recentes</p>
+                      <Link href="/meu-painel" className="text-[11px] hover:opacity-80 transition-opacity" style={{ color: 'var(--brand-primary)' }}>Ver todas →</Link>
+                    </div>
+                    {recentExp.map((exp, i) => (
+                      <RecentRow
+                        key={i}
+                        left={(exp as any).description ?? '—'}
+                        leftSub={exp.expense_date ? fmtDate(exp.expense_date) : undefined}
+                        right={(exp as any).formatted_amount ?? formatBRL(parseFloat(String(exp.amount)) || 0)}
+                        badge={exp.status}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Loading inicial (só quando ainda não sabe o perfil) ── */}
+        {authLoading && (
+          <div className="space-y-4">
+            <div className="flex gap-3">
+              <Skeleton className="h-14 flex-1 rounded-xl" />
+              <Skeleton className="h-14 flex-1 rounded-xl" />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </AppLayout>
   )
