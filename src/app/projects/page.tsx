@@ -533,13 +533,13 @@ export default function ProjectsPage() {
     })
   }, [statusFilter])
 
-  // Carrega opções dos filtros de lista uma única vez
-  useEffect(() => {
+  // Carrega opções dos filtros de lista — recarrega ao montar e ao ganhar foco de janela
+  const loadFilterOptions = useCallback(() => {
     const items = (r: any) => Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
     Promise.allSettled([
-      api.get<any>('/customers?pageSize=100'),
-      api.get<any>('/contract-types?pageSize=50'),
-      api.get<any>('/users?pageSize=50&enabled=1'),
+      api.get<any>('/customers?pageSize=200'),
+      api.get<any>('/contract-types?pageSize=200&active=1'),
+      api.get<any>('/users?pageSize=100&enabled=1'),
       api.get<any>('/executives?pageSize=100'),
     ]).then(([c, ct, u, ex]) => {
       if (c.status === 'fulfilled') setFilterCustomers(items(c.value))
@@ -548,6 +548,13 @@ export default function ProjectsPage() {
       if (ex.status === 'fulfilled') setFilterExecutives(items(ex.value))
     })
   }, [])
+
+  useEffect(() => {
+    loadFilterOptions()
+    const onFocus = () => loadFilterOptions()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [loadFilterOptions])
 
   const loadOptions = useCallback(async () => {
     try {
@@ -831,7 +838,14 @@ export default function ProjectsPage() {
     finally { setSaving(false) }
   }
 
-  const remove = (id: number) => setDeleteConfirm({ open: true, type: 'project', id, message: 'Deseja excluir este projeto? Esta ação não pode ser desfeita.' })
+  const remove = (project: Project) => {
+    const hasMovements = (project.consumed_hours ?? 0) > 0 || (project.total_logged_minutes ?? 0) > 0
+    if (hasMovements) {
+      toast.error('Este projeto possui movimentações e não pode ser excluído.')
+      return
+    }
+    setDeleteConfirm({ open: true, type: 'project', id: project.id, message: 'Deseja excluir este projeto? Esta ação não pode ser desfeita.' })
+  }
 
   const doRemoveProject = async (id: number) => {
     setDeleting(id)
@@ -974,7 +988,7 @@ export default function ProjectsPage() {
           <div className="flex items-center gap-3 flex-wrap">
             {/* Botão Multi-contratual em destaque */}
             <button
-              onClick={() => { setMultiContratual(v => { if (!v) setFilterContractType(''); return !v }); setPage(1) }}
+              onClick={() => { setMultiContratual(v => !v); setFilterContractType(''); setPage(1) }}
               className="px-4 py-1.5 rounded-xl text-xs font-bold transition-all"
               style={multiContratual
                 ? { background: 'var(--brand-primary)', color: '#0A0A0B', boxShadow: '0 0 12px rgba(0,245,255,0.35)' }
@@ -984,20 +998,15 @@ export default function ProjectsPage() {
               ⬡ Multi-contratual
             </button>
 
-          {/* pills de tipo de contrato — desabilitado quando Multi-contratual ativo */}
+          {/* Pills de tipo de contrato — clicar deseleciona Multi-contratual automaticamente */}
           <div
-            className="flex items-center gap-1 p-1 rounded-xl w-fit transition-opacity"
-            style={{
-              background: 'var(--brand-bg)',
-              border: '1px solid var(--brand-border)',
-              opacity: multiContratual ? 0.35 : 1,
-              pointerEvents: multiContratual ? 'none' : 'auto',
-            }}
+            className="flex items-center gap-1 p-1 rounded-xl w-fit flex-wrap"
+            style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}
           >
             <button
-              onClick={() => { setFilterContractType(''); setPage(1) }}
+              onClick={() => { setFilterContractType(''); setMultiContratual(false); setPage(1) }}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-              style={!filterContractType
+              style={!filterContractType && !multiContratual
                 ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
                 : { color: 'var(--brand-muted)' }}
             >
@@ -1006,7 +1015,7 @@ export default function ProjectsPage() {
             {filterContractTypes.map(ct => (
               <button
                 key={ct.id}
-                onClick={() => { setFilterContractType(String(ct.id)); setPage(1) }}
+                onClick={() => { setFilterContractType(String(ct.id)); setMultiContratual(false); setPage(1) }}
                 className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
                 style={filterContractType === String(ct.id)
                   ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
@@ -1204,7 +1213,7 @@ export default function ProjectsPage() {
                               <button onClick={() => openEdit(p)} className="p-1.5 rounded-lg transition-colors hover:bg-white/5" style={{ color: 'var(--brand-subtle)' }} title="Editar">
                                 <Pencil size={13} />
                               </button>
-                              <button onClick={() => remove(p.id)} disabled={deleting === p.id} className="p-1.5 rounded-lg transition-colors hover:bg-white/5 disabled:opacity-50" style={{ color: 'var(--brand-danger)' }} title="Excluir">
+                              <button onClick={() => remove(p)} disabled={deleting === p.id} className="p-1.5 rounded-lg transition-colors hover:bg-white/5 disabled:opacity-50" style={{ color: 'var(--brand-danger)' }} title="Excluir">
                                 <Trash2 size={13} />
                               </button>
                             </>
