@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/button'
 import {
   CheckSquare, Clock, Receipt, ChevronLeft, ChevronRight,
   Check, XCircle, X, Filter, ChevronDown, Eye, Pencil, RotateCcw,
+  Paperclip,
 } from 'lucide-react'
+import { RowMenu } from '@/components/ui/row-menu'
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { api, ApiError } from '@/lib/api'
 import { toast } from 'sonner'
@@ -24,6 +26,7 @@ interface TSItem {
   observation?: string
   ticket?: string
   status: string
+  attachment_url?: string
 }
 
 interface ExpItem {
@@ -225,6 +228,13 @@ function TsViewModal({ item, onClose }: { item: TSItem; onClose: () => void }) {
               <p className="text-zinc-200 bg-zinc-800 rounded-lg p-3 leading-relaxed">{item.observation}</p>
             </div>
           )}
+          <div>
+            <span className="text-zinc-500 block mb-1">Anexo</span>
+            {item.attachment_url
+              ? <ReceiptLink url={item.attachment_url} />
+              : <span className="text-zinc-600">Sem anexo</span>
+            }
+          </div>
         </div>
         <div className="px-5 py-3 border-t border-zinc-800 flex justify-end">
           <Button variant="outline" onClick={onClose} className="h-8 text-xs border-zinc-700 text-zinc-300">Fechar</Button>
@@ -259,6 +269,19 @@ function ReceiptLink({ url }: { url: string }) {
       {loading ? 'Carregando...' : 'Ver comprovante'}
     </button>
   )
+}
+
+
+async function openReceiptUrl(url: string) {
+  try {
+    const token = localStorage.getItem('minutor_token')
+    const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    if (!res.ok) { alert('Arquivo não encontrado no servidor'); return }
+    const blob = await res.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    window.open(blobUrl, '_blank')
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000)
+  } catch { alert('Erro ao abrir arquivo') }
 }
 
 // ─── Modal: visualizar / aprovar despesa ─────────────────────────────────────
@@ -451,23 +474,20 @@ export default function ApprovalsPage() {
 
   // Load support data
   useEffect(() => {
-    api.get<any>('/users?pageSize=500').then(r => {
+    api.get<any>('/users?pageSize=100').then(r => {
       const l = Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
       setUsers(l.map((u: any) => ({ id: u.id, name: u.name })))
     }).catch(() => {})
-    api.get<any>('/users?pageSize=500&role=Coordenador').then(r => {
+    api.get<any>('/users?pageSize=100&role=Coordenador').then(r => {
       const l = Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
       setCoordinators(l.map((u: any) => ({ id: u.id, name: u.name })))
     }).catch(() => {})
-    api.get<any>('/users?pageSize=500&is_executive=true').then(r => {
+    api.get<any>('/users?pageSize=100&is_executive=true').then(r => {
       const l = Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
       setExecutives(l.map((u: any) => ({ id: u.id, name: u.name })))
     }).catch(() => {})
-    api.get<any>('/projects?pageSize=500').then(r => {
-      const l = Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
-      setProjects(l.map((p: any) => ({ id: p.id, name: p.name })))
-    }).catch(() => {})
-    api.get<any>('/customers?pageSize=500').then(r => {
+    // /projects omitido — endpoint lento; filtro de projeto não está disponível temporariamente
+    api.get<any>('/customers?pageSize=100').then(r => {
       const l = Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
       setCustomers(l.map((c: any) => ({ id: c.id, name: c.name })))
     }).catch(() => {})
@@ -760,6 +780,7 @@ export default function ApprovalsPage() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-zinc-800 bg-zinc-900">
+              <th className="px-3 py-2.5 w-10"></th>
               {tab === 'timesheets' && (
                 <th className="px-3 py-2.5 w-8">
                   <input type="checkbox" checked={allSelected} onChange={toggleAll}
@@ -776,7 +797,6 @@ export default function ApprovalsPage() {
               <th className="text-right px-3 py-2.5 text-zinc-500 font-medium">
                 {tab === 'timesheets' ? 'Tempo' : 'Valor'}
               </th>
-              <th className="px-3 py-2.5 text-right text-zinc-500 font-medium">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -814,6 +834,14 @@ export default function ApprovalsPage() {
                 className={`border-b border-zinc-800/60 cursor-pointer transition-colors ${
                   selected.includes(ts.id) ? 'bg-blue-950/30' : 'hover:bg-zinc-800/40'
                 }`}>
+                <td className="px-2 py-2.5 w-10" onClick={e => e.stopPropagation()}>
+                  <RowMenu items={[
+                    { label: 'Visualizar', icon: <Eye size={12} />, onClick: () => setTsView(ts) },
+                    { label: 'Aprovar', icon: <Check size={12} />, onClick: () => approveTs(ts.id), disabled: actioning === ts.id },
+                    { label: 'Solicitar Ajuste', icon: <RotateCcw size={12} />, onClick: () => { setAdjModal({ open: true, id: ts.id, type: 'timesheet' }); setAdjReason('') } },
+                    { label: 'Rejeitar', icon: <XCircle size={12} />, onClick: () => { setRejectModal({ open: true, ids: [ts.id] }); setRejectReason('') }, danger: true },
+                  ]} />
+                </td>
                 <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
                   <input type="checkbox" checked={selected.includes(ts.id)} onChange={() => toggleOne(ts.id)}
                     className="rounded border-zinc-600 bg-zinc-800 accent-blue-500" />
@@ -823,26 +851,6 @@ export default function ApprovalsPage() {
                 <td className="px-3 py-2.5 text-zinc-500 hidden sm:table-cell">{ts.project?.customer?.name ?? '—'}</td>
                 <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell truncate max-w-[200px]">{ts.project?.name ?? '—'}</td>
                 <td className="px-3 py-2.5 text-right font-mono text-zinc-300">{fmtMin(ts.effort_minutes)}</td>
-                <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
-                  <div className="flex items-center gap-0.5 justify-end">
-                    <button onClick={() => setTsView(ts)} title="Visualizar"
-                      className="w-6 h-6 flex items-center justify-center rounded text-zinc-500 hover:text-blue-400 hover:bg-blue-400/10 transition-colors">
-                      <Eye size={12} />
-                    </button>
-                    <button onClick={() => approveTs(ts.id)} disabled={actioning === ts.id} title="Aprovar"
-                      className="w-6 h-6 flex items-center justify-center rounded text-zinc-500 hover:text-green-400 hover:bg-green-400/10 transition-colors">
-                      <Check size={13} />
-                    </button>
-                    <button onClick={() => { setAdjModal({ open: true, id: ts.id, type: 'timesheet' }); setAdjReason('') }} title="Solicitar ajuste"
-                      className="w-6 h-6 flex items-center justify-center rounded text-zinc-500 hover:text-blue-400 hover:bg-blue-400/10 transition-colors">
-                      <RotateCcw size={12} />
-                    </button>
-                    <button onClick={() => { setRejectModal({ open: true, ids: [ts.id] }); setRejectReason('') }} title="Rejeitar"
-                      className="w-6 h-6 flex items-center justify-center rounded text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-colors">
-                      <XCircle size={13} />
-                    </button>
-                  </div>
-                </td>
               </tr>
             ))}
 
@@ -850,32 +858,23 @@ export default function ApprovalsPage() {
             {!currentLoading && tab === 'expenses' && expItems.map(exp => (
               <tr key={exp.id}
                 className="border-b border-zinc-800/60 hover:bg-zinc-800/40 transition-colors">
+                <td className="px-2 py-2.5 w-10">
+                  <RowMenu items={[
+                    { label: 'Visualizar', icon: <Eye size={12} />, onClick: () => setExpApprove(exp) },
+                    { label: 'Aprovar', icon: <Check size={12} />, onClick: () => setExpApprove(exp) },
+                    { label: 'Solicitar Ajuste', icon: <RotateCcw size={12} />, onClick: () => { setAdjModal({ open: true, id: exp.id, type: 'expense' }); setAdjReason('') } },
+                    { label: 'Rejeitar', icon: <XCircle size={12} />, onClick: () => { setRejectModal({ open: true, ids: [exp.id] }); setRejectReason('') }, danger: true },
+                    ...(exp.receipt_url ? [
+                      { label: 'Ver Comprovante', icon: <Paperclip size={12} />, onClick: () => openReceiptUrl(exp.receipt_url!) },
+                    ] : []),
+                  ]} />
+                </td>
                 <td className="px-3 py-2.5 text-zinc-300 whitespace-nowrap">{fmt(exp.expense_date)}</td>
                 <td className="px-3 py-2.5 text-zinc-200 font-medium">{exp.user?.name ?? '—'}</td>
                 <td className="px-3 py-2.5 text-zinc-500 hidden sm:table-cell">{exp.project?.customer?.name ?? '—'}</td>
                 <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell truncate max-w-[160px]">{exp.project?.name ?? '—'}</td>
                 <td className="px-3 py-2.5 text-zinc-400 hidden lg:table-cell truncate max-w-[140px]">{exp.description}</td>
                 <td className="px-3 py-2.5 text-right font-mono text-zinc-300">{fmtBRL(parseFloat(String(exp.amount)) || 0)}</td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-0.5 justify-end">
-                    <button onClick={() => setExpApprove(exp)} title="Ver e aprovar"
-                      className="w-6 h-6 flex items-center justify-center rounded text-zinc-500 hover:text-blue-400 hover:bg-blue-400/10 transition-colors">
-                      <Eye size={12} />
-                    </button>
-                    <button onClick={() => setExpApprove(exp)} title="Aprovar"
-                      className="w-6 h-6 flex items-center justify-center rounded text-zinc-500 hover:text-green-400 hover:bg-green-400/10 transition-colors">
-                      <Check size={13} />
-                    </button>
-                    <button onClick={() => { setAdjModal({ open: true, id: exp.id, type: 'expense' }); setAdjReason('') }} title="Solicitar ajuste"
-                      className="w-6 h-6 flex items-center justify-center rounded text-zinc-500 hover:text-blue-400 hover:bg-blue-400/10 transition-colors">
-                      <RotateCcw size={12} />
-                    </button>
-                    <button onClick={() => { setRejectModal({ open: true, ids: [exp.id] }); setRejectReason('') }} title="Rejeitar"
-                      className="w-6 h-6 flex items-center justify-center rounded text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-colors">
-                      <XCircle size={13} />
-                    </button>
-                  </div>
-                </td>
               </tr>
             ))}
           </tbody>
