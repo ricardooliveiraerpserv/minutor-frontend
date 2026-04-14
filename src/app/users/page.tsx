@@ -38,27 +38,30 @@ interface PartnerOption  { id: number; name: string }
 
 // ─── Profile type logic ───────────────────────────────────────────────────────
 
-type ProfileType    = 'cliente' | 'consultor' | 'coordenador' | 'parceiro_adm'
-type ConsultantType = 'horista' | 'bh_fixo' | 'bh_mensal'
+type ProfileType    = 'cliente' | 'consultor' | 'coordenador' | 'parceiro_adm' | 'administrator'
+type ConsultantType = 'horista' | 'bh_fixo' | 'bh_mensal' | 'fixo'
 
 const PROFILE_OPTIONS: { value: ProfileType; label: string }[] = [
-  { value: 'cliente',      label: 'Cliente' },
-  { value: 'consultor',    label: 'Consultor' },
-  { value: 'coordenador',  label: 'Coordenador' },
-  { value: 'parceiro_adm', label: 'Parceiro' },
+  { value: 'cliente',       label: 'Cliente' },
+  { value: 'consultor',     label: 'Consultor' },
+  { value: 'coordenador',   label: 'Coordenador' },
+  { value: 'parceiro_adm',  label: 'Parceiro' },
+  { value: 'administrator', label: 'Administrador' },
 ]
 
-const CONSULTANT_OPTIONS: { value: ConsultantType; label: string }[] = [
-  { value: 'horista',   label: 'Horista' },
-  { value: 'bh_fixo',   label: 'Fixo' },
-  { value: 'bh_mensal', label: 'Banco de Horas' },
+const CONSULTANT_OPTIONS: { value: ConsultantType; label: string; desc: string }[] = [
+  { value: 'horista',   label: 'Horista',               desc: 'Pago por hora — possui horas extras' },
+  { value: 'bh_fixo',   label: 'Banco de Horas Fixo',   desc: 'Valor mensal fixo — banco de horas sem extras' },
+  { value: 'bh_mensal', label: 'Banco de Horas Mensal', desc: 'Valor mensal — banco de horas com extras e Total a Receber' },
+  { value: 'fixo',      label: 'Fixo',                  desc: 'Valor fixo mensal — sem banco de horas' },
 ]
 
 // Map profile → role name to send to backend
 function resolveRoleName(profile: ProfileType): string {
-  if (profile === 'cliente')      return 'Cliente'
-  if (profile === 'coordenador')  return 'Coordenador'
-  if (profile === 'parceiro_adm') return 'Parceiro ADM'
+  if (profile === 'cliente')       return 'Cliente'
+  if (profile === 'coordenador')   return 'Coordenador'
+  if (profile === 'parceiro_adm')  return 'Parceiro ADM'
+  if (profile === 'administrator') return 'Administrator'
   return 'Consultor'
 }
 
@@ -67,10 +70,11 @@ function resolveProfileFromRoles(roleNames: string[]): {
   profile: ProfileType | ''
   consultantType: ConsultantType | ''
 } {
-  if (roleNames.includes('Cliente'))     return { profile: 'cliente',      consultantType: '' }
-  if (roleNames.includes('Coordenador')) return { profile: 'coordenador',  consultantType: '' }
-  if (roleNames.includes('Parceiro ADM'))return { profile: 'parceiro_adm', consultantType: '' }
-  if (roleNames.includes('Consultor'))   return { profile: 'consultor',    consultantType: 'horista' }
+  if (roleNames.includes('Administrator')) return { profile: 'administrator', consultantType: '' }
+  if (roleNames.includes('Cliente'))       return { profile: 'cliente',       consultantType: '' }
+  if (roleNames.includes('Coordenador'))   return { profile: 'coordenador',   consultantType: '' }
+  if (roleNames.includes('Parceiro ADM'))  return { profile: 'parceiro_adm',  consultantType: '' }
+  if (roleNames.includes('Consultor'))     return { profile: 'consultor',     consultantType: 'horista' }
   return { profile: '', consultantType: '' }
 }
 
@@ -142,14 +146,14 @@ function ConsultantTypeCard({
         >
           <span className={selected ? 'text-zinc-300 font-medium' : 'text-zinc-500'}>
             {selected ? selected.label : 'Selecione o tipo...'}
-            {selected && (
-              <span className="ml-1.5 text-[10px] text-zinc-500 font-normal">
-                {selected.value === 'horista' ? '(por hora)' : '(fixo)'}
-              </span>
-            )}
           </span>
           <ChevronDown size={12} className={`text-zinc-500 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
         </button>
+
+        {/* Legenda do tipo selecionado */}
+        {selected && !open && (
+          <div className="px-3 pb-2 text-[10px] text-zinc-500">{selected.desc}</div>
+        )}
 
         {/* Opções dentro do mesmo card */}
         {open && (
@@ -157,16 +161,16 @@ function ConsultantTypeCard({
             {CONSULTANT_OPTIONS.map(opt => (
               <button key={opt.value} type="button"
                 onClick={() => { onChange(opt.value); setOpen(false) }}
-                className={`w-full flex items-center gap-2 px-2.5 h-8 rounded-md text-xs text-left transition-colors ${
+                className={`w-full flex flex-col items-start px-2.5 py-1.5 rounded-md text-xs text-left transition-colors ${
                   value === opt.value
                     ? 'bg-blue-600/20 text-blue-300'
                     : 'text-zinc-400 hover:bg-zinc-700/60 hover:text-zinc-200'
                 }`}>
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${value === opt.value ? 'bg-blue-400' : 'bg-zinc-600'}`} />
-                {opt.label}
-                <span className="text-[10px] text-zinc-500">
-                  {opt.value === 'horista' ? '(por hora)' : '(fixo)'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${value === opt.value ? 'bg-blue-400' : 'bg-zinc-600'}`} />
+                  <span className="font-medium">{opt.label}</span>
+                </div>
+                <span className="text-[10px] text-zinc-500 pl-3.5">{opt.desc}</span>
               </button>
             ))}
           </div>
@@ -242,7 +246,7 @@ export default function UsersPage() {
     api.get<any>('/roles?pageSize=100').then(r =>
       setRoles(Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : [])
     ).catch(() => {})
-    api.get<any>('/customers?pageSize=1000').then(r =>
+    api.get<any>('/customers?pageSize=100').then(r =>
       setCustomers(Array.isArray(r?.items) ? r.items : [])
     ).catch(() => {})
     api.get<any>('/partners?pageSize=-1').then(r =>
@@ -275,9 +279,9 @@ export default function UsersPage() {
   const openEdit = (item: UserItem) => {
     const roleNames = item.roles?.map(r => r.name) ?? []
     const { profile } = resolveProfileFromRoles(roleNames)
-    // Prefer stored consultant_type; fall back to deriving from rate_type
+    // Prefer stored consultant_type; fall back only for horista (hourly)
     const consultant_type = (item.consultant_type as ConsultantType | undefined)
-      ?? (item.rate_type === 'hourly' ? 'horista' : item.rate_type === 'monthly' ? 'bh_fixo' : '')
+      ?? (item.rate_type === 'hourly' ? 'horista' : '')
     setForm({
       name:                item.name,
       email:               item.email,
@@ -499,7 +503,7 @@ export default function UsersPage() {
             {/* ── Perfil de acesso (seleção única) ── */}
             <div>
               <Label className="text-xs text-zinc-400 mb-2 block">Perfil de acesso *</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {PROFILE_OPTIONS.map(opt => (
                   <button
                     key={opt.value}

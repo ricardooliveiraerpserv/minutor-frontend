@@ -15,7 +15,8 @@ import {
   ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, Lock,
   Clock, Receipt, BarChart2, LayoutDashboard, TrendingUp, TrendingDown, Minus, Eye,
   CalendarDays, RefreshCw, ChevronDown, ChevronUp, MoreVertical,
-  AlertTriangle, Zap, Users, DollarSign, Target, Activity,
+  AlertTriangle, Zap, Users, DollarSign, Target, Activity, Paperclip,
+  Building2, FolderOpen, Tag, CreditCard, FileText, User,
 } from 'lucide-react'
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
@@ -39,6 +40,7 @@ interface TimesheetItem {
   ticket_subject?: string
   status: 'pending' | 'approved' | 'rejected' | 'conflicted' | 'adjustment_requested'
   status_display: string
+  attachment_url?: string
 }
 
 interface ExpenseItem {
@@ -112,6 +114,12 @@ interface HourBankMonth {
   final_balance: number
 }
 
+function fmt(d: string | null | undefined) {
+  if (!d) return '—'
+  const [y, m, day] = d.split('-')
+  return `${day}/${m}/${y}`
+}
+
 function fmtHours(h: number): string {
   const abs = Math.abs(h)
   const hrs = Math.floor(abs)
@@ -142,11 +150,155 @@ function HBBalancePill({ value, size = 'sm' }: { value: number; size?: 'sm' | 'l
   )
 }
 
-function HBPaymentSection({ data, fixedSalary, expTotal }: { data: HourBankMonth; fixedSalary: number; expTotal: number }) {
-  const hasExtra     = data.accumulated_balance > 0
+// ─── Horista Payment Section ──────────────────────────────────────────────────
+
+function HoristaPaymentSection({
+  yearMonth, workedHours, billableHours, guaranteedHours, hourlyRate, expTotal,
+}: {
+  yearMonth: string
+  workedHours: number
+  billableHours: number
+  guaranteedHours: number | null
+  hourlyRate: number
+  expTotal: number
+}) {
+  const totalService = hourlyRate > 0 ? billableHours * hourlyRate : 0
+  const totalGeral   = totalService + expTotal
+  const isGuaranteed = guaranteedHours !== null && workedHours < Number(guaranteedHours)
+
+  return (
+    <div className="rounded-2xl p-5 space-y-3" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+      <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>
+        Remuneração — {fmtYearMonth(yearMonth)}
+      </p>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Horas Trabalhadas</p>
+          <p className="text-lg font-bold" style={{ color: 'var(--brand-text)' }}>{fmtHours(workedHours)}</p>
+          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>apontadas no período</p>
+        </div>
+
+        {guaranteedHours !== null && (
+          <div className="rounded-xl p-3" style={{ background: isGuaranteed ? 'rgba(234,179,8,0.06)' : 'var(--brand-bg)', border: `1px solid ${isGuaranteed ? 'rgba(234,179,8,0.2)' : 'var(--brand-border)'}` }}>
+            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Horas Garantidas</p>
+            <p className="text-lg font-bold" style={{ color: isGuaranteed ? '#eab308' : 'var(--brand-muted)' }}>{fmtHours(Number(guaranteedHours))}</p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>piso mínimo</p>
+          </div>
+        )}
+
+        <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Valor / Hora</p>
+          <p className="text-lg font-bold" style={{ color: hourlyRate > 0 ? 'var(--brand-text)' : 'var(--brand-muted)' }}>
+            {hourlyRate > 0 ? formatBRL(hourlyRate) : '—'}
+          </p>
+          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>taxa horária</p>
+        </div>
+
+        <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Horas Faturáveis</p>
+          <p className="text-lg font-bold" style={{ color: 'var(--brand-primary)' }}>{fmtHours(billableHours)}</p>
+          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>
+            {isGuaranteed ? 'piso garantido aplicado' : 'horas trabalhadas'}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-xl p-3" style={{ background: expTotal > 0 ? 'rgba(249,115,22,0.06)' : 'var(--brand-bg)', border: `1px solid ${expTotal > 0 ? 'rgba(249,115,22,0.2)' : 'var(--brand-border)'}` }}>
+          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Despesas no Período</p>
+          <p className="text-lg font-bold" style={{ color: expTotal > 0 ? '#f97316' : 'var(--brand-muted)' }}>
+            {expTotal > 0 ? formatBRL(expTotal) : '—'}
+          </p>
+          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>reembolsos e gastos</p>
+        </div>
+
+        <div className="rounded-xl p-3" style={{ background: 'rgba(0,245,255,0.04)', border: '1px solid rgba(0,245,255,0.15)' }}>
+          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Total a Receber</p>
+          <p className="text-lg font-bold" style={{ color: 'var(--brand-primary)' }}>
+            {hourlyRate > 0 ? formatBRL(totalGeral) : '—'}
+          </p>
+          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>
+            {hourlyRate > 0
+              ? `${fmtHours(billableHours)} × ${formatBRL(hourlyRate)}/h${expTotal > 0 ? ' + despesas' : ''}`
+              : 'Taxa não configurada'}
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-xl px-4 py-3 flex items-center justify-between"
+        style={{ background: totalService > 0 ? 'rgba(34,197,94,0.06)' : 'var(--brand-bg)', border: `1px solid ${totalService > 0 ? 'rgba(34,197,94,0.2)' : 'var(--brand-border)'}` }}>
+        <div>
+          <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Total do Serviço</p>
+          <p className="text-lg font-bold" style={{ color: totalService > 0 ? '#22c55e' : 'var(--brand-muted)' }}>
+            {totalService > 0 ? formatBRL(totalService) : '—'}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Total Geral</p>
+          <p className="text-lg font-bold" style={{ color: 'var(--brand-primary)' }}>
+            {hourlyRate > 0 ? formatBRL(totalGeral) : '—'}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Fixo Payment Section ─────────────────────────────────────────────────────
+
+function FixoPaymentSection({
+  yearMonth, workedHours, fixedMonthly, expTotal,
+}: {
+  yearMonth: string
+  workedHours: number
+  fixedMonthly: number
+  expTotal: number
+}) {
+  const totalGeral = fixedMonthly + expTotal
+
+  return (
+    <div className="rounded-2xl p-5 space-y-3" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+      <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>
+        Remuneração — {fmtYearMonth(yearMonth)}
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Horas Trabalhadas */}
+        <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Horas Trabalhadas</p>
+          <p className="text-lg font-bold" style={{ color: 'var(--brand-text)' }}>{fmtHours(workedHours)}</p>
+          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>apontadas no período</p>
+        </div>
+
+        {/* Valor Fixo Mensal */}
+        <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Valor Fixo Mensal</p>
+          <p className="text-lg font-bold" style={{ color: fixedMonthly > 0 ? 'var(--brand-text)' : 'var(--brand-muted)' }}>
+            {fixedMonthly > 0 ? formatBRL(fixedMonthly) : '—'}
+          </p>
+          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>valor do serviço mensal</p>
+        </div>
+
+        {/* Despesas */}
+        <div className="rounded-xl p-3" style={{ background: expTotal > 0 ? 'rgba(249,115,22,0.06)' : 'var(--brand-bg)', border: `1px solid ${expTotal > 0 ? 'rgba(249,115,22,0.2)' : 'var(--brand-border)'}` }}>
+          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Despesas no Período</p>
+          <p className="text-lg font-bold" style={{ color: expTotal > 0 ? '#f97316' : 'var(--brand-muted)' }}>
+            {expTotal > 0 ? formatBRL(expTotal) : '—'}
+          </p>
+          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>reembolsos e gastos</p>
+        </div>
+      </div>
+
+    </div>
+  )
+}
+
+function HBPaymentSection({ data, fixedSalary, expTotal, showExtras = true }: { data: HourBankMonth; fixedSalary: number; expTotal: number; showExtras?: boolean }) {
+  const hasExtra     = showExtras && data.accumulated_balance > 0
   const extraHours   = hasExtra ? data.accumulated_balance : 0
   const valorHoraExt = fixedSalary > 0 ? fixedSalary / 180 : 0
-  const totalExtra   = extraHours * valorHoraExt
+  const totalExtra   = hasExtra ? extraHours * valorHoraExt : 0
   const totalSalario = fixedSalary + totalExtra
   const totalGeral   = totalSalario + expTotal
 
@@ -157,7 +309,7 @@ function HBPaymentSection({ data, fixedSalary, expTotal }: { data: HourBankMonth
       </p>
 
       {/* Linha 1: Valor do Serviço */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+      <div className={`grid gap-3 mb-3 ${showExtras ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
         {/* Valor Base Mensal */}
         <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
           <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Valor Base Mensal</p>
@@ -167,23 +319,27 @@ function HBPaymentSection({ data, fixedSalary, expTotal }: { data: HourBankMonth
           <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>mensal</p>
         </div>
 
-        {/* Horas Extras */}
-        <div className="rounded-xl p-3" style={{ background: hasExtra ? 'rgba(34,197,94,0.06)' : 'var(--brand-bg)', border: `1px solid ${hasExtra ? 'rgba(34,197,94,0.2)' : 'var(--brand-border)'}` }}>
-          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Horas Extras</p>
-          <p className="text-lg font-bold" style={{ color: hasExtra ? '#22c55e' : 'var(--brand-muted)' }}>
-            {hasExtra ? fmtHours(extraHours) : '—'}
-          </p>
-          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>saldo acumulado {'>'} 0</p>
-        </div>
+        {/* Horas Extras — apenas para bh_mensal */}
+        {showExtras && (
+          <div className="rounded-xl p-3" style={{ background: hasExtra ? 'rgba(34,197,94,0.06)' : 'var(--brand-bg)', border: `1px solid ${hasExtra ? 'rgba(34,197,94,0.2)' : 'var(--brand-border)'}` }}>
+            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Horas Extras</p>
+            <p className="text-lg font-bold" style={{ color: hasExtra ? '#22c55e' : 'var(--brand-muted)' }}>
+              {hasExtra ? fmtHours(extraHours) : '—'}
+            </p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>saldo acumulado {'>'} 0</p>
+          </div>
+        )}
 
-        {/* Valor Hora Extra */}
-        <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
-          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Valor / Hora Extra</p>
-          <p className="text-lg font-bold" style={{ color: valorHoraExt > 0 ? 'var(--brand-text)' : 'var(--brand-muted)' }}>
-            {valorHoraExt > 0 ? formatBRL(valorHoraExt) : '—'}
-          </p>
-          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>fixo ÷ 180</p>
-        </div>
+        {/* Valor Hora Extra — apenas para bh_mensal */}
+        {showExtras && (
+          <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Valor / Hora Extra</p>
+            <p className="text-lg font-bold" style={{ color: valorHoraExt > 0 ? 'var(--brand-text)' : 'var(--brand-muted)' }}>
+              {valorHoraExt > 0 ? formatBRL(valorHoraExt) : '—'}
+            </p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>fixo ÷ 180</p>
+          </div>
+        )}
 
         {/* Total do Serviço */}
         <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
@@ -323,26 +479,82 @@ function periodBounds(year: number, month: number): { startDate: string; endDate
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function ReceiptLinkInline({ url }: { url: string }) {
+async function openReceiptUrl(url: string) {
+  try {
+    const token = localStorage.getItem('minutor_token')
+    const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    if (!res.ok) { alert('Arquivo não encontrado no servidor'); return }
+    const blob = await res.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    window.open(blobUrl, '_blank')
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000)
+  } catch { alert('Erro ao abrir arquivo') }
+}
+
+function ReceiptLinkInline({ url, label = 'Visualizar' }: { url: string; label?: string }) {
   const [loading, setLoading] = useState(false)
   const open = async () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('minutor_token')
       const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-      if (!res.ok) { alert('Comprovante não encontrado no servidor'); return }
+      if (!res.ok) { alert('Arquivo não encontrado no servidor'); return }
       const blob = await res.blob()
       const blobUrl = URL.createObjectURL(blob)
       window.open(blobUrl, '_blank')
       setTimeout(() => URL.revokeObjectURL(blobUrl), 60000)
-    } catch { alert('Erro ao abrir comprovante') }
+    } catch { alert('Erro ao abrir arquivo') }
     finally { setLoading(false) }
   }
   return (
     <button type="button" onClick={open} disabled={loading}
-      className="text-[11px] text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50">
-      {loading ? 'Abrindo...' : 'Visualizar'}
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+      style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.15)' }}>
+      <Paperclip size={11} />
+      {loading ? 'Abrindo...' : label}
     </button>
+  )
+}
+
+// ─── Expense detail helpers ───────────────────────────────────────────────────
+
+const EXP_STATUS_CONF: Record<string, { bg: string; color: string; label: string }> = {
+  pending:              { bg: 'rgba(234,179,8,0.12)',  color: '#EAB308', label: 'Pendente' },
+  approved:             { bg: 'rgba(34,197,94,0.12)',  color: '#22C55E', label: 'Aprovado' },
+  rejected:             { bg: 'rgba(239,68,68,0.12)',  color: '#EF4444', label: 'Rejeitado' },
+  adjustment_requested: { bg: 'rgba(249,115,22,0.12)', color: '#F97316', label: 'Ajuste Solicitado' },
+}
+const EXP_TYPE_LABEL: Record<string, string> = {
+  reimbursement:  'Reembolso',
+  advance:        'Adiantamento',
+  corporate_card: 'Cartão Corporativo',
+}
+const PAYMENT_LABEL_MAP: Record<string, string> = {
+  pix:           'PIX',
+  credit_card:   'Cartão de Crédito',
+  debit_card:    'Cartão de Débito',
+  cash:          'Dinheiro',
+  bank_transfer: 'Transferência Bancária',
+}
+
+function InfoRowModal({ icon: Icon, label, value, children, last }: {
+  icon: React.ElementType; label: string; value?: string | null
+  children?: React.ReactNode; last?: boolean
+}) {
+  return (
+    <div className={`flex items-start gap-3 px-4 py-3 ${!last ? 'border-b' : ''}`}
+      style={ !last ? { borderColor: 'var(--brand-border)' } : undefined }>
+      <span className="mt-0.5 shrink-0 p-1.5 rounded-lg"
+        style={{ background: 'rgba(0,245,255,0.06)', color: 'var(--brand-primary)' }}>
+        <Icon size={11} />
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] uppercase tracking-widest mb-0.5" style={{ color: 'var(--brand-subtle)' }}>{label}</p>
+        {children ?? (
+          <p className="text-xs font-medium" style={{ color: 'var(--brand-text)' }}>{value ?? '—'}</p>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -572,7 +784,7 @@ function SummaryCard({
           <Icon size={14} />
         </div>
       </div>
-      <div className="text-3xl font-bold text-white tracking-tight">{value}</div>
+      <div className="text-lg font-bold text-white tracking-tight break-all leading-tight">{value}</div>
       {sub && <div className="text-xs text-zinc-500 mt-1.5">{sub}</div>}
     </div>
   )
@@ -880,6 +1092,8 @@ export default function MeuPainelPage() {
   const [tsForm,     setTsForm]     = useState({ ...EMPTY_TS })
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; message: string; onConfirm: () => void } | null>(null)
   const [tsSaving,   setTsSaving]   = useState(false)
+  const [tsFile,     setTsFile]     = useState<File | null>(null)
+  const tsFileRef = useRef<HTMLInputElement>(null)
 
   // ── Expense state ──────────────────────────────────────────────────────────
   const [expenses,    setExpenses]   = useState<ExpenseItem[]>([])
@@ -915,11 +1129,11 @@ export default function MeuPainelPage() {
 
   // Load support data once
   useEffect(() => {
-    api.get<any>('/my-projects?pageSize=200').then(r =>
+    api.get<any>('/my-projects?pageSize=30').then(r =>
       setProjects(Array.isArray(r?.items) ? r.items : [])
     ).catch(() => {})
 
-    api.get<any>('/expense-categories?per_page=200').then(r => {
+    api.get<any>('/expense-categories?per_page=50').then(r => {
       const list: CategoryOption[] = Array.isArray(r?.data)  ? r.data
                                    : Array.isArray(r?.items) ? r.items : []
       setCategories(list.filter(c => !c.parent_id))
@@ -1083,6 +1297,7 @@ export default function MeuPainelPage() {
 
   const openCreateTs = () => {
     setTsForm({ ...EMPTY_TS, date: todayISO() })
+    setTsFile(null)
     setTsModal({ open: true })
   }
 
@@ -1101,6 +1316,7 @@ export default function MeuPainelPage() {
       observation: item.observation ?? '',
       ticket:      item.ticket ?? '',
     })
+    setTsFile(null)
     setTsModal({ open: true, item })
   }
 
@@ -1122,25 +1338,57 @@ export default function MeuPainelPage() {
     }
     setTsSaving(true)
     try {
-      const payload: Record<string, unknown> = {
-        project_id:  Number(tsForm.project_id),
-        date:        tsForm.date,
-        observation: tsForm.observation || undefined,
-        ticket:      tsForm.ticket      || undefined,
-      }
-      if (hasTotal && !hasStart) {
-        // Total informado sem início/fim — omite start/end para não falhar validação 'sometimes'
-        payload.total_hours = hoursToHHMM(totalVal)
+      const token = localStorage.getItem('minutor_token')
+
+      if (tsFile) {
+        // Multipart: usa FormData para enviar o anexo
+        const fd = new FormData()
+        fd.append('project_id',  tsForm.project_id)
+        fd.append('date',        tsForm.date)
+        if (tsForm.observation) fd.append('observation', tsForm.observation)
+        if (tsForm.ticket)      fd.append('ticket',      tsForm.ticket)
+        if (hasTotal && !hasStart) {
+          fd.append('total_hours', hoursToHHMM(totalVal))
+        } else {
+          fd.append('start_time', tsForm.start_time)
+          fd.append('end_time',   tsForm.end_time)
+        }
+        fd.append('attachment', tsFile)
+
+        const url    = tsModal.item ? `/api/v1/timesheets/${tsModal.item.id}` : '/api/v1/timesheets'
+        if (tsModal.item) fd.append('_method', 'PUT')
+        const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          const details = err.details ?? err.errors
+          const detailMsg = Array.isArray(details) ? details.join('; ')
+            : typeof details === 'object' && details !== null
+              ? Object.values(details).flat().join('; ')
+              : undefined
+          throw new Error(detailMsg ?? err.detailMessage ?? err.message ?? 'Erro ao salvar')
+        }
       } else {
-        payload.start_time = tsForm.start_time
-        payload.end_time   = tsForm.end_time
+        const payload: Record<string, unknown> = {
+          project_id:  Number(tsForm.project_id),
+          date:        tsForm.date,
+          observation: tsForm.observation || undefined,
+          ticket:      tsForm.ticket      || undefined,
+        }
+        if (hasTotal && !hasStart) {
+          // Total informado sem início/fim — omite start/end para não falhar validação 'sometimes'
+          payload.total_hours = hoursToHHMM(totalVal)
+        } else {
+          payload.start_time = tsForm.start_time
+          payload.end_time   = tsForm.end_time
+        }
+        if (tsModal.item) await api.put(`/timesheets/${tsModal.item.id}`, payload)
+        else              await api.post('/timesheets', payload)
       }
-      if (tsModal.item) await api.put(`/timesheets/${tsModal.item.id}`, payload)
-      else              await api.post('/timesheets', payload)
+
       toast.success(tsModal.item ? 'Apontamento atualizado' : 'Apontamento criado')
       setTsModal({ open: false })
       loadTimesheets()
-    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao salvar') }
+    } catch (e: any) { toast.error(e instanceof ApiError ? e.message : (e?.message ?? 'Erro ao salvar')) }
     finally     { setTsSaving(false) }
   }
 
@@ -1375,14 +1623,19 @@ export default function MeuPainelPage() {
   // ── Tabs config ────────────────────────────────────────────────────────────
 
   const isHBConsultant = ['bh_fixo', 'bh_mensal'].includes((user as any)?.consultant_type ?? '')
+  const isHorista      = (user as any)?.consultant_type === 'horista'
+  const isFixo         = (user as any)?.consultant_type === 'fixo'
 
   const TABS: { id: TabType; label: string; icon: React.ElementType }[] = [
     { id: 'overview',   label: 'Total Geral',  icon: LayoutDashboard },
     { id: 'timesheets', label: 'Apontamentos', icon: Clock },
     { id: 'expenses',   label: 'Despesas',     icon: Receipt },
     { id: 'indicators', label: 'Indicadores',  icon: BarChart2 },
-    ...(isHBConsultant ? [{ id: 'hora-banco' as TabType, label: 'Banco de Horas', icon: CalendarDays }] : []),
+    ...(!isFixo && (isHBConsultant || isHorista) ? [{ id: 'hora-banco' as TabType, label: 'Remuneração', icon: DollarSign }] : []),
   ]
+
+  // Se activeTab não existe na lista (ex: fixo que estava em hora-banco), volta ao overview
+  const validTab = TABS.some(t => t.id === activeTab) ? activeTab : 'overview'
 
   const pmOptions = paymentMethods.length > 0 ? paymentMethods : PAYMENT_FALLBACK
 
@@ -1453,7 +1706,7 @@ export default function MeuPainelPage() {
       <div className="flex gap-0.5 border-b border-zinc-800 mb-6">
         {TABS.map(tab => {
           const Icon = tab.icon
-          const active = activeTab === tab.id
+          const active = validTab === tab.id
           return (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
@@ -1471,11 +1724,11 @@ export default function MeuPainelPage() {
       {/* ══════════════════════════════════════════════════════════════════════
           Tab: Total Geral
       ══════════════════════════════════════════════════════════════════════ */}
-      {activeTab === 'overview' && (
+      {validTab === 'overview' && (
         <div className="space-y-5">
 
           {/* Summary cards */}
-          <div className="grid gap-3 grid-cols-2 lg:grid-cols-6">
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-6 xl:grid-cols-7">
             <SummaryCard
               label="Horas no Período"
               value={minutesToHours(tsTotalMin)}
@@ -1484,19 +1737,62 @@ export default function MeuPainelPage() {
               accent="bg-blue-500/15 text-blue-400"
               onClick={() => setActiveTab('timesheets')}
             />
-            {isHBConsultant ? (
+            {isFixo ? (
               <>
                 <SummaryCard
-                  label="Total a Receber"
-                  value={hbBeforeStart ? '—' : hourlyRate > 0 ? formatBRL(hbServiceVal) : '—'}
-                  sub={hbBeforeStart
-                    ? `Inicia em ${hbStartYM ? fmtYearMonth(hbStartYM) : '—'}`
-                    : hbExtraHours > 0
-                      ? `Salário base + ${hbExtraHours.toFixed(1)}h extras`
-                      : 'Salário base mensal'}
-                  icon={TrendingUp}
-                  accent="bg-green-500/15 text-green-400"
+                  label="Horas Trabalhadas"
+                  value={fmtHours(workedHours)}
+                  sub="apontadas no período"
+                  icon={Clock}
+                  accent="bg-blue-500/15 text-blue-400"
+                  onClick={() => setActiveTab('timesheets')}
                 />
+                <SummaryCard
+                  label="Valor Fixo Mensal"
+                  value={hourlyRate > 0 ? formatBRL(hourlyRate) : '—'}
+                  sub="valor do serviço mensal"
+                  icon={DollarSign}
+                  accent="bg-indigo-500/15 text-indigo-400"
+                />
+                <SummaryCard
+                  label="Total Despesas"
+                  value={formatBRL(expTotal)}
+                  sub={`${expenses.length} lançamento${expenses.length !== 1 ? 's' : ''}`}
+                  icon={Receipt}
+                  accent="bg-orange-500/15 text-orange-400"
+                  onClick={() => setActiveTab('expenses')}
+                />
+                <SummaryCard
+                  label="Total Geral"
+                  value={hourlyRate > 0 ? formatBRL(hourlyRate + expTotal) : expTotal > 0 ? formatBRL(expTotal) : '—'}
+                  sub={expTotal > 0 ? 'Valor fixo + despesas' : 'Sem despesas no período'}
+                  icon={TrendingUp}
+                  accent="bg-cyan-500/15 text-cyan-400"
+                />
+                {/* "Total a Receber" removido — redundante com "Total Geral" */}
+              </>
+            ) : isHBConsultant ? (
+              <>
+                <SummaryCard
+                  label="Valor Fixo Mensal"
+                  value={hourlyRate > 0 ? formatBRL(hourlyRate) : '—'}
+                  sub="valor do serviço mensal"
+                  icon={DollarSign}
+                  accent="bg-indigo-500/15 text-indigo-400"
+                />
+                {(user as any)?.consultant_type === 'bh_mensal' && (
+                  <SummaryCard
+                    label="Total a Receber"
+                    value={hbBeforeStart ? '—' : hourlyRate > 0 ? formatBRL(hbServiceVal) : '—'}
+                    sub={hbBeforeStart
+                      ? `Inicia em ${hbStartYM ? fmtYearMonth(hbStartYM) : '—'}`
+                      : hbExtraHours > 0
+                        ? `Salário base + ${hbExtraHours.toFixed(1)}h extras`
+                        : 'Salário base mensal'}
+                    icon={TrendingUp}
+                    accent="bg-green-500/15 text-green-400"
+                  />
+                )}
                 <SummaryCard
                   label="Total Despesas"
                   value={formatBRL(expTotal)}
@@ -1517,6 +1813,13 @@ export default function MeuPainelPage() {
               </>
             ) : (
               <>
+                <SummaryCard
+                  label={rateType === 'monthly' ? 'Valor Fixo Mensal' : 'Taxa / Hora'}
+                  value={hourlyRate > 0 ? formatBRL(hourlyRate) : '—'}
+                  sub={rateType === 'monthly' ? 'salário base mensal' : 'por hora trabalhada'}
+                  icon={DollarSign}
+                  accent="bg-indigo-500/15 text-indigo-400"
+                />
                 <SummaryCard
                   label="Valor Total do Serviço"
                   value={estimatedValue !== null ? formatBRL(estimatedValue) : '—'}
@@ -1565,6 +1868,16 @@ export default function MeuPainelPage() {
             />
           </div>
 
+          {/* Fixo: seção de remuneração direto no Total Geral */}
+          {isFixo && (
+            <FixoPaymentSection
+              yearMonth={`${year}-${String(month + 1).padStart(2, '0')}`}
+              workedHours={workedHours}
+              fixedMonthly={hourlyRate}
+              expTotal={expTotal}
+            />
+          )}
+
           {/* Recent lists */}
           <div className="grid md:grid-cols-2 gap-4">
 
@@ -1592,7 +1905,7 @@ export default function MeuPainelPage() {
                             <div className="text-xs font-medium text-zinc-200 truncate">
                               {ts.project?.name ?? '—'}
                             </div>
-                            <div className="text-[11px] text-zinc-600 mt-0.5">{ts.date}</div>
+                            <div className="text-[11px] text-zinc-600 mt-0.5">{fmt(ts.date)}</div>
                           </div>
                           <div className="flex items-center gap-2.5 shrink-0">
                             <span className="text-xs font-mono font-semibold text-zinc-300">
@@ -1629,7 +1942,7 @@ export default function MeuPainelPage() {
                           <div className="min-w-0">
                             <div className="text-xs font-medium text-zinc-200 truncate">{exp.description}</div>
                             <div className="text-[11px] text-zinc-600 mt-0.5">
-                              {exp.expense_date} · {exp.project?.name}
+                              {fmt(exp.expense_date)} · {exp.project?.name}
                             </div>
                           </div>
                           <div className="flex items-center gap-2.5 shrink-0">
@@ -1648,7 +1961,7 @@ export default function MeuPainelPage() {
       {/* ══════════════════════════════════════════════════════════════════════
           Tab: Apontamentos
       ══════════════════════════════════════════════════════════════════════ */}
-      {activeTab === 'timesheets' && (
+      {validTab === 'timesheets' && (
         <div>
           {/* Status pills */}
           <div className="mb-3">
@@ -1732,7 +2045,7 @@ export default function MeuPainelPage() {
                       className={`border-b border-zinc-800 transition-colors last:border-0 ${
                         locked ? 'bg-zinc-900/40' : 'hover:bg-zinc-800/25'
                       }`}>
-                      <td className="px-4 py-3.5 text-zinc-300 font-medium tabular-nums whitespace-nowrap">{ts.date}</td>
+                      <td className="px-4 py-3.5 text-zinc-300 font-medium tabular-nums whitespace-nowrap">{fmt(ts.date)}</td>
                       <td className="px-4 py-3.5 text-zinc-400 hidden md:table-cell max-w-[120px] truncate">
                         {clientName ?? <span className="text-zinc-700">—</span>}
                       </td>
@@ -1748,7 +2061,12 @@ export default function MeuPainelPage() {
                       <td className="px-4 py-3.5 text-zinc-500 font-mono hidden md:table-cell whitespace-nowrap">
                         {ts.start_time} – {ts.end_time}
                       </td>
-                      <td className="px-4 py-3.5 text-white font-mono font-bold whitespace-nowrap">{ts.effort_hours}</td>
+                      <td className="px-4 py-3.5 text-white font-mono font-bold whitespace-nowrap">
+                        <span className="flex items-center gap-1.5">
+                          {ts.effort_hours}
+                          {ts.attachment_url && <Paperclip size={10} className="text-zinc-500 shrink-0" aria-label="Tem anexo" />}
+                        </span>
+                      </td>
                       <td className="px-4 py-3.5 text-zinc-500 hidden lg:table-cell max-w-[180px] truncate"
                         title={ts.observation}>
                         {ts.observation ?? <span className="text-zinc-700">—</span>}
@@ -1792,7 +2110,7 @@ export default function MeuPainelPage() {
       {/* ══════════════════════════════════════════════════════════════════════
           Tab: Despesas
       ══════════════════════════════════════════════════════════════════════ */}
-      {activeTab === 'expenses' && (
+      {validTab === 'expenses' && (
         <div>
           {/* Status pills */}
           <div className="mb-3">
@@ -1882,14 +2200,19 @@ export default function MeuPainelPage() {
                       className={`border-b border-zinc-800 transition-colors last:border-0 ${
                         locked ? 'bg-zinc-900/40' : 'hover:bg-zinc-800/25'
                       }`}>
-                      <td className="px-4 py-3.5 text-zinc-300 font-medium tabular-nums whitespace-nowrap">{exp.expense_date}</td>
+                      <td className="px-4 py-3.5 text-zinc-300 font-medium tabular-nums whitespace-nowrap">{fmt(exp.expense_date)}</td>
                       <td className="px-4 py-3.5 text-zinc-400 hidden md:table-cell max-w-[120px] truncate">
                         {exp.project?.customer?.name ?? <span className="text-zinc-700">—</span>}
                       </td>
                       <td className="px-4 py-3.5 text-zinc-200 max-w-[160px] truncate" title={exp.description}>{exp.description}</td>
                       <td className="px-4 py-3.5 text-zinc-400 hidden md:table-cell max-w-[140px] truncate">{exp.project?.name ?? '—'}</td>
                       <td className="px-4 py-3.5 text-zinc-400 hidden lg:table-cell">{exp.category?.name ?? '—'}</td>
-                      <td className="px-4 py-3.5 text-white font-bold whitespace-nowrap">{exp.formatted_amount}</td>
+                      <td className="px-4 py-3.5 text-white font-bold whitespace-nowrap">
+                        <span className="flex items-center gap-1.5">
+                          {exp.formatted_amount}
+                          {exp.receipt_url && <Paperclip size={10} className="text-zinc-500 shrink-0" aria-label="Tem comprovante" />}
+                        </span>
+                      </td>
                       <td className="px-4 py-3.5">
                         <StatusBadge status={exp.status} display={exp.status_display} />
                       </td>
@@ -1899,6 +2222,9 @@ export default function MeuPainelPage() {
                           ...(!locked ? [
                             { label: 'Editar', icon: <Pencil size={12} />, onClick: () => openEditExp(exp) },
                             { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => deleteExp(exp.id), danger: true },
+                          ] : []),
+                          ...(exp.receipt_url ? [
+                            { label: 'Ver Comprovante', icon: <Paperclip size={12} />, onClick: () => openReceiptUrl(exp.receipt_url!) },
                           ] : []),
                         ]} />
                       </td>
@@ -1929,7 +2255,7 @@ export default function MeuPainelPage() {
       {/* ══════════════════════════════════════════════════════════════════════
           Tab: Indicadores
       ══════════════════════════════════════════════════════════════════════ */}
-      {activeTab === 'indicators' && (
+      {validTab === 'indicators' && (
         <div className="space-y-5">
 
           {/* ── Alertas ──────────────────────────────────────────────────────── */}
@@ -2452,80 +2778,227 @@ export default function MeuPainelPage() {
       {/* ══════════════════════════════════════════════════════════════════════
           Tab: Banco de Horas
       ══════════════════════════════════════════════════════════════════════ */}
-      {activeTab === 'hora-banco' && (
+      {validTab === 'hora-banco' && !isFixo && (
         <div className="space-y-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-semibold" style={{ color: 'var(--brand-text)' }}>Banco de Horas</h2>
+              <h2 className="text-base font-semibold" style={{ color: 'var(--brand-text)' }}>
+                {isHorista ? 'Horas & Remuneração' : isFixo ? 'Remuneração Fixo' : 'Banco de Horas'}
+              </h2>
               <p className="text-xs mt-0.5" style={{ color: 'var(--brand-subtle)' }}>
-                Horas previstas, trabalhadas e saldo acumulado — {MONTHS[month]} {year}
+                {isHorista || isFixo
+                  ? `Horas trabalhadas e remuneração — ${MONTHS[month]} ${year}`
+                  : `Horas previstas, trabalhadas e saldo acumulado — ${MONTHS[month]} ${year}`}
               </p>
             </div>
-            <button onClick={() => setHbKey(k => k + 1)} className="p-2 rounded-lg hover:bg-white/5 transition-colors" style={{ color: 'var(--brand-subtle)' }}>
-              <RefreshCw size={14} />
-            </button>
+            {!isHorista && !isFixo && (
+              <button onClick={() => setHbKey(k => k + 1)} className="p-2 rounded-lg hover:bg-white/5 transition-colors" style={{ color: 'var(--brand-subtle)' }}>
+                <RefreshCw size={14} />
+              </button>
+            )}
           </div>
 
-          {hbLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-44 w-full rounded-2xl" />
-              <Skeleton className="h-64 w-full rounded-2xl" />
-            </div>
-          ) : !hbCurrent && hbStartDate ? (
-            <div className="flex flex-col items-center justify-center py-16 rounded-2xl" style={{ border: '1px dashed var(--brand-border)' }}>
-              <CalendarDays size={28} style={{ color: 'var(--brand-subtle)' }} />
-              <p className="mt-3 text-sm font-medium" style={{ color: 'var(--brand-text)' }}>
-                Banco de horas não iniciado neste período
-              </p>
-              <p className="mt-1 text-xs" style={{ color: 'var(--brand-subtle)' }}>
-                Inicia em {fmtYearMonth(hbStartDate.substring(0, 7))}
-              </p>
-            </div>
-          ) : (
-            <>
-              {hbCurrent && (() => {
-                const now = new Date()
-                const isCurrentMonth = hbCurrent.year_month === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-                const fixedSalary = (user as any)?.rate_type === 'monthly' ? Number((user as any)?.hourly_rate ?? 0) : 0
-                return (
-                  <>
-                    <HBPaymentSection data={hbCurrent} fixedSalary={fixedSalary} expTotal={expTotal} />
-                    <HBCurrentMonthCard data={hbCurrent} isCurrentMonth={isCurrentMonth} />
-                  </>
-                )
-              })()}
+          {isFixo ? (
+            /* ── Fixo: valor mensal fixo + horas trabalhadas (sem extras) ── */
+            timesheets.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 rounded-2xl" style={{ border: '1px dashed var(--brand-border)' }}>
+                <Clock size={28} style={{ color: 'var(--brand-subtle)' }} />
+                <p className="mt-3 text-sm font-medium" style={{ color: 'var(--brand-text)' }}>
+                  Nenhum apontamento no período
+                </p>
+                <p className="mt-1 text-xs" style={{ color: 'var(--brand-subtle)' }}>
+                  {MONTHS[month]} {year}
+                </p>
+              </div>
+            ) : (
+              <>
+                <FixoPaymentSection
+                  yearMonth={`${year}-${String(month + 1).padStart(2, '0')}`}
+                  workedHours={workedHours}
+                  fixedMonthly={hourlyRate}
+                  expTotal={expTotal}
+                />
 
-              {hbHistory.length > 0 && (
+                {/* Apontamentos do período */}
                 <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
                   <div className="px-4 py-3 border-b" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
-                    <p className="text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Meses Anteriores</p>
+                    <p className="text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>
+                      Apontamentos do Período — {timesheets.length} registro{timesheets.length !== 1 ? 's' : ''}
+                    </p>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs" style={{ background: 'var(--brand-surface)' }}>
                       <thead style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--brand-border)' }}>
                         <tr>
-                          {['Mês', 'Previsto', 'Trabalhado', 'Saldo Mês', 'Saldo Ant.', 'Saldo Final'].map(h => (
+                          {['Data', 'Projeto', 'Horas', 'Status'].map(h => (
                             <th key={h} className="px-4 py-2.5 text-center font-semibold uppercase tracking-wider text-[10px] first:text-left" style={{ color: 'var(--brand-subtle)' }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {hbHistory.map((row, i) => (
-                          <HBHistoryRow key={`${row.user_id}-${row.year_month}-${i}`} row={row} />
-                        ))}
+                        {timesheets.map(ts => {
+                          const hrs = ts.effort_minutes / 60
+                          return (
+                            <tr key={ts.id} className="border-b hover:bg-white/[0.02] transition-colors" style={{ borderColor: 'var(--brand-border)' }}>
+                              <td className="px-4 py-2.5 font-medium" style={{ color: 'var(--brand-text)' }}>{fmt(ts.date)}</td>
+                              <td className="px-4 py-2.5 text-center max-w-[180px] truncate" style={{ color: 'var(--brand-muted)' }}>{ts.project?.name ?? '—'}</td>
+                              <td className="px-4 py-2.5 text-center font-mono" style={{ color: 'var(--brand-text)' }}>{fmtHours(hrs)}</td>
+                              <td className="px-4 py-2.5 text-center">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                  ts.status === 'approved' ? 'bg-green-500/15 text-green-400' :
+                                  ts.status === 'rejected' ? 'bg-red-500/15 text-red-400' :
+                                  'bg-zinc-500/15 text-zinc-400'
+                                }`}>{ts.status_display}</span>
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
                 </div>
-              )}
 
-              <div className="flex items-center gap-4 text-[10px] px-1" style={{ color: 'var(--brand-subtle)' }}>
-                <span className="flex items-center gap-1"><TrendingUp size={10} className="text-green-400" /> Saldo positivo</span>
-                <span className="flex items-center gap-1"><TrendingDown size={10} className="text-red-400" /> Saldo negativo</span>
-                <span className="flex items-center gap-1"><Minus size={10} className="text-zinc-500" /> Zerado</span>
-                {hbCurrent && <span className="ml-auto">HP = Dias úteis × {hbCurrent.daily_hours}h/dia</span>}
+                <div className="flex items-center gap-4 text-[10px] px-1" style={{ color: 'var(--brand-subtle)' }}>
+                  <span>Valor fixo: {hourlyRate > 0 ? formatBRL(hourlyRate) : '—'}/mês</span>
+                  <span className="ml-auto">Total trabalhado: {fmtHours(workedHours)}</span>
+                </div>
+              </>
+            )
+          ) : isHorista ? (
+            /* ── Horista: view baseada nos apontamentos já carregados ── */
+            timesheets.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 rounded-2xl" style={{ border: '1px dashed var(--brand-border)' }}>
+                <Clock size={28} style={{ color: 'var(--brand-subtle)' }} />
+                <p className="mt-3 text-sm font-medium" style={{ color: 'var(--brand-text)' }}>
+                  Nenhum apontamento no período
+                </p>
+                <p className="mt-1 text-xs" style={{ color: 'var(--brand-subtle)' }}>
+                  {MONTHS[month]} {year}
+                </p>
               </div>
-            </>
+            ) : (
+              <>
+                <HoristaPaymentSection
+                  yearMonth={`${year}-${String(month + 1).padStart(2, '0')}`}
+                  workedHours={workedHours}
+                  billableHours={billableHours}
+                  guaranteedHours={guaranteedHours}
+                  hourlyRate={hourlyRate}
+                  expTotal={expTotal}
+                />
+
+                {/* Apontamentos do período */}
+                <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
+                  <div className="px-4 py-3 border-b" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
+                    <p className="text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>
+                      Apontamentos do Período — {timesheets.length} registro{timesheets.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs" style={{ background: 'var(--brand-surface)' }}>
+                      <thead style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--brand-border)' }}>
+                        <tr>
+                          {['Data', 'Projeto', 'Horas', 'Valor', 'Status'].map(h => (
+                            <th key={h} className="px-4 py-2.5 text-center font-semibold uppercase tracking-wider text-[10px] first:text-left" style={{ color: 'var(--brand-subtle)' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {timesheets.map(ts => {
+                          const hrs = ts.effort_minutes / 60
+                          const val = effectiveRate > 0 ? hrs * effectiveRate : null
+                          return (
+                            <tr key={ts.id} className="border-b hover:bg-white/[0.02] transition-colors" style={{ borderColor: 'var(--brand-border)' }}>
+                              <td className="px-4 py-2.5 font-medium" style={{ color: 'var(--brand-text)' }}>{fmt(ts.date)}</td>
+                              <td className="px-4 py-2.5 text-center max-w-[180px] truncate" style={{ color: 'var(--brand-muted)' }}>{ts.project?.name ?? '—'}</td>
+                              <td className="px-4 py-2.5 text-center font-mono" style={{ color: 'var(--brand-text)' }}>{fmtHours(hrs)}</td>
+                              <td className="px-4 py-2.5 text-center font-mono" style={{ color: val ? '#22c55e' : 'var(--brand-subtle)' }}>{val ? formatBRL(val) : '—'}</td>
+                              <td className="px-4 py-2.5 text-center">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                  ts.status === 'approved' ? 'bg-green-500/15 text-green-400' :
+                                  ts.status === 'rejected' ? 'bg-red-500/15 text-red-400' :
+                                  'bg-zinc-500/15 text-zinc-400'
+                                }`}>{ts.status_display}</span>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 text-[10px] px-1" style={{ color: 'var(--brand-subtle)' }}>
+                  <span>Taxa: {hourlyRate > 0 ? formatBRL(hourlyRate) : '—'}/h</span>
+                  {guaranteedHours !== null && <span>Garantido: {fmtHours(Number(guaranteedHours))}/mês</span>}
+                  <span className="ml-auto">Total faturável: {fmtHours(billableHours)}</span>
+                </div>
+              </>
+            )
+          ) : (
+            /* ── BH Consultor: banco de horas com saldo ── */
+            hbLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-44 w-full rounded-2xl" />
+                <Skeleton className="h-64 w-full rounded-2xl" />
+              </div>
+            ) : !hbCurrent && hbStartDate ? (
+              <div className="flex flex-col items-center justify-center py-16 rounded-2xl" style={{ border: '1px dashed var(--brand-border)' }}>
+                <CalendarDays size={28} style={{ color: 'var(--brand-subtle)' }} />
+                <p className="mt-3 text-sm font-medium" style={{ color: 'var(--brand-text)' }}>
+                  Banco de horas não iniciado neste período
+                </p>
+                <p className="mt-1 text-xs" style={{ color: 'var(--brand-subtle)' }}>
+                  Inicia em {fmtYearMonth(hbStartDate.substring(0, 7))}
+                </p>
+              </div>
+            ) : (
+              <>
+                {hbCurrent && (() => {
+                  const now = new Date()
+                  const isCurrentMonth = hbCurrent.year_month === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+                  const fixedSalary = (user as any)?.rate_type === 'monthly' ? Number((user as any)?.hourly_rate ?? 0) : 0
+                  const isBhFixo = (user as any)?.consultant_type === 'bh_fixo'
+                  return (
+                    <>
+                      <HBPaymentSection data={hbCurrent} fixedSalary={fixedSalary} expTotal={expTotal} showExtras={!isBhFixo} />
+                      <HBCurrentMonthCard data={hbCurrent} isCurrentMonth={isCurrentMonth} />
+                    </>
+                  )
+                })()}
+
+                {hbHistory.length > 0 && (
+                  <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
+                    <div className="px-4 py-3 border-b" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
+                      <p className="text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Meses Anteriores</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs" style={{ background: 'var(--brand-surface)' }}>
+                        <thead style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--brand-border)' }}>
+                          <tr>
+                            {['Mês', 'Previsto', 'Trabalhado', 'Saldo Mês', 'Saldo Ant.', 'Saldo Final'].map(h => (
+                              <th key={h} className="px-4 py-2.5 text-center font-semibold uppercase tracking-wider text-[10px] first:text-left" style={{ color: 'var(--brand-subtle)' }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {hbHistory.map((row, i) => (
+                            <HBHistoryRow key={`${row.user_id}-${row.year_month}-${i}`} row={row} />
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-4 text-[10px] px-1" style={{ color: 'var(--brand-subtle)' }}>
+                  <span className="flex items-center gap-1"><TrendingUp size={10} className="text-green-400" /> Saldo positivo</span>
+                  <span className="flex items-center gap-1"><TrendingDown size={10} className="text-red-400" /> Saldo negativo</span>
+                  <span className="flex items-center gap-1"><Minus size={10} className="text-zinc-500" /> Zerado</span>
+                  {hbCurrent && <span className="ml-auto">HP = Dias úteis × {hbCurrent.daily_hours}h/dia</span>}
+                </div>
+              </>
+            )
           )}
         </div>
       )}
@@ -2680,6 +3153,40 @@ export default function MeuPainelPage() {
               )
             })()}
 
+            {/* Attachment upload */}
+            <div>
+              <Label className="text-xs text-zinc-400">Anexo</Label>
+
+              {/* Anexo existente (modo edição) */}
+              {tsModal.item?.attachment_url && !tsFile && (
+                <div className="mt-1.5 flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700">
+                  <Paperclip size={12} className="text-green-400 shrink-0" />
+                  <span className="text-xs text-green-400 flex-1">Anexo enviado</span>
+                  <ReceiptLinkInline url={tsModal.item.attachment_url} />
+                  <button type="button" onClick={() => tsFileRef.current?.click()}
+                    className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">
+                    Substituir
+                  </button>
+                </div>
+              )}
+
+              {/* Upload area */}
+              {(!tsModal.item?.attachment_url || tsFile) && (
+                <div
+                  onClick={() => tsFileRef.current?.click()}
+                  className="mt-1.5 border border-dashed border-zinc-700 rounded-lg p-4 cursor-pointer hover:border-zinc-500 transition-colors text-center">
+                  <span className="text-xs text-zinc-500">
+                    {tsFile
+                      ? <span className="text-blue-400">{tsFile.name}</span>
+                      : 'Clique para anexar arquivo (opcional)'}
+                  </span>
+                </div>
+              )}
+
+              <input ref={tsFileRef} type="file" accept="image/*,.pdf,.doc,.docx" className="hidden"
+                onChange={e => setTsFile(e.target.files?.[0] ?? null)} />
+            </div>
+
             <div className="flex gap-2 justify-end pt-2">
               <Button variant="outline" onClick={() => setTsModal({ open: false })}
                 className="h-9 text-xs border-zinc-700 text-zinc-300">
@@ -2810,118 +3317,197 @@ export default function MeuPainelPage() {
       )}
 
       {/* ── Modal: Visualizar Despesa ── */}
-      {expViewItem && (
-        <ModalOverlay onClose={() => setExpViewItem(null)}>
-          <div className="p-6 space-y-4">
-            <h2 className="text-sm font-semibold text-white">Detalhes da Despesa</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Data</p>
-                <p className="text-sm text-zinc-200 font-medium">{expViewItem.expense_date}</p>
+      {expViewItem && (() => {
+        const sc = EXP_STATUS_CONF[expViewItem.status] ?? { bg: 'rgba(113,113,122,0.12)', color: '#71717A', label: expViewItem.status_display ?? expViewItem.status }
+        const canEdit = ['pending', 'rejected', 'adjustment_requested'].includes(expViewItem.status)
+        return (
+          <ModalOverlay onClose={() => setExpViewItem(null)}>
+            <div className="max-h-[88vh] overflow-y-auto">
+              {/* Header */}
+              <div className="px-5 pt-5 pb-4 flex items-start gap-3">
+                <div className="p-2.5 rounded-xl shrink-0"
+                  style={{ background: 'rgba(249,115,22,0.1)', color: '#F97316' }}>
+                  <Receipt size={16} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-white">Detalhes da Despesa</h3>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>
+                    #{expViewItem.id} · {fmt(expViewItem.expense_date)}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Valor</p>
-                <p className="text-sm text-white font-bold">{expViewItem.formatted_amount}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Status</p>
-                <StatusBadge status={expViewItem.status} display={expViewItem.status_display} />
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Categoria</p>
-                <p className="text-sm text-zinc-200">{expViewItem.category?.name ?? '—'}</p>
+
+              <div className="px-5 pb-5 space-y-4">
+                {/* Status + Categoria */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                    style={{ background: sc.bg, color: sc.color }}>
+                    {sc.label}
+                  </span>
+                  {expViewItem.category?.name && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                      style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}>
+                      <Tag size={9} /> {expViewItem.category.name}
+                    </span>
+                  )}
+                </div>
+
+                {/* Valor hero */}
+                <div className="rounded-xl px-4 py-4"
+                  style={{ background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.15)' }}>
+                  <p className="text-[10px] uppercase tracking-widest mb-1" style={{ color: 'var(--brand-subtle)' }}>Valor Total</p>
+                  <p className="text-2xl font-bold" style={{ color: '#F97316' }}>{expViewItem.formatted_amount}</p>
+                </div>
+
+                {/* Info card */}
+                <div className="rounded-xl overflow-hidden"
+                  style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                  <InfoRowModal icon={CalendarDays} label="Data" value={fmt(expViewItem.expense_date)} />
+                  {expViewItem.project?.customer?.name && (
+                    <InfoRowModal icon={Building2} label="Cliente" value={expViewItem.project.customer.name} />
+                  )}
+                  <InfoRowModal icon={FolderOpen} label="Projeto" value={expViewItem.project?.name} />
+                  <InfoRowModal icon={Tag} label="Tipo" value={EXP_TYPE_LABEL[expViewItem.expense_type] ?? expViewItem.expense_type} />
+                  {(expViewItem as any).payment_method && (
+                    <InfoRowModal icon={CreditCard} label="Pagamento" value={PAYMENT_LABEL_MAP[(expViewItem as any).payment_method] ?? (expViewItem as any).payment_method} />
+                  )}
+                  <InfoRowModal icon={Paperclip} label="Comprovante" last>
+                    {expViewItem.receipt_url
+                      ? <ReceiptLinkInline url={expViewItem.receipt_url} label="Visualizar Comprovante" />
+                      : <span className="text-xs" style={{ color: 'var(--brand-subtle)' }}>Sem comprovante</span>
+                    }
+                  </InfoRowModal>
+                </div>
+
+                {/* Descrição */}
+                {expViewItem.description && (
+                  <div className="rounded-xl overflow-hidden"
+                    style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                    <div className="flex items-center gap-2 px-4 py-2.5"
+                      style={{ borderBottom: '1px solid var(--brand-border)' }}>
+                      <FileText size={11} style={{ color: 'var(--brand-primary)' }} />
+                      <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: 'var(--brand-subtle)' }}>Descrição</span>
+                    </div>
+                    <p className="px-4 py-3 text-sm leading-relaxed" style={{ color: 'var(--brand-muted)' }}>
+                      {expViewItem.description}
+                    </p>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  {canEdit && (
+                    <Button variant="outline" onClick={() => { setExpViewItem(null); openEditExp(expViewItem) }}
+                      className="h-8 text-xs border-zinc-700 text-zinc-300 gap-1.5">
+                      <Pencil size={11} /> Editar
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => setExpViewItem(null)}
+                    className="h-8 text-xs border-zinc-700 text-zinc-300">
+                    Fechar
+                  </Button>
+                </div>
               </div>
             </div>
-            {expViewItem.project?.customer?.name && (
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Cliente</p>
-                <p className="text-sm text-zinc-200">{expViewItem.project.customer.name}</p>
-              </div>
-            )}
-            <div>
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Projeto</p>
-              <p className="text-sm text-zinc-200">{expViewItem.project?.name ?? '—'}</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Descrição</p>
-              <p className="text-sm text-zinc-300">{expViewItem.description}</p>
-            </div>
-            {expViewItem.receipt_url && (
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Comprovante</p>
-                <ReceiptLinkInline url={expViewItem.receipt_url} />
-              </div>
-            )}
-            <div className="flex justify-end pt-1">
-              <Button variant="outline" onClick={() => setExpViewItem(null)}
-                className="h-8 text-xs border-zinc-700 text-zinc-300">
-                Fechar
-              </Button>
-            </div>
-          </div>
-        </ModalOverlay>
-      )}
+          </ModalOverlay>
+        )
+      })()}
 
       {/* ── Modal: Visualizar Apontamento ── */}
-      {tsViewItem && (
-        <ModalOverlay onClose={() => setTsViewItem(null)}>
-          <div className="p-6 space-y-4">
-            <h3 className="text-base font-semibold text-white">Detalhes do Apontamento</h3>
+      {tsViewItem && (() => {
+        const sc = EXP_STATUS_CONF[tsViewItem.status] ?? { bg: 'rgba(113,113,122,0.12)', color: '#71717A', label: tsViewItem.status_display ?? tsViewItem.status }
+        const canEditTs = ['pending', 'rejected', 'adjustment_requested'].includes(tsViewItem.status)
+        return (
+          <ModalOverlay onClose={() => setTsViewItem(null)}>
+            <div className="max-h-[88vh] overflow-y-auto">
+              {/* Header */}
+              <div className="px-5 pt-5 pb-4 flex items-start gap-3">
+                <div className="p-2.5 rounded-xl shrink-0"
+                  style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)' }}>
+                  <Clock size={16} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-white">Detalhes do Apontamento</h3>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>
+                    #{tsViewItem.id} · {fmt(tsViewItem.date)}
+                  </p>
+                </div>
+              </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Data</p>
-                <p className="text-sm text-zinc-200 font-medium">{tsViewItem.date}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Horário</p>
-                <p className="text-sm text-zinc-200 font-mono">{tsViewItem.start_time} – {tsViewItem.end_time}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Horas</p>
-                <p className="text-sm text-white font-bold font-mono">{tsViewItem.effort_hours}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Status</p>
-                <StatusBadge status={tsViewItem.status} display={tsViewItem.status_display} />
+              <div className="px-5 pb-5 space-y-4">
+                {/* Status */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                    style={{ background: sc.bg, color: sc.color }}>
+                    {tsViewItem.status === 'approved' && <Lock size={9} />}
+                    {sc.label}
+                  </span>
+                </div>
+
+                {/* Horas hero */}
+                <div className="rounded-xl px-4 py-4"
+                  style={{ background: 'rgba(0,245,255,0.04)', border: '1px solid rgba(0,245,255,0.12)' }}>
+                  <p className="text-[10px] uppercase tracking-widest mb-1" style={{ color: 'var(--brand-subtle)' }}>Total de Horas</p>
+                  <p className="text-2xl font-bold font-mono" style={{ color: 'var(--brand-primary)' }}>{tsViewItem.effort_hours}</p>
+                  {tsViewItem.start_time && tsViewItem.end_time && (
+                    <p className="text-[11px] mt-1 font-mono" style={{ color: 'var(--brand-muted)' }}>
+                      {tsViewItem.start_time} → {tsViewItem.end_time}
+                    </p>
+                  )}
+                </div>
+
+                {/* Info card */}
+                <div className="rounded-xl overflow-hidden"
+                  style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                  <InfoRowModal icon={CalendarDays} label="Data" value={fmt(tsViewItem.date)} />
+                  {tsViewItem.project?.customer?.name && (
+                    <InfoRowModal icon={Building2} label="Cliente" value={tsViewItem.project.customer.name} />
+                  )}
+                  <InfoRowModal icon={FolderOpen} label="Projeto" value={tsViewItem.project?.name} />
+                  {tsViewItem.ticket && (
+                    <InfoRowModal icon={Tag} label="Ticket" value={`#${tsViewItem.ticket}`} />
+                  )}
+                  <InfoRowModal icon={Paperclip} label="Anexo" last>
+                    {tsViewItem.attachment_url
+                      ? <ReceiptLinkInline url={tsViewItem.attachment_url} label="Visualizar Anexo" />
+                      : <span className="text-xs" style={{ color: 'var(--brand-subtle)' }}>Sem anexo</span>
+                    }
+                  </InfoRowModal>
+                </div>
+
+                {/* Observação */}
+                {tsViewItem.observation && (
+                  <div className="rounded-xl overflow-hidden"
+                    style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                    <div className="flex items-center gap-2 px-4 py-2.5"
+                      style={{ borderBottom: '1px solid var(--brand-border)' }}>
+                      <FileText size={11} style={{ color: 'var(--brand-primary)' }} />
+                      <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: 'var(--brand-subtle)' }}>Observação</span>
+                    </div>
+                    <p className="px-4 py-3 text-sm leading-relaxed" style={{ color: 'var(--brand-muted)' }}>
+                      {tsViewItem.observation}
+                    </p>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  {canEditTs && (
+                    <Button variant="outline" onClick={() => { setTsViewItem(null); openEditTs(tsViewItem) }}
+                      className="h-8 text-xs border-zinc-700 text-zinc-300 gap-1.5">
+                      <Pencil size={11} /> Editar
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => setTsViewItem(null)}
+                    className="h-8 text-xs border-zinc-700 text-zinc-300">
+                    Fechar
+                  </Button>
+                </div>
               </div>
             </div>
-
-            <div>
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Projeto</p>
-              <p className="text-sm text-zinc-200">{tsViewItem.project?.name ?? '—'}</p>
-            </div>
-
-            {tsViewItem.project?.customer?.name && (
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Cliente</p>
-                <p className="text-sm text-zinc-200">{tsViewItem.project.customer.name}</p>
-              </div>
-            )}
-
-            {tsViewItem.observation && (
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Observação</p>
-                <p className="text-sm text-zinc-300">{tsViewItem.observation}</p>
-              </div>
-            )}
-
-            {tsViewItem.ticket && (
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Ticket</p>
-                <p className="text-sm text-zinc-300 font-mono">{tsViewItem.ticket}</p>
-              </div>
-            )}
-
-            <div className="flex justify-end pt-1">
-              <Button variant="outline" onClick={() => setTsViewItem(null)}
-                className="h-8 text-xs border-zinc-700 text-zinc-300">
-                Fechar
-              </Button>
-            </div>
-          </div>
-        </ModalOverlay>
-      )}
+          </ModalOverlay>
+        )
+      })()}
 
     </AppLayout>
   )

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import {
   Home,
   Clock,
@@ -19,9 +19,15 @@ import {
   LayoutDashboard,
   Database,
   Landmark,
+  FileType,
+  Wrench,
+  Users,
+  Star,
+  UserCheck,
+  CalendarDays,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, Suspense } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { LucideIcon } from 'lucide-react'
 import type { User } from '@/types'
@@ -87,9 +93,21 @@ const NAV: NavEntry[] = [
       { label: 'On Demand',              href: '/dashboards/on-demand',           icon: Zap },
     ],
   },
-  { type: 'item', label: 'Parceiros',      href: '/partners',    icon: Handshake },
   { type: 'item', label: 'Banco de Horas', href: '/hora-banco',  icon: Landmark },
-  { type: 'item', label: 'Cadastros',      href: '/cadastros',   icon: Database },
+  {
+    type: 'group',
+    label: 'Cadastros',
+    icon: Database,
+    items: [
+      { label: 'Tipos de Contrato',   href: '/cadastros?tab=contracts',  icon: FileType },
+      { label: 'Tipos de Serviço',    href: '/cadastros?tab=services',   icon: Wrench },
+      { label: 'Clientes',            href: '/cadastros?tab=customers',  icon: Users },
+      { label: 'Executivos',          href: '/cadastros?tab=executives', icon: Star },
+      { label: 'Grupos de Consultor', href: '/cadastros?tab=groups',     icon: UserCheck },
+      { label: 'Feriados',            href: '/cadastros?tab=holidays',   icon: CalendarDays },
+      { label: 'Parceiros',           href: '/partners',                 icon: Handshake },
+    ],
+  },
   { type: 'item', label: 'Configurações',  href: '/settings',    icon: Settings },
 ]
 
@@ -105,10 +123,11 @@ function itemStyle(active: boolean): React.CSSProperties {
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-export function Sidebar({ user }: { user: User }) {
-  const pathname  = usePathname()
+function SidebarInner({ user }: { user: User }) {
+  const pathname     = usePathname()
+  const searchParams = useSearchParams()
   const [collapsed,   setCollapsed]   = useState(false)
-  const [openGroups,  setOpenGroups]  = useState<string[]>(['Dashboards'])
+  const [openGroups,  setOpenGroups]  = useState<string[]>(['Dashboards', 'Cadastros'])
 
   const isConsultor = user?.roles?.includes('Consultor') &&
     !user.roles.includes('Administrator') &&
@@ -130,7 +149,17 @@ export function Sidebar({ user }: { user: User }) {
   const toggleGroup = (label: string) =>
     setOpenGroups(prev => prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label])
 
-  const isActive   = (href: string) => pathname === href || pathname.startsWith(href + '/')
+  const isActive = (href: string) => {
+    const [hrefPath, hrefQuery] = href.split('?')
+    if (!hrefQuery) return pathname === hrefPath || pathname.startsWith(hrefPath + '/')
+    // com query param: pathname deve bater E o tab deve bater
+    if (pathname !== hrefPath) return false
+    const params = new URLSearchParams(hrefQuery)
+    for (const [k, v] of params.entries()) {
+      if (searchParams.get(k) !== v) return false
+    }
+    return true
+  }
   const groupActive = (g: NavGroup) => g.items.some(i => isActive(i.href))
 
   return (
@@ -297,5 +326,13 @@ export function Sidebar({ user }: { user: User }) {
         {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
     </aside>
+  )
+}
+
+export function Sidebar({ user }: { user: User }) {
+  return (
+    <Suspense>
+      <SidebarInner user={user} />
+    </Suspense>
   )
 }

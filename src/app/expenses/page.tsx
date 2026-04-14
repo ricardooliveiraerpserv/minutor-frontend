@@ -2,18 +2,147 @@
 
 import { AppLayout } from '@/components/layout/app-layout'
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
-import { api, ApiError, secureUrl } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { Expense, PaginatedResponse } from '@/types'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button as UIButton } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import {
+  PageHeader, Table, Thead, Th, Tbody, Tr, Td,
+  Badge, Button, SkeletonTable, EmptyState, Pagination,
+} from '@/components/ds'
+import {
   Receipt, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
-  X, Check, XCircle, Paperclip, ExternalLink
+  X, Paperclip, Eye, Building2, FolderOpen, Tag,
+  CreditCard, FileText, Calendar, MoreVertical, CalendarDays, RefreshCw,
 } from 'lucide-react'
+
+function ReceiptLink({ url, label = 'Visualizar Comprovante' }: { url: string; label?: string }) {
+  const [loading, setLoading] = useState(false)
+  const open = async () => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('minutor_token')
+      const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      if (!res.ok) { alert('Arquivo não encontrado no servidor'); return }
+      const blob = await res.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      window.open(blobUrl, '_blank')
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000)
+    } catch { alert('Erro ao abrir arquivo') }
+    finally { setLoading(false) }
+  }
+  return (
+    <button type="button" onClick={open} disabled={loading}
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+      style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.15)' }}>
+      <Paperclip size={11} />
+      {loading ? 'Abrindo...' : label}
+    </button>
+  )
+}
+
+// ─── Expense detail helpers ───────────────────────────────────────────────────
+
+const EXP_STATUS_CONF: Record<string, { bg: string; color: string; label: string }> = {
+  pending:              { bg: 'rgba(234,179,8,0.12)',  color: '#EAB308', label: 'Pendente' },
+  approved:             { bg: 'rgba(34,197,94,0.12)',  color: '#22C55E', label: 'Aprovado' },
+  rejected:             { bg: 'rgba(239,68,68,0.12)',  color: '#EF4444', label: 'Rejeitado' },
+  adjustment_requested: { bg: 'rgba(249,115,22,0.12)', color: '#F97316', label: 'Ajuste Solicitado' },
+}
+const EXP_TYPE_LABEL: Record<string, string> = {
+  reimbursement:  'Reembolso',
+  advance:        'Adiantamento',
+  corporate_card: 'Cartão Corporativo',
+}
+const PAYMENT_LABEL_MAP: Record<string, string> = {
+  pix:           'PIX',
+  credit_card:   'Cartão de Crédito',
+  debit_card:    'Cartão de Débito',
+  cash:          'Dinheiro',
+  bank_transfer: 'Transferência Bancária',
+}
+
+function InfoRowModal({ icon: Icon, label, value, children, last }: {
+  icon: React.ElementType; label: string; value?: string | null
+  children?: React.ReactNode; last?: boolean
+}) {
+  return (
+    <div className={`flex items-start gap-3 px-4 py-3 ${!last ? 'border-b' : ''}`}
+      style={ !last ? { borderColor: 'var(--brand-border)' } : undefined }>
+      <span className="mt-0.5 shrink-0 p-1.5 rounded-lg"
+        style={{ background: 'rgba(0,245,255,0.06)', color: 'var(--brand-primary)' }}>
+        <Icon size={11} />
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] uppercase tracking-widest mb-0.5" style={{ color: 'var(--brand-subtle)' }}>{label}</p>
+        {children ?? (
+          <p className="text-xs font-medium" style={{ color: 'var(--brand-text)' }}>{value ?? '—'}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── SearchSelect ─────────────────────────────────────────────────────────────
+
+function SearchSelect({ value, onChange, options, placeholder }: {
+  value: string; onChange: (v: string) => void
+  options: { id: number | string; name: string }[]; placeholder: string
+}) {
+  const [open,  setOpen]  = useState(false)
+  const [query, setQuery] = useState('')
+  const ref      = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const selected = options.find(o => String(o.id) === value)
+  const filtered = options.filter(o => o.name.toLowerCase().includes(query.toLowerCase()))
+
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+  useEffect(() => { if (open) { setQuery(''); setTimeout(() => inputRef.current?.focus(), 50) } }, [open])
+
+  const select = (id: string) => { onChange(id); setOpen(false) }
+
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm outline-none text-left"
+        style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: selected ? 'var(--brand-text)' : 'var(--brand-subtle)' }}>
+        <span className="truncate text-sm">{selected ? selected.name : placeholder}</span>
+        <ChevronRight size={12} className="rotate-90 shrink-0" style={{ color: 'var(--brand-subtle)' }} />
+      </button>
+      {open && (
+        <div className="absolute top-full mt-1 left-0 z-50 w-full min-w-52 rounded-xl shadow-2xl overflow-hidden"
+          style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+          <div className="p-2 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+            <input ref={inputRef} value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar..."
+              className="w-full px-3 py-1.5 rounded-lg text-xs outline-none"
+              style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }} />
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            <button type="button" onClick={() => select('')}
+              className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors"
+              style={{ color: !value ? 'var(--brand-primary)' : 'var(--brand-subtle)' }}>{placeholder}</button>
+            {filtered.length === 0
+              ? <p className="px-3 py-2 text-xs" style={{ color: 'var(--brand-subtle)' }}>Nenhum resultado</p>
+              : filtered.map(o => (
+                <button key={o.id} type="button" onClick={() => select(String(o.id))}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors"
+                  style={{ color: String(o.id) === value ? 'var(--brand-primary)' : 'var(--brand-text)' }}>
+                  {o.name}
+                </button>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const STATUS_CLASS: Record<string, string> = {
   pending:              'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
@@ -42,6 +171,152 @@ function formatCurrency(val: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
 }
 
+// ─── DateRangePicker ──────────────────────────────────────────────────────────
+
+const MONTH_NAMES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+const MONTH_SHORT_PT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']
+const DAY_NAMES_PT   = ['dom','seg','ter','qua','qui','sex','sáb']
+
+function dateISO(y: number, m: number, d: number) {
+  return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+
+function DateRangePicker({ from, to, onChange }: {
+  from: string; to: string
+  onChange: (from: string, to: string) => void
+}) {
+  const [pos,       setPos]       = useState<{ top: number; left: number } | null>(null)
+  const [selecting, setSelecting] = useState<string | null>(null)
+  const [hover,     setHover]     = useState<string | null>(null)
+  const [leftYM,    setLeftYM]    = useState(() => {
+    const d = from ? new Date(from + 'T00:00:00') : new Date()
+    return { y: d.getFullYear(), m: d.getMonth() }
+  })
+  const ref    = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const open   = pos !== null
+
+  const rightYM = leftYM.m === 11 ? { y: leftYM.y + 1, m: 0 } : { y: leftYM.y, m: leftYM.m + 1 }
+
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node) &&
+          btnRef.current && !btnRef.current.contains(e.target as Node)) {
+        setPos(null); setSelecting(null); setHover(null)
+      }
+    }
+    const s = () => setPos(null)
+    document.addEventListener('mousedown', h)
+    window.addEventListener('scroll', s, { passive: true })
+    return () => { document.removeEventListener('mousedown', h); window.removeEventListener('scroll', s) }
+  }, [open])
+
+  const toggle = () => {
+    if (open) { setPos(null); setSelecting(null); return }
+    if (!btnRef.current) return
+    const r = btnRef.current.getBoundingClientRect()
+    const dropW = 500
+    const left  = Math.min(r.left, window.innerWidth - dropW - 8)
+    setPos({ top: r.bottom + 4, left: Math.max(8, left) })
+  }
+
+  const prevMonth = () => setLeftYM(p => p.m === 0 ? { y: p.y - 1, m: 11 } : { y: p.y, m: p.m - 1 })
+  const nextMonth = () => setLeftYM(p => p.m === 11 ? { y: p.y + 1, m: 0 } : { y: p.y, m: p.m + 1 })
+
+  const isStart = (d: string) => d === (selecting ?? from)
+  const isEnd   = (d: string) => selecting ? d === hover : d === to
+  const inRange = (d: string) => {
+    const s = selecting ?? from; const e = selecting ? (hover ?? '') : to
+    if (!s || !e) return false
+    const [a, b] = s <= e ? [s, e] : [e, s]
+    return d > a && d < b
+  }
+
+  const handleDay = (d: string) => {
+    if (!selecting) { setSelecting(d) }
+    else {
+      const [s, e] = selecting <= d ? [selecting, d] : [d, selecting]
+      onChange(s, e); setSelecting(null); setHover(null); setPos(null)
+    }
+  }
+
+  const renderMonth = (y: number, m: number) => {
+    const days     = new Date(y, m + 1, 0).getDate()
+    const firstDay = new Date(y, m, 1).getDay()
+    const todayStr = new Date().toISOString().split('T')[0]
+    const cells: (number | null)[] = [...Array(firstDay).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)]
+    while (cells.length % 7 !== 0) cells.push(null)
+    return (
+      <div className="w-[196px]">
+        <div className="text-center text-sm font-semibold mb-3 text-cyan-400">{MONTH_NAMES_PT[m]} {y}</div>
+        <div className="grid grid-cols-7 mb-1">
+          {DAY_NAMES_PT.map(d => <div key={d} className="text-center text-[10px] text-zinc-600 py-1">{d}</div>)}
+        </div>
+        <div className="grid grid-cols-7">
+          {cells.map((day, i) => {
+            if (!day) return <div key={i} className="h-7" />
+            const d = dateISO(y, m, day)
+            const s = isStart(d); const e = isEnd(d); const ir = inRange(d); const td = d === todayStr
+            return (
+              <button key={i} type="button"
+                onMouseEnter={() => selecting && setHover(d)}
+                onMouseLeave={() => setHover(null)}
+                onClick={() => handleDay(d)}
+                className={`h-7 w-full text-xs transition-colors rounded ${
+                  s || e ? 'bg-cyan-400 text-zinc-900 font-bold'
+                  : ir    ? 'bg-cyan-400/20 text-cyan-300'
+                  : td    ? 'text-cyan-400 font-semibold hover:bg-zinc-700'
+                  :         'text-zinc-300 hover:bg-zinc-700'
+                }`}>
+                {day}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  const fmtDisplay = (iso: string) => {
+    const [, mm, dd] = iso.split('-')
+    return `${parseInt(dd)} ${MONTH_SHORT_PT[parseInt(mm) - 1]}`
+  }
+  const displayText = from && to ? `${fmtDisplay(from)} – ${fmtDisplay(to)}`
+    : from ? `${fmtDisplay(from)} – ...` : 'Período'
+
+  return (
+    <>
+      <button ref={btnRef} type="button" onClick={toggle}
+        className={`flex items-center gap-2 h-8 px-3 bg-zinc-800 border text-xs rounded-md hover:border-zinc-500 transition-colors whitespace-nowrap ${from || to ? 'border-cyan-500/50 text-zinc-200' : 'border-zinc-700 text-zinc-400'}`}>
+        <CalendarDays size={12} className={from || to ? 'text-cyan-400' : 'text-zinc-500'} />
+        {displayText}
+        {(from || to) && (
+          <span onClick={e => { e.stopPropagation(); onChange('', '') }}
+            className="ml-1 text-zinc-600 hover:text-zinc-400 cursor-pointer">
+            <X size={10} />
+          </span>
+        )}
+      </button>
+      {pos && (
+        <div ref={ref} className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-4"
+          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}>
+          <div className="flex items-center gap-4">
+            <button type="button" onClick={prevMonth} className="text-zinc-500 hover:text-zinc-200 p-1 shrink-0"><ChevronLeft size={14} /></button>
+            <div className="flex gap-4">
+              {renderMonth(leftYM.y, leftYM.m)}
+              <div className="w-px bg-zinc-800" />
+              {renderMonth(rightYM.y, rightYM.m)}
+            </div>
+            <button type="button" onClick={nextMonth} className="text-zinc-500 hover:text-zinc-200 p-1 shrink-0"><ChevronRight size={14} /></button>
+          </div>
+          {selecting && <p className="text-[11px] text-zinc-500 text-center mt-3">Clique para selecionar a data final</p>}
+        </div>
+      )}
+    </>
+  )
+}
+
 function ModalOverlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -53,14 +328,80 @@ function ModalOverlay({ children, onClose }: { children: React.ReactNode; onClos
   )
 }
 
+async function openReceipt(url: string) {
+  try {
+    const token = localStorage.getItem('minutor_token')
+    const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    if (!res.ok) { alert('Arquivo não encontrado no servidor'); return }
+    const blob = await res.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    window.open(blobUrl, '_blank')
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000)
+  } catch { alert('Erro ao abrir arquivo') }
+}
+
+interface RowMenuItem { label: string; icon: React.ReactNode; onClick: () => void; danger?: boolean }
+
+function RowMenu({ items }: { items: RowMenuItem[] }) {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const ref    = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const open = pos !== null
+
+  useEffect(() => {
+    if (!open) return
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setPos(null)
+    }
+    document.addEventListener('mousedown', handler)
+    window.addEventListener('scroll', () => setPos(null), { passive: true })
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      window.removeEventListener('scroll', () => setPos(null))
+    }
+  }, [open])
+
+  if (items.length === 0) return null
+
+  function toggle(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (open) { setPos(null); return }
+    if (!btnRef.current) return
+    const r = btnRef.current.getBoundingClientRect()
+    const dropH = items.length * 36 + 8
+    const up = r.bottom + dropH > window.innerHeight
+    setPos({ left: r.left, top: up ? r.top - dropH : r.bottom + 4 })
+  }
+
+  return (
+    <div ref={ref} className="flex justify-end">
+      <button ref={btnRef} onClick={toggle}
+        className={`p-1.5 rounded transition-colors ${open ? 'text-zinc-200 bg-zinc-700' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'}`}>
+        <MoreVertical size={14} />
+      </button>
+      {pos && (
+        <div style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
+          className="min-w-[152px] bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl py-1 overflow-hidden">
+          {items.map((item, i) => (
+            <button key={i} onClick={() => { item.onClick(); setPos(null) }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors text-left ${
+                item.danger ? 'text-red-400 hover:bg-red-500/10' : 'text-zinc-300 hover:bg-zinc-700'
+              }`}>
+              {item.icon}{item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ExpensesPage() {
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('')
   const [data, setData] = useState<PaginatedResponse<Expense> | null>(null)
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<{ open: boolean; item?: Expense }>({ open: false })
-  const [rejectModal, setRejectModal] = useState<{ open: boolean; id?: number }>({ open: false })
-  const [rejectReason, setRejectReason] = useState('')
   const [form, setForm] = useState({
     project_id: '', expense_category_id: '', expense_date: '',
     description: '', amount: '', expense_type: 'reimbursement',
@@ -70,15 +411,34 @@ export default function ExpensesPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [projects, setProjects] = useState<SelectOption[]>([])
   const [saving, setSaving] = useState(false)
-  const [actioning, setActioning] = useState<number | null>(null)
   const [deleting, setDeleting] = useState<number | null>(null)
+  const [viewItem,       setViewItem]       = useState<Expense | null>(null)
+  const [dateFrom,       setDateFrom]       = useState('')
+  const [dateTo,         setDateTo]         = useState('')
+  const [customerId,     setCustomerId]     = useState('')
+  const [projectId,      setProjectId]      = useState('')
+  const [userId,         setUserId]         = useState('')
+  const [coordinatorId,  setCoordinatorId]  = useState('')
+  const [executiveId,    setExecutiveId]    = useState('')
+  const [customers,      setCustomers]      = useState<SelectOption[]>([])
+  const [allProjects,    setAllProjects]    = useState<SelectOption[]>([])
+  const [consultants,    setConsultants]    = useState<SelectOption[]>([])
+  const [coordinators,   setCoordinators]   = useState<SelectOption[]>([])
+  const [executives,     setExecutives]     = useState<SelectOption[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
   const params = useMemo(() => {
     const p = new URLSearchParams({ page: String(page), per_page: '20' })
-    if (status) p.set('status', status)
+    if (status)        p.set('status',         status)
+    if (dateFrom)      p.set('start_date',     dateFrom)
+    if (dateTo)        p.set('end_date',        dateTo)
+    if (customerId)    p.set('customer_id',    customerId)
+    if (projectId)     p.set('project_id',     projectId)
+    if (userId)        p.set('user_id',        userId)
+    if (coordinatorId) p.set('coordinator_id', coordinatorId)
+    if (executiveId)   p.set('executive_id',   executiveId)
     return p.toString()
-  }, [page, status])
+  }, [page, status, dateFrom, dateTo, customerId, projectId, userId, coordinatorId, executiveId])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -91,15 +451,33 @@ export default function ExpensesPage() {
 
   useEffect(() => { load() }, [load])
 
+  // Load filter options once on mount
+  useEffect(() => {
+    const items = (r: PromiseSettledResult<any>) =>
+      r.status === 'fulfilled'
+        ? (Array.isArray(r.value?.items) ? r.value.items : Array.isArray(r.value?.data) ? r.value.data : [])
+        : []
+    Promise.allSettled([
+      api.get<any>('/customers?pageSize=100'),
+      api.get<any>('/users?pageSize=100&role=Consultor'),
+      api.get<any>('/users?pageSize=100&role=Coordenador'),
+      api.get<any>('/executives?pageSize=100'),
+    ]).then(([cu, co, cr, ex]) => {
+      setCustomers(items(cu))
+      setConsultants(items(co))
+      setCoordinators(items(cr))
+      setExecutives(items(ex))
+    })
+  }, [])
+
   const loadOptions = useCallback(async () => {
     try {
-      const [c, p] = await Promise.all([
-        api.get<{ data: Category[] }>('/expense-categories?per_page=200'),
-        api.get<PaginatedResponse<SelectOption>>('/projects?per_page=200&status=started'),
-      ])
+      const c = await api.get<{ data: Category[] }>('/expense-categories?per_page=50')
       setCategories(Array.isArray(c?.data) ? c.data : [])
-      setProjects(Array.isArray(p?.items) ? p.items : [])
     } catch { /* silencioso */ }
+    api.get<PaginatedResponse<SelectOption>>('/projects?pageSize=30&status=started')
+      .then(p => setProjects(Array.isArray(p?.items) ? p.items : []))
+      .catch(() => {})
   }, [])
 
   const openCreate = () => {
@@ -152,28 +530,6 @@ export default function ExpensesPage() {
     finally { setSaving(false) }
   }
 
-  const approve = async (id: number) => {
-    setActioning(id)
-    try {
-      await api.post(`/expenses/${id}/approve`, { charge_client: false })
-      toast.success('Despesa aprovada')
-      load()
-    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao aprovar') }
-    finally { setActioning(null) }
-  }
-
-  const reject = async () => {
-    if (!rejectModal.id) return
-    setActioning(rejectModal.id)
-    try {
-      await api.post(`/expenses/${rejectModal.id}/reject`, { reason: rejectReason })
-      toast.success('Despesa rejeitada')
-      setRejectModal({ open: false })
-      setRejectReason('')
-      load()
-    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao rejeitar') }
-    finally { setActioning(null) }
-  }
 
   const remove = async (id: number) => {
     if (!confirm('Confirmar exclusão?')) return
@@ -190,107 +546,135 @@ export default function ExpensesPage() {
 
   return (
     <AppLayout title="Despesas">
-      {/* Filtros */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <div className="flex items-center gap-1">
+      <div className="max-w-7xl mx-auto">
+        <PageHeader
+          icon={Receipt}
+          title="Despesas"
+          subtitle="Registro de despesas e reembolsos"
+          actions={
+            <>
+              <Button variant="ghost" size="sm" icon={RefreshCw} onClick={load}>Atualizar</Button>
+              <Button variant="primary" size="sm" icon={Plus} onClick={openCreate}>Nova</Button>
+            </>
+          }
+        />
+
+        {/* Filter card */}
+        <div className="p-4 rounded-2xl mb-4 space-y-3"
+          style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+            <SearchSelect value={customerId}    onChange={v => { setCustomerId(v);    setPage(1) }} options={customers}    placeholder="Todos os clientes"     />
+            <SearchSelect value={projectId}     onChange={v => { setProjectId(v);     setPage(1) }} options={allProjects}  placeholder="Todos os projetos"     />
+            <SearchSelect value={userId}        onChange={v => { setUserId(v);        setPage(1) }} options={consultants}  placeholder="Todos os consultores"  />
+            <SearchSelect value={coordinatorId} onChange={v => { setCoordinatorId(v); setPage(1) }} options={coordinators} placeholder="Todos os coordenadores" />
+            <SearchSelect value={executiveId}   onChange={v => { setExecutiveId(v);   setPage(1) }} options={executives}   placeholder="Todos os executivos"   />
+          </div>
+          <div className="flex items-center gap-2">
+            <DateRangePicker
+              from={dateFrom} to={dateTo}
+              onChange={(f, t) => { setDateFrom(f); setDateTo(t); setPage(1) }}
+            />
+            {(customerId || projectId || userId || coordinatorId || executiveId || dateFrom || dateTo) && (
+              <button onClick={() => { setCustomerId(''); setProjectId(''); setUserId(''); setCoordinatorId(''); setExecutiveId(''); setDateFrom(''); setDateTo(''); setPage(1) }}
+                className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs transition-all hover:bg-white/5"
+                style={{ color: 'var(--brand-danger)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <X size={11} /> Limpar
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Status pills */}
+        <div className="flex items-center gap-1 p-1 rounded-xl w-fit mb-6"
+          style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
           {[
-            { value: '', label: 'Todas' },
-            { value: 'pending', label: 'Pendentes' },
-            { value: 'approved', label: 'Aprovadas' },
-            { value: 'rejected', label: 'Rejeitadas' },
-          ].map(({ value, label }) => (
-            <button key={value} onClick={() => { setStatus(value); setPage(1) }}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${status === value ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300'}`}>
-              {label}
+            { value: '', label: 'Todos' },
+            { value: 'pending', label: 'Pendente' },
+            { value: 'approved', label: 'Aprovado' },
+            { value: 'rejected', label: 'Rejeitado' },
+            { value: 'adjustment_requested', label: 'Ajuste' },
+          ].map(s => (
+            <button key={s.value} onClick={() => { setStatus(s.value); setPage(1) }}
+              className="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              style={status === s.value
+                ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
+                : { color: 'var(--brand-muted)', background: 'transparent' }
+              }>
+              {s.label}
             </button>
           ))}
         </div>
-        <Button onClick={openCreate} className="bg-blue-600 hover:bg-blue-500 text-white h-8 text-xs gap-1.5 ml-auto">
-          <Plus size={13} /> Nova
-        </Button>
-      </div>
 
-      {/* Tabela */}
-      <div className="rounded-lg border border-zinc-800 overflow-hidden">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-zinc-800 bg-zinc-900">
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Data</th>
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Descrição</th>
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden md:table-cell">Projeto</th>
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden lg:table-cell">Categoria</th>
-              <th className="text-right px-3 py-2.5 text-zinc-500 font-medium">Valor</th>
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
-              <th className="px-3 py-2.5 w-24"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && Array.from({ length: 8 }).map((_, i) => (
-              <tr key={i} className="border-b border-zinc-800">
-                {[...Array(7)].map((_, j) => <td key={j} className="px-3 py-2.5"><Skeleton className="h-3 w-full" /></td>)}
+        {/* Tabela */}
+        {loading ? (
+          <SkeletonTable rows={8} cols={7} />
+        ) : (
+          <Table>
+            <Thead>
+              <tr>
+                <Th className="w-10" />
+                <Th>Data</Th>
+                <Th>Descrição</Th>
+                <Th>Colaborador</Th>
+                <Th className="hidden sm:table-cell">Cliente</Th>
+                <Th className="hidden md:table-cell">Projeto</Th>
+                <Th className="hidden lg:table-cell">Categoria</Th>
+                <Th right>Valor</Th>
+                <Th>Status</Th>
               </tr>
-            ))}
-            {!loading && data?.items.length === 0 && (
-              <tr><td colSpan={7} className="px-3 py-12 text-center text-zinc-500">
-                <Receipt size={24} className="mx-auto mb-2 opacity-30" />Nenhuma despesa encontrada
-              </td></tr>
-            )}
-            {!loading && data?.items.map(exp => (
-              <tr key={exp.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
-                <td className="px-3 py-2.5 text-zinc-300 whitespace-nowrap">{formatDate(exp.expense_date)}</td>
-                <td className="px-3 py-2.5 max-w-[180px]">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-zinc-200 truncate block">{exp.description}</span>
-                    {exp.receipt_url && (
-                      <a href={secureUrl(exp.receipt_url)} target="_blank" rel="noreferrer" className="text-zinc-500 hover:text-blue-400 shrink-0">
-                        <Paperclip size={11} />
-                      </a>
-                    )}
-                  </div>
-                </td>
-                <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell truncate max-w-[140px]">{exp.project?.name ?? '—'}</td>
-                <td className="px-3 py-2.5 text-zinc-400 hidden lg:table-cell">{exp.category?.name ?? '—'}</td>
-                <td className="px-3 py-2.5 text-right text-zinc-300 whitespace-nowrap font-mono">{formatCurrency(exp.amount)}</td>
-                <td className="px-3 py-2.5">
-                  <Badge variant="outline" className={`text-[10px] border ${STATUS_CLASS[exp.status] ?? 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'}`}>
-                    {STATUS_LABEL[exp.status] ?? exp.status}
-                  </Badge>
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-1 justify-end">
-                    {exp.status === 'pending' && (
-                      <>
-                        <button onClick={() => approve(exp.id)} disabled={actioning === exp.id} title="Aprovar" className="p-1 text-zinc-500 hover:text-green-400 transition-colors"><Check size={12} /></button>
-                        <button onClick={() => { setRejectModal({ open: true, id: exp.id }); setRejectReason('') }} title="Rejeitar" className="p-1 text-zinc-500 hover:text-red-400 transition-colors"><XCircle size={12} /></button>
-                      </>
-                    )}
-                    {canEdit(exp) && (
-                      <button onClick={() => openEdit(exp)} className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors"><Pencil size={12} /></button>
-                    )}
-                    {canEdit(exp) && (
-                      <button onClick={() => remove(exp.id)} disabled={deleting === exp.id} className="p-1 text-zinc-500 hover:text-red-400 transition-colors"><Trash2 size={12} /></button>
-                    )}
-                    {exp.receipt_url && (
-                      <a href={secureUrl(exp.receipt_url)} target="_blank" rel="noreferrer" className="p-1 text-zinc-500 hover:text-blue-400 transition-colors"><ExternalLink size={12} /></a>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </Thead>
+            <Tbody>
+              {data?.items.length === 0 ? (
+                <tr>
+                  <td colSpan={9}>
+                    <EmptyState icon={Receipt} title="Nenhuma despesa encontrada" description="Tente ajustar os filtros ou criar uma nova despesa." />
+                  </td>
+                </tr>
+              ) : data?.items.map(exp => (
+                <Tr key={exp.id}>
+                  <Td className="w-10">
+                    <RowMenu items={[
+                      { label: 'Visualizar', icon: <Eye size={12} />, onClick: () => setViewItem(exp) },
+                      ...(canEdit(exp) ? [
+                        { label: 'Editar', icon: <Pencil size={12} />, onClick: () => openEdit(exp) },
+                        { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => remove(exp.id), danger: true },
+                      ] : []),
+                      ...(exp.receipt_url ? [
+                        { label: 'Ver Comprovante', icon: <Paperclip size={12} />, onClick: () => openReceipt(exp.receipt_url!) },
+                      ] : []),
+                    ]} />
+                  </Td>
+                  <Td className="whitespace-nowrap font-medium">{formatDate(exp.expense_date)}</Td>
+                  <Td className="max-w-[200px]">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate block" style={{ color: 'var(--brand-text)' }}>{exp.description}</span>
+                      {exp.receipt_url && <Paperclip size={10} aria-label="Tem comprovante" style={{ color: 'var(--brand-subtle)', flexShrink: 0 }} />}
+                    </div>
+                  </Td>
+                  <Td muted className="truncate max-w-[140px]">{exp.user?.name ?? '—'}</Td>
+                  <Td muted className="hidden sm:table-cell truncate max-w-[120px]">{exp.project?.customer?.name ?? '—'}</Td>
+                  <Td muted className="hidden md:table-cell truncate max-w-[140px]">{exp.project?.name ?? '—'}</Td>
+                  <Td muted className="hidden lg:table-cell">{exp.category?.name ?? '—'}</Td>
+                  <Td right mono className="font-semibold" style={{ color: 'var(--brand-primary)' }}>{formatCurrency(exp.amount)}</Td>
+                  <Td>
+                    <Badge variant={exp.status as any}>{STATUS_LABEL[exp.status] ?? exp.status}</Badge>
+                  </Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        )}
 
-      {/* Paginação */}
-      {(data?.items.length ?? 0) > 0 && (
-        <div className="flex items-center justify-between mt-3">
-          <span className="text-xs text-zinc-500">Página {page}</span>
-          <div className="flex items-center gap-1">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-30 transition-colors"><ChevronLeft size={14} /></button>
-            <button onClick={() => setPage(p => p + 1)} disabled={!data?.hasNext} className="p-1.5 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-30 transition-colors"><ChevronRight size={14} /></button>
-          </div>
-        </div>
-      )}
+        {/* Paginação */}
+        {!loading && (data?.items.length ?? 0) > 0 && (
+          <Pagination
+            page={page}
+            hasNext={data?.hasNext ?? false}
+            onPrev={() => setPage(p => Math.max(1, p - 1))}
+            onNext={() => setPage(p => p + 1)}
+          />
+        )}
+      </div>
 
       {/* Modal criar/editar */}
       {modal.open && (
@@ -371,31 +755,115 @@ export default function ExpensesPage() {
               </div>
             </div>
             <div className="flex gap-2 mt-5 justify-end">
-              <Button variant="outline" onClick={() => setModal({ open: false })} className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
-              <Button onClick={save} disabled={saving || !form.project_id || !form.expense_category_id || !form.expense_date || !form.amount || !form.description}
+              <UIButton variant="outline" onClick={() => setModal({ open: false })} className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</UIButton>
+              <UIButton onClick={save} disabled={saving || !form.project_id || !form.expense_category_id || !form.expense_date || !form.amount || !form.description}
                 className="h-8 text-xs bg-blue-600 hover:bg-blue-500 text-white">
                 {saving ? 'Salvando...' : 'Salvar'}
-              </Button>
+              </UIButton>
             </div>
           </div>
         </ModalOverlay>
       )}
 
-      {/* Modal rejeitar */}
-      {rejectModal.open && (
-        <ModalOverlay onClose={() => setRejectModal({ open: false })}>
-          <div className="p-5">
-            <h3 className="text-sm font-semibold text-white mb-3">Rejeitar Despesa</h3>
-            <Label className="text-xs text-zinc-400">Motivo</Label>
-            <Input value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Informe o motivo..."
-              className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
-            <div className="flex gap-2 mt-4 justify-end">
-              <Button variant="outline" onClick={() => setRejectModal({ open: false })} className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
-              <Button onClick={reject} disabled={!!actioning} className="h-8 text-xs bg-red-600 hover:bg-red-500 text-white">Rejeitar</Button>
+      {/* Modal: Visualizar Despesa */}
+      {viewItem && (() => {
+        const sc = EXP_STATUS_CONF[viewItem.status] ?? { bg: 'rgba(113,113,122,0.12)', color: '#71717A', label: viewItem.status }
+        const canEdit = ['pending', 'rejected', 'adjustment_requested'].includes(viewItem.status)
+        return (
+          <ModalOverlay onClose={() => setViewItem(null)}>
+            <div className="max-h-[88vh] overflow-y-auto">
+              {/* Header */}
+              <div className="px-5 pt-5 pb-4 flex items-start gap-3">
+                <div className="p-2.5 rounded-xl shrink-0"
+                  style={{ background: 'rgba(249,115,22,0.1)', color: '#F97316' }}>
+                  <Receipt size={16} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-white">Detalhes da Despesa</h3>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>
+                    #{viewItem.id} · {formatDate(viewItem.expense_date)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-5 pb-5 space-y-4">
+                {/* Status + Categoria */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                    style={{ background: sc.bg, color: sc.color }}>
+                    {sc.label}
+                  </span>
+                  {viewItem.category?.name && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                      style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--brand-muted)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <Tag size={9} /> {viewItem.category.name}
+                    </span>
+                  )}
+                </div>
+
+                {/* Valor hero */}
+                <div className="rounded-xl px-4 py-4"
+                  style={{ background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.15)' }}>
+                  <p className="text-[10px] uppercase tracking-widest mb-1" style={{ color: 'var(--brand-subtle)' }}>Valor Total</p>
+                  <p className="text-2xl font-bold" style={{ color: '#F97316' }}>{formatCurrency(viewItem.amount)}</p>
+                </div>
+
+                {/* Info card */}
+                <div className="rounded-xl overflow-hidden"
+                  style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                  <InfoRowModal icon={Calendar} label="Data" value={formatDate(viewItem.expense_date)} />
+                  {viewItem.user?.name && (
+                    <InfoRowModal icon={Building2} label="Colaborador" value={viewItem.user.name} />
+                  )}
+                  {viewItem.project?.customer?.name && (
+                    <InfoRowModal icon={Building2} label="Cliente" value={viewItem.project.customer.name} />
+                  )}
+                  <InfoRowModal icon={FolderOpen} label="Projeto" value={viewItem.project?.name} />
+                  <InfoRowModal icon={Tag} label="Tipo" value={EXP_TYPE_LABEL[viewItem.expense_type] ?? viewItem.expense_type} />
+                  {viewItem.payment_method && (
+                    <InfoRowModal icon={CreditCard} label="Pagamento" value={PAYMENT_LABEL_MAP[viewItem.payment_method] ?? viewItem.payment_method} />
+                  )}
+                  <InfoRowModal icon={Paperclip} label="Comprovante" last>
+                    {viewItem.receipt_url
+                      ? <ReceiptLink url={viewItem.receipt_url} />
+                      : <span className="text-xs" style={{ color: 'var(--brand-subtle)' }}>Sem comprovante</span>
+                    }
+                  </InfoRowModal>
+                </div>
+
+                {/* Descrição */}
+                {viewItem.description && (
+                  <div className="rounded-xl overflow-hidden"
+                    style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                    <div className="flex items-center gap-2 px-4 py-2.5"
+                      style={{ borderBottom: '1px solid var(--brand-border)' }}>
+                      <FileText size={11} style={{ color: 'var(--brand-primary)' }} />
+                      <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: 'var(--brand-subtle)' }}>Descrição</span>
+                    </div>
+                    <p className="px-4 py-3 text-sm leading-relaxed" style={{ color: 'var(--brand-muted)' }}>
+                      {viewItem.description}
+                    </p>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  {canEdit && (
+                    <UIButton variant="outline" onClick={() => { setViewItem(null); openEdit(viewItem) }}
+                      className="h-8 text-xs border-zinc-700 text-zinc-300 gap-1.5">
+                      <Pencil size={11} /> Editar
+                    </UIButton>
+                  )}
+                  <UIButton variant="outline" onClick={() => setViewItem(null)}
+                    className="h-8 text-xs border-zinc-700 text-zinc-300">
+                    Fechar
+                  </UIButton>
+                </div>
+              </div>
             </div>
-          </div>
-        </ModalOverlay>
-      )}
+          </ModalOverlay>
+        )
+      })()}
     </AppLayout>
   )
 }
