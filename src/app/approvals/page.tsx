@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 interface TSItem {
   id: number
   date: string
+  created_at?: string
   user?: { id: number; name: string }
   project?: { id: number; name: string; customer?: { id: number; name: string } }
   effort_minutes: number
@@ -32,6 +33,7 @@ interface TSItem {
 interface ExpItem {
   id: number
   expense_date: string
+  created_at?: string
   user?: { id: number; name: string }
   project?: { id: number; name: string; customer?: { id: number; name: string } }
   category?: { id: number; name: string }
@@ -63,6 +65,17 @@ function fmt(d: string | null | undefined) {
   if (!d) return '—'
   const [y, m, day] = d.split('-')
   return `${day}/${m}/${y}`
+}
+
+function fmtDateTime(d: string | null | undefined) {
+  if (!d) return '—'
+  const dt = new Date(d)
+  const day  = String(dt.getDate()).padStart(2, '0')
+  const mon  = String(dt.getMonth() + 1).padStart(2, '0')
+  const year = dt.getFullYear()
+  const h    = String(dt.getHours()).padStart(2, '0')
+  const min  = String(dt.getMinutes()).padStart(2, '0')
+  return `${day}/${mon}/${year} ${h}:${min}`
 }
 
 function fmtMin(minutes: number) {
@@ -788,9 +801,10 @@ export default function ApprovalsPage() {
                 </th>
               )}
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Data</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">Gravação</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Colaborador</th>
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">Cliente</th>
-              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden md:table-cell">Projeto</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden md:table-cell">Cliente</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden lg:table-cell">Projeto</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden lg:table-cell">Descrição</th>
               <th className="text-right px-3 py-2.5 text-zinc-500 font-medium">
                 {tab === 'timesheets' ? 'Tempo' : 'Valor'}
@@ -845,9 +859,10 @@ export default function ApprovalsPage() {
                     className="rounded border-zinc-600 bg-zinc-800 accent-blue-500" />
                 </td>
                 <td className="px-3 py-2.5 text-zinc-300 whitespace-nowrap">{fmt(ts.date)}</td>
+                <td className="px-3 py-2.5 text-zinc-400 whitespace-nowrap hidden sm:table-cell">{fmtDateTime(ts.created_at)}</td>
                 <td className="px-3 py-2.5 text-zinc-200 font-medium">{ts.user?.name ?? '—'}</td>
-                <td className="px-3 py-2.5 text-zinc-500 hidden sm:table-cell">{ts.project?.customer?.name ?? '—'}</td>
-                <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell truncate max-w-[200px]">{ts.project?.name ?? '—'}</td>
+                <td className="px-3 py-2.5 text-zinc-500 hidden md:table-cell">{ts.project?.customer?.name ?? '—'}</td>
+                <td className="px-3 py-2.5 text-zinc-400 hidden lg:table-cell truncate max-w-[200px]">{ts.project?.name ?? '—'}</td>
                 <td className="px-3 py-2.5 hidden lg:table-cell max-w-[200px]">
                   {ts.observation ? (
                     <span title={ts.observation} className="block truncate text-zinc-400 cursor-default">
@@ -875,9 +890,10 @@ export default function ApprovalsPage() {
                   ]} />
                 </td>
                 <td className="px-3 py-2.5 text-zinc-300 whitespace-nowrap">{fmt(exp.expense_date)}</td>
+                <td className="px-3 py-2.5 text-zinc-400 whitespace-nowrap hidden sm:table-cell">{fmtDateTime(exp.created_at)}</td>
                 <td className="px-3 py-2.5 text-zinc-200 font-medium">{exp.user?.name ?? '—'}</td>
-                <td className="px-3 py-2.5 text-zinc-500 hidden sm:table-cell">{exp.project?.customer?.name ?? '—'}</td>
-                <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell truncate max-w-[160px]">{exp.project?.name ?? '—'}</td>
+                <td className="px-3 py-2.5 text-zinc-500 hidden md:table-cell">{exp.project?.customer?.name ?? '—'}</td>
+                <td className="px-3 py-2.5 text-zinc-400 hidden lg:table-cell truncate max-w-[160px]">{exp.project?.name ?? '—'}</td>
                 <td className="px-3 py-2.5 hidden lg:table-cell max-w-[200px]">
                   {exp.description ? (
                     <span title={exp.description} className="block truncate text-zinc-400 cursor-default">
