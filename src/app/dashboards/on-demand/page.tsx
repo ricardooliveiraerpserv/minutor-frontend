@@ -129,7 +129,7 @@ export default function OnDemandPage() {
 
   // Load projects filtered by customer + contract type
   useEffect(() => {
-    const params = new URLSearchParams({ pageSize: '1000', parent_projects_only: 'true', contract_type_name: 'On Demand' })
+    const params = new URLSearchParams({ pageSize: '1000', contract_type_name: 'On Demand' })
     if (selectedCustomer) params.set('customer_id', String(selectedCustomer))
     api.get<any>(`/projects?${params}`)
       .then(r => setProjects(Array.isArray(r?.items) ? r.items : [])).catch(() => {})
