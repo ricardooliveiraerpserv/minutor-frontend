@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
 import { BarChart2, Clock, TrendingUp, TrendingDown, AlertCircle, DollarSign, ChevronDown } from 'lucide-react'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -238,7 +239,8 @@ export default function BankHoursFixedPage() {
   const isAdmin = user?.roles?.includes('Administrator') || user?.permissions?.includes('admin.full_access') || false
 
   const now = new Date()
-  const currentMonthVal = `${now.getMonth() + 1}/${now.getFullYear()}`
+  const isoFirstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const isoLastDay  = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()}`
 
   const [customers,   setCustomers]   = useState<Customer[]>([])
   const [executives,  setExecutives]  = useState<Executive[]>([])
@@ -246,6 +248,8 @@ export default function BankHoursFixedPage() {
   const [selectedCustomer,  setSelectedCustomer]  = useState<number | ''>('')
   const [selectedExecutive, setSelectedExecutive] = useState<number | ''>('')
   const [selectedProject,   setSelectedProject]   = useState<number | ''>('')
+  const [dateFrom, setDateFrom] = useState(isoFirstDay)
+  const [dateTo,   setDateTo]   = useState(isoLastDay)
 
   const [summary,      setSummary]      = useState<SummaryData | null>(null)
   const [projectsList, setProjectsList] = useState<ProjectItem[]>([])
@@ -255,25 +259,13 @@ export default function BankHoursFixedPage() {
   const [loadingProjects, setLoadingProjects] = useState(false)
   const [loadingMaint,    setLoadingMaint]    = useState(false)
 
-  // month filters — one per tab
-  const [totalMonth,    setTotalMonth]    = useState(currentMonthVal)
-  const [projMonth,     setProjMonth]     = useState(currentMonthVal)
-  const [maintMonth,    setMaintMonth]    = useState(currentMonthVal)
-
   const [activeTab, setActiveTab] = useState<'total' | 'projects' | 'maintenance'>('total')
-
-  // month/year from "M/YYYY" string
-  const parseMonth = (v: string) => {
-    if (!v) return {}
-    const [m, y] = v.split('/')
-    return { month: m, year: y }
-  }
 
   // Customers
   useEffect(() => {
     if (!isAdmin) return
-    api.get<any>('/customers?pageSize=1000&has_contract_type_name=Banco+de+Horas+Fixo').then(r => setCustomers(Array.isArray(r?.items) ? r.items : [])).catch(() => {})
-    api.get<any>('/executives?pageSize=1000').then(r => setExecutives(Array.isArray(r?.items) ? r.items : [])).catch(() => {})
+    api.get<any>('/customers?pageSize=100&has_contract_type_name=Banco+de+Horas+Fixo').then(r => setCustomers(Array.isArray(r?.items) ? r.items : [])).catch(() => {})
+    api.get<any>('/executives?pageSize=100').then(r => setExecutives(Array.isArray(r?.items) ? r.items : [])).catch(() => {})
   }, [isAdmin])
 
   // Projects list
@@ -296,45 +288,42 @@ export default function BankHoursFixedPage() {
   const fetchSummary = useCallback(() => {
     if (!selectedProject && isAdmin) return
     const p = baseParams()
-    const { month, year } = parseMonth(totalMonth)
-    if (month) p.set('month', month)
-    if (year)  p.set('year',  year)
+    const [toY, toM] = dateTo.split('-').map(Number)
+    p.set('month', String(toM)); p.set('year', String(toY))
     setLoadingSummary(true)
     api.get<any>(`/dashboards/bank-hours-fixed?${p}`)
       .then(r => setSummary(r?.data ?? r ?? null))
       .catch(() => setSummary(null))
       .finally(() => setLoadingSummary(false))
-  }, [baseParams, totalMonth, isAdmin])
+  }, [baseParams, dateTo, isAdmin])
 
   // Projects tab data
   const fetchProjects = useCallback(() => {
     if (!selectedProject && isAdmin) return
     const p = baseParams()
-    const { month, year } = parseMonth(projMonth)
-    if (month) p.set('month', month)
-    if (year)  p.set('year',  year)
+    const [toY, toM] = dateTo.split('-').map(Number)
+    p.set('month', String(toM)); p.set('year', String(toY))
     p.set('service_type_name', 'Projeto')
     setLoadingProjects(true)
     api.get<any>(`/dashboards/bank-hours-fixed/projects?${p}`)
       .then(r => setProjectsList(Array.isArray(r?.data) ? r.data : []))
       .catch(() => setProjectsList([]))
       .finally(() => setLoadingProjects(false))
-  }, [baseParams, projMonth, isAdmin])
+  }, [baseParams, dateTo, isAdmin])
 
   // Maintenance tab data
   const fetchMaintenance = useCallback(() => {
     if (!selectedProject && isAdmin) return
     const p = baseParams()
-    const { month, year } = parseMonth(maintMonth)
-    if (month) p.set('month', month)
-    if (year)  p.set('year',  year)
+    const [toY, toM] = dateTo.split('-').map(Number)
+    p.set('month', String(toM)); p.set('year', String(toY))
     p.set('service_type_name', 'Sustentação')
     setLoadingMaint(true)
     api.get<any>(`/dashboards/bank-hours-fixed/projects?${p}`)
       .then(r => setMaintList(Array.isArray(r?.data) ? r.data : []))
       .catch(() => setMaintList([]))
       .finally(() => setLoadingMaint(false))
-  }, [baseParams, maintMonth, isAdmin])
+  }, [baseParams, dateTo, isAdmin])
 
   useEffect(() => { fetchSummary() }, [fetchSummary])
   useEffect(() => { if (activeTab === 'projects')    fetchProjects()    }, [fetchProjects, activeTab])
@@ -433,6 +422,14 @@ export default function BankHoursFixedPage() {
             <option value="">Selecione um projeto</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
           </FilterSelect>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Período</label>
+            <DateRangePicker
+              from={dateFrom}
+              to={dateTo}
+              onChange={(f, t) => { setDateFrom(f); setDateTo(t) }}
+            />
+          </div>
         </div>
 
         {/* Empty */}
@@ -480,9 +477,6 @@ export default function BankHoursFixedPage() {
                         value={fmtH(summary.month_consumed_hours)}
                         icon={Clock}
                         accent="default"
-                        monthFilter
-                        selectedMonth={totalMonth}
-                        onMonthChange={v => setTotalMonth(v)}
                       />
                       <MetricCard
                         label="Saldo de Horas"
@@ -566,9 +560,6 @@ export default function BankHoursFixedPage() {
                     label="Consumo do Mês"
                     value={fmtH(summary?.month_consumed_hours ?? 0)}
                     icon={Clock}
-                    monthFilter
-                    selectedMonth={projMonth}
-                    onMonthChange={v => setProjMonth(v)}
                   />
                 </div>
                 <ProjectsTable items={projectsList} loading={loadingProjects} />
@@ -589,9 +580,6 @@ export default function BankHoursFixedPage() {
                     label="Consumo do Mês"
                     value={fmtH(summary?.month_consumed_hours ?? 0)}
                     icon={Clock}
-                    monthFilter
-                    selectedMonth={maintMonth}
-                    onMonthChange={v => setMaintMonth(v)}
                   />
                 </div>
                 <ProjectsTable items={maintList} loading={loadingMaint} />
