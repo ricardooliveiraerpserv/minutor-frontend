@@ -14,6 +14,7 @@ import {
   Search, KeyRound, Check, Copy, Eye
 } from 'lucide-react'
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
+import { RowMenu } from '@/components/ui/row-menu'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -430,11 +431,11 @@ export default function UsersPage() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-zinc-800 bg-zinc-900">
+              <th className="px-3 py-2.5 w-10"></th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden md:table-cell">E-mail</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">Perfil</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
-              <th className="px-3 py-2.5 w-24"></th>
             </tr>
           </thead>
           <tbody>
@@ -442,6 +443,14 @@ export default function UsersPage() {
               <tr><td colSpan={5} className="px-3 py-8 text-center text-zinc-500">Nenhum usuário encontrado</td></tr>
             ) : users.map(user => (
               <tr key={user.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
+                <td className="px-2 py-2.5 w-10">
+                  <RowMenu items={[
+                    { label: 'Visualizar', icon: <Eye size={12} />, onClick: () => setViewUser(user) },
+                    { label: 'Editar', icon: <Pencil size={12} />, onClick: () => openEdit(user) },
+                    { label: 'Resetar senha', icon: <KeyRound size={12} />, onClick: () => resetPassword(user), disabled: resetting === user.id },
+                    { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => remove(user.id), danger: true, disabled: deleting === user.id },
+                  ]} />
+                </td>
                 <td className="px-3 py-2.5 text-zinc-200 font-medium">{user.name}</td>
                 <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell">{user.email}</td>
                 <td className="px-3 py-2.5 hidden sm:table-cell">
@@ -464,26 +473,6 @@ export default function UsersPage() {
                     : 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'}`}>
                     {user.enabled ? 'Ativo' : 'Inativo'}
                   </Badge>
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-1 justify-end">
-                    <button onClick={() => setViewUser(user)} title="Visualizar"
-                      className="p-1 text-zinc-500 hover:text-blue-400 transition-colors">
-                      <Eye size={12} />
-                    </button>
-                    <button onClick={() => openEdit(user)} title="Editar"
-                      className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors">
-                      <Pencil size={12} />
-                    </button>
-                    <button onClick={() => resetPassword(user)} disabled={resetting === user.id}
-                      title="Resetar senha" className="p-1 text-zinc-500 hover:text-yellow-400 transition-colors">
-                      <KeyRound size={12} />
-                    </button>
-                    <button onClick={() => remove(user.id)} disabled={deleting === user.id} title="Excluir"
-                      className="p-1 text-zinc-500 hover:text-red-400 transition-colors">
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
                 </td>
               </tr>
             ))}

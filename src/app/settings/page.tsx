@@ -14,6 +14,7 @@ import {
   Plus, Pencil, Trash2, X, Check, Search,
   RefreshCw, CheckCircle, XCircle, TrendingUp, Users,
 } from 'lucide-react'
+import { RowMenu } from '@/components/ui/row-menu'
 import type { Role, Permission, SystemSettings } from '@/types'
 import { UserManagementTab } from './UserManagementTab'
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
@@ -426,9 +427,9 @@ function RolesTab() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-zinc-800 bg-zinc-900">
+              <th className="px-3 py-2.5 w-10"></th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">Permissões</th>
-              <th className="px-3 py-2.5 w-24"></th>
             </tr>
           </thead>
           <tbody>
@@ -436,15 +437,15 @@ function RolesTab() {
               <tr><td colSpan={3} className="px-3 py-8 text-center text-zinc-500">Nenhum perfil</td></tr>
             ) : roles.map(role => (
               <tr key={role.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
+                <td className="px-2 py-2.5 w-10">
+                  <RowMenu items={[
+                    { label: 'Permissões', icon: <Shield size={12} />, onClick: () => openPerms(role) },
+                    { label: 'Editar', icon: <Pencil size={12} />, onClick: () => { setForm({ name: role.name }); setModal({ open: true, item: role }) } },
+                    { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => remove(role.id), danger: true, disabled: deleting === role.id },
+                  ]} />
+                </td>
                 <td className="px-3 py-2.5 text-zinc-200">{role.name}</td>
                 <td className="px-3 py-2.5 text-zinc-400 hidden sm:table-cell">{role.permissions?.length ?? 0} permissões</td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-1 justify-end">
-                    <button onClick={() => openPerms(role)} className="p-1 text-zinc-500 hover:text-blue-400 transition-colors" title="Gerenciar permissões"><Shield size={12} /></button>
-                    <button onClick={() => { setForm({ name: role.name }); setModal({ open: true, item: role }) }} className="p-1 text-zinc-500 hover:text-zinc-200"><Pencil size={12} /></button>
-                    <button onClick={() => remove(role.id)} disabled={deleting === role.id} className="p-1 text-zinc-500 hover:text-red-400"><Trash2 size={12} /></button>
-                  </div>
-                </td>
               </tr>
             ))}
           </tbody>

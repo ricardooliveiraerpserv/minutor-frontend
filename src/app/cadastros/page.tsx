@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { FileType, Wrench, Users, Star, UserCheck, CalendarDays, Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Search, Check } from 'lucide-react'
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
+import { RowMenu } from '@/components/ui/row-menu'
 import type { CustomerFull, Executive, ConsultantGroup } from '@/types'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -141,10 +142,10 @@ function CrudTab({ endpoint, label }: { endpoint: string; label: string }) {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-zinc-800 bg-zinc-900">
+              <th className="px-3 py-2.5 w-10"></th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">Código</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
-              <th className="px-3 py-2.5 w-16"></th>
             </tr>
           </thead>
           <tbody>
@@ -152,15 +153,15 @@ function CrudTab({ endpoint, label }: { endpoint: string; label: string }) {
               <tr><td colSpan={4} className="px-3 py-8 text-center text-zinc-500">Nenhum registro</td></tr>
             ) : items.map(item => (
               <tr key={item.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
+                <td className="px-2 py-2.5 w-10">
+                  <RowMenu items={[
+                    { label: 'Editar', icon: <Pencil size={12} />, onClick: () => openEdit(item) },
+                    { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => remove(item.id), danger: true, disabled: deleting === item.id },
+                  ]} />
+                </td>
                 <td className="px-3 py-2.5 text-zinc-200">{item.name}</td>
                 <td className="px-3 py-2.5 text-zinc-400 font-mono hidden sm:table-cell">{item.code}</td>
                 <td className="px-3 py-2.5"><ActiveBadge active={item.active} /></td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-1 justify-end">
-                    <button onClick={() => openEdit(item)} className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors"><Pencil size={12} /></button>
-                    <button onClick={() => remove(item.id)} disabled={deleting === item.id} className="p-1 text-zinc-500 hover:text-red-400 transition-colors"><Trash2 size={12} /></button>
-                  </div>
-                </td>
               </tr>
             ))}
           </tbody>
@@ -314,12 +315,12 @@ function CustomersTab() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-zinc-800 bg-zinc-900">
+              <th className="px-3 py-2.5 w-10"></th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden md:table-cell">Razão Social</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">CPF/CNPJ</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden lg:table-cell">Executivo</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
-              <th className="px-3 py-2.5 w-16"></th>
             </tr>
           </thead>
           <tbody>
@@ -327,17 +328,17 @@ function CustomersTab() {
               <tr><td colSpan={6} className="px-3 py-8 text-center text-zinc-500">Nenhum cliente</td></tr>
             ) : items.map(item => (
               <tr key={item.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
+                <td className="px-2 py-2.5 w-10">
+                  <RowMenu items={[
+                    { label: 'Editar', icon: <Pencil size={12} />, onClick: () => openEdit(item) },
+                    { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => remove(item.id), danger: true, disabled: deleting === item.id },
+                  ]} />
+                </td>
                 <td className="px-3 py-2.5 text-zinc-200">{item.name}</td>
                 <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell">{item.company_name || '—'}</td>
                 <td className="px-3 py-2.5 text-zinc-400 font-mono hidden sm:table-cell">{item.cgc || '—'}</td>
                 <td className="px-3 py-2.5 text-zinc-400 hidden lg:table-cell">{item.executive?.name || '—'}</td>
                 <td className="px-3 py-2.5"><ActiveBadge active={item.active} /></td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-1 justify-end">
-                    <button onClick={() => openEdit(item)} className="p-1 text-zinc-500 hover:text-zinc-200"><Pencil size={12} /></button>
-                    <button onClick={() => remove(item.id)} disabled={deleting === item.id} className="p-1 text-zinc-500 hover:text-red-400"><Trash2 size={12} /></button>
-                  </div>
-                </td>
               </tr>
             ))}
           </tbody>
@@ -637,10 +638,10 @@ function ConsultantGroupsTab() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-zinc-800 bg-zinc-900">
+              <th className="px-3 py-2.5 w-10"></th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Consultores</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
-              <th className="px-3 py-2.5 w-16"></th>
             </tr>
           </thead>
           <tbody>
@@ -648,18 +649,18 @@ function ConsultantGroupsTab() {
               <tr><td colSpan={4} className="px-3 py-8 text-center text-zinc-500">Nenhum grupo encontrado</td></tr>
             ) : items.map(item => (
               <tr key={item.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
+                <td className="px-2 py-2.5 w-10">
+                  <RowMenu items={[
+                    { label: 'Editar', icon: <Pencil size={12} />, onClick: () => openEdit(item) },
+                    { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => remove(item.id), danger: true, disabled: deleting === item.id },
+                  ]} />
+                </td>
                 <td className="px-3 py-2.5">
                   <button onClick={() => setDetailModal(item)} className="text-zinc-200 hover:text-blue-400 text-left font-medium">{item.name}</button>
                   {item.description && <p className="text-[11px] text-zinc-500 mt-0.5">{item.description}</p>}
                 </td>
                 <td className="px-3 py-2.5 text-zinc-400">{item.consultants_count ?? item.consultants?.length ?? 0}</td>
                 <td className="px-3 py-2.5"><ActiveBadge active={item.active} /></td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-1 justify-end">
-                    <button onClick={() => openEdit(item)} className="p-1 text-zinc-500 hover:text-zinc-200"><Pencil size={12} /></button>
-                    <button onClick={() => remove(item.id)} disabled={deleting === item.id} className="p-1 text-zinc-500 hover:text-red-400"><Trash2 size={12} /></button>
-                  </div>
-                </td>
               </tr>
             ))}
           </tbody>
@@ -880,11 +881,11 @@ function HolidaysTab() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-zinc-800 bg-zinc-900">
+              <th className="px-3 py-2.5 w-10"></th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Data</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Tipo</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
-              <th className="px-3 py-2.5 w-16"></th>
             </tr>
           </thead>
           <tbody>
@@ -892,18 +893,18 @@ function HolidaysTab() {
               <tr><td colSpan={5} className="px-3 py-8 text-center text-zinc-500">Nenhum feriado em {year}</td></tr>
             ) : items.map(item => (
               <tr key={item.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
+                <td className="px-2 py-2.5 w-10">
+                  <RowMenu items={[
+                    { label: 'Editar', icon: <Pencil size={12} />, onClick: () => openEdit(item) },
+                    { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => remove(item.id), danger: true, disabled: deleting === item.id },
+                  ]} />
+                </td>
                 <td className="px-3 py-2.5 font-mono text-zinc-200">
                   {new Date(item.date + 'T12:00:00').toLocaleDateString('pt-BR')}
                 </td>
                 <td className="px-3 py-2.5 text-zinc-200">{item.name}</td>
                 <td className="px-3 py-2.5 text-zinc-400">{typeLabel(item.type)}{item.state && ` (${item.state})`}</td>
                 <td className="px-3 py-2.5"><ActiveBadge active={item.active} /></td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-1 justify-end">
-                    <button onClick={() => openEdit(item)} className="p-1 text-zinc-500 hover:text-zinc-200"><Pencil size={12} /></button>
-                    <button onClick={() => remove(item.id)} disabled={deleting === item.id} className="p-1 text-zinc-500 hover:text-red-400"><Trash2 size={12} /></button>
-                  </div>
-                </td>
               </tr>
             ))}
           </tbody>

@@ -8,6 +8,7 @@ import { Project, PaginatedResponse, ProjectChangeLog, HourContribution } from '
 import { toast } from 'sonner'
 import { FolderOpen, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, Search, ChevronDown, Eye, Clock, Users, TrendingUp, Tag, History, HandCoins, Save, AlertCircle } from 'lucide-react'
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
+import { RowMenu } from '@/components/ui/row-menu'
 
 interface ProjectForm {
   name: string
@@ -1039,6 +1040,7 @@ export default function ProjectsPage() {
             <table className="text-sm" style={{ background: 'var(--brand-surface)', minWidth: '900px', width: '100%' }}>
               <thead style={{ borderBottom: '1px solid var(--brand-border)', background: 'rgba(255,255,255,0.02)' }}>
                 <tr>
+                  <th className="px-4 py-3.5 w-10" />
                   <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '110px' }}>Código</th>
                   <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)', minWidth: '200px' }}>Projeto</th>
                   <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '140px' }}>Cliente</th>
@@ -1047,7 +1049,6 @@ export default function ProjectsPage() {
                   <th className="px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '120px' }}>Hs Consumidas</th>
                   <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '160px' }}>Saldo</th>
                   <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Status</th>
-                  <th className="px-4 py-3.5 w-20" />
                 </tr>
               </thead>
               <tbody>
@@ -1104,6 +1105,17 @@ export default function ProjectsPage() {
                       onMouseEnter={e => !isDisabled && (e.currentTarget.style.background = 'rgba(0,245,255,0.03)')}
                       onMouseLeave={e => (e.currentTarget.style.background = p._level > 0 ? 'rgba(255,255,255,0.015)' : 'transparent')}
                     >
+                      {/* RowMenu */}
+                      <td className="px-2 py-3 w-10">
+                        <RowMenu items={[
+                          { label: 'Visualizar', icon: <Eye size={12} />, onClick: () => openView(p) },
+                          ...(!isDisabled ? [
+                            { label: 'Editar', icon: <Pencil size={12} />, onClick: () => openEdit(p) },
+                            { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => remove(p), danger: true, disabled: deleting === p.id },
+                          ] : []),
+                        ]} />
+                      </td>
+
                       {/* Código */}
                       <td className="px-4 py-3" style={{ paddingLeft: p._level > 0 ? `${16 + p._level * 24}px` : undefined }}>
                         <span className="font-mono text-xs px-2 py-0.5 rounded-md" style={{ background: 'var(--brand-border)', color: 'var(--brand-subtle)' }}>
@@ -1193,29 +1205,6 @@ export default function ProjectsPage() {
                         </span>
                       </td>
 
-                      {/* Ações */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1 justify-end">
-                          <button
-                            onClick={() => openView(p)}
-                            className="p-1.5 rounded-lg transition-colors hover:bg-white/5"
-                            style={{ color: 'var(--brand-primary)' }}
-                            title="Visualizar"
-                          >
-                            <Eye size={13} />
-                          </button>
-                          {!isDisabled && (
-                            <>
-                              <button onClick={() => openEdit(p)} className="p-1.5 rounded-lg transition-colors hover:bg-white/5" style={{ color: 'var(--brand-subtle)' }} title="Editar">
-                                <Pencil size={13} />
-                              </button>
-                              <button onClick={() => remove(p)} disabled={deleting === p.id} className="p-1.5 rounded-lg transition-colors hover:bg-white/5 disabled:opacity-50" style={{ color: 'var(--brand-danger)' }} title="Excluir">
-                                <Trash2 size={13} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
                     </tr>
                   )
                 })}
@@ -1797,11 +1786,11 @@ export default function ProjectsPage() {
                                 <td className="px-3 py-2.5 tabular-nums font-semibold" style={{ color: 'var(--brand-text)' }}>{formatBRL((c.contributed_hours * c.hourly_rate))}</td>
                                 <td className="px-3 py-2.5" style={{ color: 'var(--brand-muted)' }}>{c.contributed_by_user?.name ?? '—'}</td>
                                 <td className="px-3 py-2.5 max-w-[140px] truncate" style={{ color: 'var(--brand-muted)' }}>{c.description ?? '—'}</td>
-                                <td className="px-3 py-2.5">
-                                  <div className="flex items-center gap-1">
-                                    <button onClick={() => { setContribForm({ contributed_hours: String(c.contributed_hours), hourly_rate: String(c.hourly_rate), contributed_at: c.contributed_at.split('T')[0], description: c.description ?? '' }); setContribModal({ open: true, item: c }) }} className="p-1 rounded hover:bg-white/5" style={{ color: 'var(--brand-subtle)' }}><Pencil size={11} /></button>
-                                    <button onClick={() => deleteContrib(c)} className="p-1 rounded hover:bg-white/5" style={{ color: 'var(--brand-danger)' }}><Trash2 size={11} /></button>
-                                  </div>
+                                <td className="px-2 py-2.5 w-10">
+                                  <RowMenu items={[
+                                    { label: 'Editar', icon: <Pencil size={12} />, onClick: () => { setContribForm({ contributed_hours: String(c.contributed_hours), hourly_rate: String(c.hourly_rate), contributed_at: c.contributed_at.split('T')[0], description: c.description ?? '' }); setContribModal({ open: true, item: c }) } },
+                                    { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => deleteContrib(c), danger: true },
+                                  ]} />
                                 </td>
                               </tr>
                             ))}
@@ -1859,11 +1848,11 @@ export default function ProjectsPage() {
                                   <td className="px-3 py-2.5 tabular-nums font-semibold" style={{ color: 'var(--brand-text)' }}>{log.new_value_formatted ?? String(log.new_value ?? '—')}</td>
                                   <td className="px-3 py-2.5 tabular-nums whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>{log.effective_from ? new Date(log.effective_from + '-01').toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' }) : '—'}</td>
                                   <td className="px-3 py-2.5 max-w-[120px] truncate" style={{ color: 'var(--brand-muted)' }} title={log.reason ?? ''}>{log.reason ?? '—'}</td>
-                                  <td className="px-3 py-2.5">
-                                    <div className="flex items-center gap-1">
-                                      <button onClick={() => { setEditingLog(log); setEditLogReason(log.reason ?? '') }} className="p-1 rounded hover:bg-white/5" style={{ color: 'var(--brand-subtle)' }}><Pencil size={11} /></button>
-                                      <button onClick={() => deleteLog(log)} className="p-1 rounded hover:bg-white/5" style={{ color: 'var(--brand-danger)' }}><Trash2 size={11} /></button>
-                                    </div>
+                                  <td className="px-2 py-2.5 w-10">
+                                    <RowMenu items={[
+                                      { label: 'Editar', icon: <Pencil size={12} />, onClick: () => { setEditingLog(log); setEditLogReason(log.reason ?? '') } },
+                                      { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => deleteLog(log), danger: true },
+                                    ]} />
                                   </td>
                                 </tr>
                               ))}

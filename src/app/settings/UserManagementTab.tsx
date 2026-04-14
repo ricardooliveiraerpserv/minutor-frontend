@@ -13,6 +13,7 @@ import {
   Search, KeyRound, Check, Copy, Eye,
 } from 'lucide-react'
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
+import { RowMenu } from '@/components/ui/row-menu'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -212,7 +213,7 @@ function TableSkeleton() {
     <>
       {[...Array(6)].map((_, i) => (
         <tr key={i} className="border-b border-zinc-800">
-          {[...Array(5)].map((_, j) => (
+          {[...Array(6)].map((_, j) => (
             <td key={j} className="px-3 py-2.5"><Skeleton className="h-4 w-full" /></td>
           ))}
         </tr>
@@ -523,6 +524,7 @@ export function UserManagementTab() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-zinc-800 bg-zinc-900">
+              <th className="px-3 py-2.5 w-10"></th>
               <th className="px-3 py-2.5 w-8">
                 <input type="checkbox"
                   checked={users.length > 0 && selectedIds.size === users.length}
@@ -533,7 +535,6 @@ export function UserManagementTab() {
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden md:table-cell">E-mail</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">Perfil</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
-              <th className="px-3 py-2.5 w-24"></th>
             </tr>
           </thead>
           <tbody>
@@ -541,6 +542,14 @@ export function UserManagementTab() {
               <tr><td colSpan={6} className="px-3 py-8 text-center text-zinc-500">Nenhum usuário encontrado</td></tr>
             ) : users.map(user => (
               <tr key={user.id} className={`border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors ${selectedIds.has(user.id) ? 'bg-blue-600/5' : ''}`}>
+                <td className="px-2 py-2.5 w-10">
+                  <RowMenu items={[
+                    { label: 'Visualizar', icon: <Eye size={12} />, onClick: () => setViewUser(user) },
+                    { label: 'Editar', icon: <Pencil size={12} />, onClick: () => openEdit(user) },
+                    { label: 'Resetar senha', icon: <KeyRound size={12} />, onClick: () => resetPassword(user), disabled: resetting === user.id },
+                    { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => remove(user.id), danger: true, disabled: deleting === user.id },
+                  ]} />
+                </td>
                 <td className="px-3 py-2.5 w-8">
                   <input type="checkbox" checked={selectedIds.has(user.id)} onChange={() => toggleSelect(user.id)}
                     className="rounded border-zinc-600 bg-zinc-800 accent-blue-500 cursor-pointer" />
@@ -565,14 +574,6 @@ export function UserManagementTab() {
                     : 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'}`}>
                     {user.enabled ? 'Ativo' : 'Inativo'}
                   </Badge>
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-1 justify-end">
-                    <button onClick={() => setViewUser(user)} title="Visualizar" className="p-1 text-zinc-500 hover:text-blue-400 transition-colors"><Eye size={12} /></button>
-                    <button onClick={() => openEdit(user)} title="Editar" className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors"><Pencil size={12} /></button>
-                    <button onClick={() => resetPassword(user)} disabled={resetting === user.id} title="Resetar senha" className="p-1 text-zinc-500 hover:text-yellow-400 transition-colors"><KeyRound size={12} /></button>
-                    <button onClick={() => remove(user.id)} disabled={deleting === user.id} title="Excluir" className="p-1 text-zinc-500 hover:text-red-400 transition-colors"><Trash2 size={12} /></button>
-                  </div>
                 </td>
               </tr>
             ))}

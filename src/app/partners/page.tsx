@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Search, Handshake } from 'lucide-react'
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
+import { RowMenu } from '@/components/ui/row-menu'
 
 interface PartnerItem {
   id: number
@@ -168,12 +169,12 @@ export default function PartnersPage() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-zinc-800 bg-zinc-900">
+              <th className="px-3 py-2.5 w-10"></th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Nome</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden md:table-cell">Documento</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden md:table-cell">E-mail</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">Telefone</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
-              <th className="px-3 py-2.5 w-16"></th>
             </tr>
           </thead>
           <tbody>
@@ -190,6 +191,12 @@ export default function PartnersPage() {
               </tr>
             ) : items.map(item => (
               <tr key={item.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
+                <td className="px-2 py-2.5 w-10">
+                  <RowMenu items={[
+                    { label: 'Editar', icon: <Pencil size={12} />, onClick: () => openEdit(item) },
+                    { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => remove(item.id), danger: true, disabled: deleting === item.id },
+                  ]} />
+                </td>
                 <td className="px-3 py-2.5 text-zinc-200 font-medium">{item.name}</td>
                 <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell">{item.document ?? '—'}</td>
                 <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell">{item.email ?? '—'}</td>
@@ -200,17 +207,6 @@ export default function PartnersPage() {
                     : 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'}`}>
                     {item.active ? 'Ativo' : 'Inativo'}
                   </Badge>
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-1 justify-end">
-                    <button onClick={() => openEdit(item)} className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors">
-                      <Pencil size={12} />
-                    </button>
-                    <button onClick={() => remove(item.id)} disabled={deleting === item.id}
-                      className="p-1 text-zinc-500 hover:text-red-400 transition-colors">
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
                 </td>
               </tr>
             ))}
