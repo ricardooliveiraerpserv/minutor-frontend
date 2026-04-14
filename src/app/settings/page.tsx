@@ -3,7 +3,6 @@
 import { AppLayout } from '@/components/layout/app-layout'
 import { useState, useEffect, useCallback } from 'react'
 import { api, ApiError } from '@/lib/api'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,49 +10,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import {
   Settings,
-  RefreshCw, CheckCircle, XCircle, TrendingUp, Users,
+  RefreshCw, CheckCircle, XCircle, Users,
 } from 'lucide-react'
 import type { SystemSettings } from '@/types'
 import { UserManagementTab } from './UserManagementTab'
-
-// ─── helpers ────────────────────────────────────────────────────────────────
-
-function ActiveBadge({ active }: { active: boolean }) {
-  return (
-    <Badge variant="outline" className={`text-[10px] border ${active
-      ? 'bg-green-500/20 text-green-400 border-green-500/30'
-      : 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'}`}>
-      {active ? 'Ativo' : 'Inativo'}
-    </Badge>
-  )
-}
-
-function TableSkeleton({ cols }: { cols: number }) {
-  return (
-    <>
-      {[...Array(5)].map((_, i) => (
-        <tr key={i} className="border-b border-zinc-800">
-          {[...Array(cols)].map((_, j) => (
-            <td key={j} className="px-3 py-2.5"><Skeleton className="h-4 w-full" /></td>
-          ))}
-        </tr>
-      ))}
-    </>
-  )
-}
-
-function ModalOverlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="relative bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-md shadow-xl">
-        <button onClick={onClose} className="absolute top-3 right-3 text-zinc-500 hover:text-zinc-300">
-          <X size={16} />
-        </button>
-        {children}
-      </div>
-    </div>
-  )
-}
 
 // ─── TABS ────────────────────────────────────────────────────────────────────
 
