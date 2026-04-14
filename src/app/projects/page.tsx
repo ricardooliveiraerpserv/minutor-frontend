@@ -413,6 +413,9 @@ export default function ProjectsPage() {
   const [editLogReason, setEditLogReason] = useState('')
   const [form, setForm] = useState<ProjectForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [prefixModal, setPrefixModal] = useState(false)
+  const [prefixInput, setPrefixInput] = useState('')
+  const [prefixSaving, setPrefixSaving] = useState(false)
   const [deleting, setDeleting] = useState<number | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{
     open: boolean
@@ -792,6 +795,20 @@ export default function ProjectsPage() {
     if (!viewProject) return
     if (tab === 'contributions' && contributions.length === 0) loadContributions(viewProject.id)
     if (tab === 'history' && history.length === 0) loadHistory(viewProject.id, historyFieldFilter)
+  }
+
+  const savePrefix = async () => {
+    const prefix = prefixInput.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3)
+    if (prefix.length !== 3) { toast.error('O prefixo deve ter exatamente 3 letras'); return }
+    setPrefixSaving(true)
+    try {
+      await api.put(`/customers/${form.customer_id}`, { code_prefix: prefix })
+      // Atualiza localmente o customer na lista para refletir o prefixo
+      setCustomers(prev => prev.map(c => String(c.id) === form.customer_id ? { ...c, code_prefix: prefix } : c))
+      setPrefixModal(false)
+      toast.success(`Prefixo "${prefix}" configurado`)
+    } catch (e) { toast.error(e instanceof ApiError ? e.message : 'Erro ao salvar prefixo') }
+    finally { setPrefixSaving(false) }
   }
 
   const save = async () => {
@@ -1315,8 +1332,16 @@ export default function ProjectsPage() {
                         )}
                       </div>
                     ) : form.customer_id ? (
-                      <div className="px-3 py-2.5 rounded-xl text-xs text-amber-400 italic" style={inputStyle}>
-                        Cliente sem prefixo configurado — cadastre um prefixo no cliente para gerar código automático
+                      <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={inputStyle}>
+                        <span className="text-xs text-amber-400 italic flex-1">Cliente sem prefixo configurado</span>
+                        <button
+                          type="button"
+                          onClick={() => { setPrefixInput(''); setPrefixModal(true) }}
+                          className="text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors hover:opacity-80 shrink-0"
+                          style={{ background: 'var(--brand-primary)', color: '#0A0A0B' }}
+                        >
+                          Configurar prefixo
+                        </button>
                       </div>
                     ) : (
                       <div className="px-3 py-2.5 rounded-xl text-sm text-zinc-500 italic" style={inputStyle}>
@@ -2005,6 +2030,42 @@ export default function ProjectsPage() {
         onClose={() => setDeleteConfirm({ open: false })}
         onConfirm={confirmDelete}
       />
+
+      {/* Mini-modal configurar prefixo do cliente */}
+      {prefixModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+          <div className="w-full max-w-xs rounded-2xl p-5 shadow-2xl" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+            <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--brand-text)' }}>Prefixo do cliente</h4>
+            <p className="text-xs mb-4" style={{ color: 'var(--brand-subtle)' }}>3 letras únicas usadas para gerar códigos dos projetos (ex: ABC → ABC001-26)</p>
+            <input
+              autoFocus
+              type="text"
+              maxLength={3}
+              value={prefixInput}
+              onChange={e => setPrefixInput(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3))}
+              onKeyDown={e => e.key === 'Enter' && savePrefix()}
+              placeholder="ABC"
+              className="w-full px-3 py-2.5 rounded-xl text-sm font-mono text-center tracking-[0.5em] outline-none mb-4"
+              style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setPrefixModal(false)}
+                className="px-3 py-2 rounded-xl text-xs font-medium"
+                style={{ color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}
+              >Cancelar</button>
+              <button
+                type="button"
+                onClick={savePrefix}
+                disabled={prefixSaving || prefixInput.length !== 3}
+                className="px-4 py-2 rounded-xl text-xs font-bold disabled:opacity-40"
+                style={{ background: 'var(--brand-primary)', color: '#0A0A0B' }}
+              >{prefixSaving ? 'Salvando...' : 'Salvar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   )
 }
