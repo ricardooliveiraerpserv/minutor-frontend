@@ -445,15 +445,26 @@ export function UserManagementTab() {
           <option value="1">Ativos</option>
           <option value="0">Inativos</option>
         </select>
-        <select value={filterRole} onChange={e => { setFilterRole(e.target.value); setPage(1) }}
-          className="bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs rounded-md h-8 px-2">
-          <option value="">Todos os perfis</option>
-          <option value="Cliente">Cliente</option>
-          <option value="Consultor">Consultor</option>
-          <option value="Coordenador">Coordenador</option>
-          <option value="Parceiro ADM">Parceiro ADM</option>
-          <option value="Administrator">Administrator</option>
-        </select>
+        <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-full px-1.5 py-1">
+          {[
+            { value: '',              label: 'Todos' },
+            { value: 'Consultor',     label: 'Consultor' },
+            { value: 'Coordenador',   label: 'Coordenador' },
+            { value: 'Cliente',       label: 'Cliente' },
+            { value: 'Parceiro ADM',  label: 'Parceiro' },
+            { value: 'Administrator', label: 'Admin' },
+          ].map(opt => (
+            <button key={opt.value} type="button"
+              onClick={() => { setFilterRole(opt.value); setPage(1) }}
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                filterRole === opt.value
+                  ? 'bg-[var(--brand-primary)] text-zinc-900'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
         <Button onClick={openCreate} className="bg-blue-600 hover:bg-blue-500 text-white h-8 text-xs gap-1.5">
           <Plus size={13} /> Novo
         </Button>
