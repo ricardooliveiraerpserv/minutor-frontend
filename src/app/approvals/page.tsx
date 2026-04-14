@@ -791,9 +791,7 @@ export default function ApprovalsPage() {
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Colaborador</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">Cliente</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden md:table-cell">Projeto</th>
-              {tab === 'expenses' && (
-                <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden lg:table-cell">Descrição</th>
-              )}
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden lg:table-cell">Descrição</th>
               <th className="text-right px-3 py-2.5 text-zinc-500 font-medium">
                 {tab === 'timesheets' ? 'Tempo' : 'Valor'}
               </th>
@@ -850,6 +848,13 @@ export default function ApprovalsPage() {
                 <td className="px-3 py-2.5 text-zinc-200 font-medium">{ts.user?.name ?? '—'}</td>
                 <td className="px-3 py-2.5 text-zinc-500 hidden sm:table-cell">{ts.project?.customer?.name ?? '—'}</td>
                 <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell truncate max-w-[200px]">{ts.project?.name ?? '—'}</td>
+                <td className="px-3 py-2.5 hidden lg:table-cell max-w-[200px]">
+                  {ts.observation ? (
+                    <span title={ts.observation} className="block truncate text-zinc-400 cursor-default">
+                      {ts.observation}
+                    </span>
+                  ) : <span className="text-zinc-600">—</span>}
+                </td>
                 <td className="px-3 py-2.5 text-right font-mono text-zinc-300">{fmtMin(ts.effort_minutes)}</td>
               </tr>
             ))}
@@ -873,7 +878,13 @@ export default function ApprovalsPage() {
                 <td className="px-3 py-2.5 text-zinc-200 font-medium">{exp.user?.name ?? '—'}</td>
                 <td className="px-3 py-2.5 text-zinc-500 hidden sm:table-cell">{exp.project?.customer?.name ?? '—'}</td>
                 <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell truncate max-w-[160px]">{exp.project?.name ?? '—'}</td>
-                <td className="px-3 py-2.5 text-zinc-400 hidden lg:table-cell truncate max-w-[140px]">{exp.description}</td>
+                <td className="px-3 py-2.5 hidden lg:table-cell max-w-[200px]">
+                  {exp.description ? (
+                    <span title={exp.description} className="block truncate text-zinc-400 cursor-default">
+                      {exp.description}
+                    </span>
+                  ) : <span className="text-zinc-600">—</span>}
+                </td>
                 <td className="px-3 py-2.5 text-right font-mono text-zinc-300">{fmtBRL(parseFloat(String(exp.amount)) || 0)}</td>
               </tr>
             ))}
