@@ -1,7 +1,7 @@
 'use client'
 
 import { AppLayout } from '@/components/layout/app-layout'
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { api } from '@/lib/api'
 import { Project, PaginatedResponse } from '@/types'
 import { toast } from 'sonner'
@@ -39,6 +39,113 @@ const inputStyle = {
   background: 'var(--brand-bg)',
   border: '1px solid var(--brand-border)',
   color: 'var(--brand-text)',
+}
+
+// ─── SearchSelect ─────────────────────────────────────────────────────────────
+
+function SearchSelect({ value, onChange, options, placeholder }: {
+  value: string; onChange: (v: string) => void
+  options: { id: number | string; name: string }[]; placeholder: string
+}) {
+  const [open,  setOpen]  = useState(false)
+  const [query, setQuery] = useState('')
+  const ref      = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const selected = options.find(o => String(o.id) === value)
+  const filtered = options.filter(o => o.name.toLowerCase().includes(query.toLowerCase()))
+
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+  useEffect(() => { if (open) { setQuery(''); setTimeout(() => inputRef.current?.focus(), 50) } }, [open])
+
+  const select = (id: string) => { onChange(id); setOpen(false) }
+
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs outline-none text-left whitespace-nowrap"
+        style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: selected ? 'var(--brand-text)' : 'var(--brand-subtle)' }}>
+        <span className="truncate">{selected ? selected.name : placeholder}</span>
+        <ChevronRight size={12} className="rotate-90 shrink-0" style={{ color: 'var(--brand-subtle)' }} />
+      </button>
+      {open && (
+        <div className="absolute top-full mt-1 left-0 z-50 min-w-full min-w-52 rounded-xl shadow-2xl overflow-hidden"
+          style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+          <div className="p-2 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+            <input ref={inputRef} value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar..."
+              className="w-full px-3 py-1.5 rounded-lg text-xs outline-none"
+              style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }} />
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            <button type="button" onClick={() => select('')}
+              className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors"
+              style={{ color: !value ? 'var(--brand-primary)' : 'var(--brand-subtle)' }}>{placeholder}</button>
+            {filtered.length === 0
+              ? <p className="px-3 py-2 text-xs" style={{ color: 'var(--brand-subtle)' }}>Nenhum resultado</p>
+              : filtered.map(o => (
+                <button key={o.id} type="button" onClick={() => select(String(o.id))}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors"
+                  style={{ color: String(o.id) === value ? 'var(--brand-primary)' : 'var(--brand-text)' }}>
+                  {o.name}
+                </button>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── SimpleSelect ─────────────────────────────────────────────────────────────
+
+function SimpleSelect({ value, onChange, options, placeholder }: {
+  value: string; onChange: (v: string) => void
+  options: { id: string; name: string }[]; placeholder: string
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const selected = options.find(o => o.id === value)
+
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+
+  const select = (id: string) => { onChange(id); setOpen(false) }
+
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs outline-none text-left whitespace-nowrap"
+        style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: selected ? 'var(--brand-text)' : 'var(--brand-subtle)' }}>
+        <span>{selected ? selected.name : placeholder}</span>
+        <ChevronRight size={12} className="rotate-90 shrink-0" style={{ color: 'var(--brand-subtle)' }} />
+      </button>
+      {open && (
+        <div className="absolute top-full mt-1 left-0 z-50 min-w-full rounded-xl shadow-2xl overflow-hidden"
+          style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+          <div className="max-h-52 overflow-y-auto">
+            <button type="button" onClick={() => select('')}
+              className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors"
+              style={{ color: !value ? 'var(--brand-primary)' : 'var(--brand-subtle)' }}>{placeholder}</button>
+            {options.map(o => (
+              <button key={o.id} type="button" onClick={() => select(o.id)}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors"
+                style={{ color: o.id === value ? 'var(--brand-primary)' : 'var(--brand-text)' }}>
+                {o.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -359,49 +466,35 @@ export default function GestaoProjetosPage() {
               style={{ ...inputStyle }}
             />
           </div>
-          <div className="relative">
-            <select
-              value={clienteFilter}
-              onChange={e => setCliente(e.target.value)}
-              className="h-9 pl-3 pr-8 rounded-xl text-xs outline-none appearance-none cursor-pointer"
-              style={{ ...inputStyle }}
-            >
-              <option value="">Todos os clientes</option>
-              {clientes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--brand-muted)' }} />
-          </div>
-          <div className="relative">
-            <select
-              value={statusFilter}
-              onChange={e => setStatus(e.target.value)}
-              className="h-9 pl-3 pr-8 rounded-xl text-xs outline-none appearance-none cursor-pointer"
-              style={{ ...inputStyle }}
-            >
-              <option value="">Todos os status</option>
-              <option value="started">Em Andamento</option>
-              <option value="active">Ativo</option>
-              <option value="awaiting_start">Aguardando Início</option>
-              <option value="paused">Pausado</option>
-              <option value="finished">Finalizado</option>
-              <option value="cancelled">Cancelado</option>
-            </select>
-            <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--brand-muted)' }} />
-          </div>
-          <div className="relative">
-            <select
-              value={saudeFilter}
-              onChange={e => setSaude(e.target.value)}
-              className="h-9 pl-3 pr-8 rounded-xl text-xs outline-none appearance-none cursor-pointer"
-              style={{ ...inputStyle }}
-            >
-              <option value="">Todas as saúdes</option>
-              <option value="green">Saudável (&lt;70%)</option>
-              <option value="yellow">Atenção (70–90%)</option>
-              <option value="red">Crítico (&gt;90%)</option>
-            </select>
-            <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--brand-muted)' }} />
-          </div>
+          <SearchSelect
+            value={clienteFilter}
+            onChange={v => setCliente(v)}
+            options={clientes.map(c => ({ id: c.id, name: c.name }))}
+            placeholder="Todos os clientes"
+          />
+          <SimpleSelect
+            value={statusFilter}
+            onChange={v => setStatus(v)}
+            placeholder="Todos os status"
+            options={[
+              { id: 'started',       name: 'Em Andamento' },
+              { id: 'active',        name: 'Ativo' },
+              { id: 'awaiting_start',name: 'Aguardando Início' },
+              { id: 'paused',        name: 'Pausado' },
+              { id: 'finished',      name: 'Finalizado' },
+              { id: 'cancelled',     name: 'Cancelado' },
+            ]}
+          />
+          <SimpleSelect
+            value={saudeFilter}
+            onChange={v => setSaude(v)}
+            placeholder="Todas as saúdes"
+            options={[
+              { id: 'green',  name: 'Saudável (<70%)' },
+              { id: 'yellow', name: 'Atenção (70–90%)' },
+              { id: 'red',    name: 'Crítico (>90%)' },
+            ]}
+          />
         </div>
 
         {/* ── Tabela ── */}
