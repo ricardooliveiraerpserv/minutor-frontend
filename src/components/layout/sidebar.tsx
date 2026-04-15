@@ -138,7 +138,16 @@ function SidebarInner({ user }: { user: User }) {
   const pathname     = usePathname()
   const searchParams = useSearchParams()
   const [collapsed,   setCollapsed]   = useState(false)
-  const [openGroups,  setOpenGroups]  = useState<string[]>(['Dashboards', 'Cadastros'])
+  const [openGroups,  setOpenGroups]  = useState<string[]>(() => {
+    // Abre automaticamente apenas o grupo que contém a rota atual
+    const active: string[] = []
+    for (const entry of NAV) {
+      if (entry.type === 'group' && entry.items.some(i => pathname === i.href.split('?')[0] || pathname.startsWith(i.href.split('?')[0] + '/'))) {
+        active.push(entry.label)
+      }
+    }
+    return active
+  })
 
   const isConsultor   = user?.type === 'consultor'
   const isCoordenador = user?.type === 'coordenador'
