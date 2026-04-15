@@ -1210,10 +1210,10 @@ export default function ProjectsPage() {
                       style={{
                         borderBottom: '1px solid var(--brand-border)',
                         opacity: isDisabled ? 0.4 : 1,
-                        background: p._level > 0 ? 'rgba(255,255,255,0.015)' : 'transparent',
+                        background: p._level > 0 ? 'rgba(139,92,246,0.07)' : 'transparent',
                       }}
-                      onMouseEnter={e => !isDisabled && (e.currentTarget.style.background = 'rgba(0,245,255,0.03)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = p._level > 0 ? 'rgba(255,255,255,0.015)' : 'transparent')}
+                      onMouseEnter={e => !isDisabled && (e.currentTarget.style.background = p._level > 0 ? 'rgba(139,92,246,0.12)' : 'rgba(0,245,255,0.03)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = p._level > 0 ? 'rgba(139,92,246,0.07)' : 'transparent')}
                     >
                       {/* RowMenu */}
                       <td className="px-2 py-3 w-10">

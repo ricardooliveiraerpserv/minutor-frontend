@@ -229,7 +229,7 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTree
   const teamCount = (project.consultants?.length ?? 0) + (project.coordinators?.length ?? 0)
 
   const isChild = treeRow ? treeRow._level > 0 : false
-  const rowBg   = isChild ? 'rgba(255,255,255,0.015)' : undefined
+  const rowBg   = isChild ? 'rgba(139,92,246,0.07)' : undefined
 
   return (
     <>
