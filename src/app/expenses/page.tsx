@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
 import { MonthYearPicker } from '@/components/ui/month-year-picker'
+import { useAuth } from '@/hooks/use-auth'
 
 function ReceiptLink({ url, label = 'Visualizar Comprovante' }: { url: string; label?: string }) {
   const [loading, setLoading] = useState(false)
@@ -399,6 +400,9 @@ function RowMenu({ items }: { items: RowMenuItem[] }) {
 }
 
 export default function ExpensesPage() {
+  const { user } = useAuth()
+  const isCoordenador = user?.type === 'coordenador'
+
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('')
   const [data, setData] = useState<PaginatedResponse<Expense> | null>(null)
@@ -574,7 +578,7 @@ export default function ExpensesPage() {
             <SearchSelect value={customerId}    onChange={v => { setCustomerId(v);    setPage(1) }} options={customers}    placeholder="Todos os clientes"     />
             <SearchSelect value={projectId}     onChange={v => { setProjectId(v);     setPage(1) }} options={allProjects}  placeholder="Todos os projetos"     />
             <SearchSelect value={userId}        onChange={v => { setUserId(v);        setPage(1) }} options={consultants}  placeholder="Todos os consultores"  />
-            <SearchSelect value={coordinatorId} onChange={v => { setCoordinatorId(v); setPage(1) }} options={coordinators} placeholder="Todos os coordenadores" />
+            {!isCoordenador && <SearchSelect value={coordinatorId} onChange={v => { setCoordinatorId(v); setPage(1) }} options={coordinators} placeholder="Todos os coordenadores" />}
             <SearchSelect value={executiveId}   onChange={v => { setExecutiveId(v);   setPage(1) }} options={executives}   placeholder="Todos os executivos"   />
           </div>
           <div className="flex items-center gap-2">

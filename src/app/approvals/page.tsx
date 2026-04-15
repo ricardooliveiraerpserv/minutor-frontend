@@ -15,6 +15,7 @@ import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { MonthYearPicker } from '@/components/ui/month-year-picker'
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { api, ApiError } from '@/lib/api'
+import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -442,6 +443,9 @@ function Row({ label, value, highlight }: { label: string; value?: string | null
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ApprovalsPage() {
+  const { user } = useAuth()
+  const isCoordenador = user?.type === 'coordenador'
+
   const [tab, setTab] = useState<'timesheets' | 'expenses'>('timesheets')
 
   // Filters
@@ -742,12 +746,14 @@ export default function ApprovalsPage() {
                 onChange={setUserId}
                 options={users}
               />
+              {!isCoordenador && (
               <SearchableSelect
                 label="Coordenador"
                 value={coordinatorId}
                 onChange={setCoordinatorId}
                 options={coordinators}
               />
+              )}
               <SearchableSelect
                 label="Executivo"
                 value={executiveId}
