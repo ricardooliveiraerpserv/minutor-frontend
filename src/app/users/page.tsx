@@ -212,6 +212,7 @@ export default function UsersPage() {
   const isAdmin      = authUser?.type === 'admin'
   const ep           = authUser?.extra_permissions ?? []
   const canCreate    = isAdmin || ep.includes('users.create')
+  const canView      = isAdmin || ep.includes('users.view_all')
   const canEdit      = isAdmin || ep.includes('users.update')
   const canDelete    = isAdmin
   const canResetPwd  = isAdmin || ep.includes('users.reset_password')
@@ -451,10 +452,10 @@ export default function UsersPage() {
               <tr key={user.id} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
                 <td className="px-2 py-2.5 w-10">
                   <RowMenu items={[
-                    { label: 'Visualizar',    icon: <Eye      size={12} />, onClick: () => setViewUser(user) },
-                    ...(canEdit     ? [{ label: 'Editar',       icon: <Pencil   size={12} />, onClick: () => openEdit(user) }] : []),
-                    ...(canResetPwd ? [{ label: 'Resetar senha',icon: <KeyRound size={12} />, onClick: () => resetPassword(user), disabled: resetting === user.id }] : []),
-                    ...(canDelete   ? [{ label: 'Excluir',      icon: <Trash2   size={12} />, onClick: () => remove(user.id), danger: true, disabled: deleting === user.id }] : []),
+                    ...(canView     ? [{ label: 'Visualizar',    icon: <Eye      size={12} />, onClick: () => setViewUser(user) }] : []),
+                    ...(canEdit     ? [{ label: 'Editar',        icon: <Pencil   size={12} />, onClick: () => openEdit(user) }] : []),
+                    ...(canResetPwd ? [{ label: 'Resetar senha', icon: <KeyRound size={12} />, onClick: () => resetPassword(user), disabled: resetting === user.id }] : []),
+                    ...(canDelete   ? [{ label: 'Excluir',       icon: <Trash2   size={12} />, onClick: () => remove(user.id), danger: true, disabled: deleting === user.id }] : []),
                   ]} />
                 </td>
                 <td className="px-3 py-2.5 text-zinc-200 font-medium">{user.name}</td>
