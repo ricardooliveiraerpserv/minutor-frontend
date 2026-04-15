@@ -151,7 +151,8 @@ function SidebarInner({ user }: { user: User }) {
       // Projetos e Usuários — opcionais via extra_permissions
       // Insere antes de "Aprovações" (último item do NAV_COORDINATOR)
       const optionalBefore: NavEntry[] = []
-      if (has('projects.view')) optionalBefore.push({ type: 'item', label: 'Projetos', href: '/projects', icon: FolderOpen })
+      const hasProjectsAction = ['projects.create','projects.update','projects.delete','projects.view_financial'].some(p => ep.includes(p))
+      if (hasProjectsAction) optionalBefore.push({ type: 'item', label: 'Projetos', href: '/projects', icon: FolderOpen })
       const hasAnyUserPerm = ['users.view_all','users.create','users.update','users.reset_password'].some(p => ep.includes(p))
       if (hasAnyUserPerm) optionalBefore.push({ type: 'item', label: 'Usuários', href: '/users', icon: Users })
       if (optionalBefore.length > 0) nav.splice(nav.length - 1, 0, ...optionalBefore)

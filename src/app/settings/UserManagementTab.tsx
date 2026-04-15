@@ -61,8 +61,7 @@ const EXTRA_PERMISSION_OPTIONS: { value: string; label: string; group: string }[
   { value: 'users.create',                       label: 'Criar usuários',                 group: 'Usuários' },
   { value: 'users.update',                       label: 'Editar usuários',                group: 'Usuários' },
   { value: 'users.reset_password',               label: 'Resetar senhas',                 group: 'Usuários' },
-  // Projetos
-  { value: 'projects.view',                      label: 'Visualizar projetos',            group: 'Projetos' },
+  // Projetos (projects.view é base do coordenador — não aparece como extra)
   { value: 'projects.create',                    label: 'Incluir projetos',               group: 'Projetos' },
   { value: 'projects.update',                    label: 'Editar projetos',                group: 'Projetos' },
   { value: 'projects.view_financial',            label: 'Ver financeiro do projeto',      group: 'Projetos' },
@@ -86,7 +85,7 @@ const EXTRA_PERMISSION_OPTIONS: { value: string; label: string; group: string }[
 // Permissões base de cada tipo — o que já está incluído por padrão no perfil
 const BASE_PERMISSIONS_BY_TYPE: Record<string, string[]> = {
   admin:          ['*'],
-  coordenador:    ['hours.view_all','hours.update_all','hours.delete_all','timesheets.approve','timesheets.view_project_full','expenses.view_all','expenses.approve','reports.view','reports.export','financial.view_project_cost'],
+  coordenador:    ['projects.view','hours.view_all','hours.update_all','hours.delete_all','timesheets.approve','timesheets.view_project_full','expenses.view_all','expenses.approve','reports.view','reports.export','financial.view_project_cost'],
   consultor:      [],
   cliente:        ['reports.view'],
   parceiro_admin: ['timesheets.approve','timesheets.view_project_full','users.create','users.update','users.reset_password','reports.view'],
