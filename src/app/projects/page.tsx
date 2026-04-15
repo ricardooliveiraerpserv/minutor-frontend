@@ -1072,9 +1072,21 @@ export default function ProjectsPage() {
               >Limpar</button>
             )}
           </div>
-          {/* Linha 2: pills de tipo de contrato */}
+          {/* Linha 2: Multi-contratual + pills de tipo de contrato */}
           <div className="flex items-center gap-3 flex-wrap">
-          {/* Pills de tipo de contrato */}
+            {/* Botão Multi-contratual em destaque */}
+            <button
+              onClick={() => { setMultiContratual(v => !v); setFilterContractType(''); setPage(1) }}
+              className="px-4 py-1.5 rounded-xl text-xs font-bold transition-all"
+              style={multiContratual
+                ? { background: 'var(--brand-primary)', color: '#0A0A0B', boxShadow: '0 0 12px rgba(0,245,255,0.35)' }
+                : { background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.25)' }
+              }
+            >
+              ⬡ Multi-contratual
+            </button>
+
+          {/* Pills de tipo de contrato — clicar deseleciona Multi-contratual automaticamente */}
           <div
             className="flex items-center gap-1 p-1 rounded-xl w-fit flex-wrap"
             style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}
