@@ -3,8 +3,9 @@
 import { AppLayout } from '@/components/layout/app-layout'
 import { useApiQuery } from '@/hooks/use-query'
 import { Timesheet, PaginatedResponse } from '@/types'
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect, Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import { toast } from 'sonner'
 import {
@@ -625,7 +626,9 @@ function SearchSelect({ value, onChange, options, placeholder }: {
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
-export default function TimesheetsPage() {
+function TimesheetsPageContent() {
+  const searchParams = useSearchParams()
+  const [projectId, setProjectId]     = useState(() => searchParams.get('project_id') ?? '')
   const [page, setPage]               = useState(1)
   const [status, setStatus]           = useState('')
   const [origin, setOrigin]           = useState('')
@@ -701,20 +704,21 @@ export default function TimesheetsPage() {
     if (startDate)      p.set('start_date', startDate)
     if (endDate)        p.set('end_date', endDate)
     if (ticket)         p.set('ticket', ticket)
+    if (projectId)      p.set('project_id', projectId)
     if (sortField)      p.set('order', sortDir === 'desc' ? `-${sortField}` : sortField)
     return p.toString()
-  }, [page, status, origin, serviceTypeId, contractTypeId, customerId, executiveId, userId, startDate, endDate, ticket, sortField, sortDir])
+  }, [page, status, origin, serviceTypeId, contractTypeId, customerId, executiveId, userId, projectId, startDate, endDate, ticket, sortField, sortDir])
 
   const { data, loading, error, refetch } = useApiQuery<PaginatedResponse<Timesheet>>(
     `/timesheets?${params}`, [params]
   )
 
   const resetPage = useCallback(() => setPage(1), [])
-  const hasFilters = !!(status || origin || serviceTypeId || contractTypeId || customerId || executiveId || userId || startDate || endDate || ticket)
+  const hasFilters = !!(status || origin || serviceTypeId || contractTypeId || customerId || executiveId || userId || projectId || startDate || endDate || ticket)
 
   const clearFilters = useCallback(() => {
     setStatus(''); setOrigin(''); setServiceTypeId(''); setContractTypeId('')
-    setCustomerId(''); setExecutiveId(''); setUserId('')
+    setCustomerId(''); setExecutiveId(''); setUserId(''); setProjectId('')
     setStartDate(''); setEndDate(''); setRefMonth(null); setRefYear(null)
     setTicket(''); setPage(1)
   }, [])
@@ -831,6 +835,15 @@ export default function TimesheetsPage() {
               to={endDate}
               onChange={(f, t) => { setStartDate(f); setEndDate(t); setRefMonth(null); setRefYear(null); resetPage() }}
             />
+            {projectId && (
+              <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium"
+                style={{ background: 'rgba(0,245,255,0.08)', border: '1px solid rgba(0,245,255,0.2)', color: 'var(--brand-primary)' }}>
+                Projeto #{projectId}
+                <button onClick={() => { setProjectId(''); resetPage() }} className="ml-1 hover:opacity-70 transition-opacity">
+                  <X size={10} />
+                </button>
+              </div>
+            )}
             {hasFilters && (
               <button
                 onClick={clearFilters}
@@ -968,5 +981,13 @@ export default function TimesheetsPage() {
         </div>
       )}
     </AppLayout>
+  )
+}
+
+export default function TimesheetsPage() {
+  return (
+    <Suspense>
+      <TimesheetsPageContent />
+    </Suspense>
   )
 }

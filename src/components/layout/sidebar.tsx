@@ -91,8 +91,9 @@ const NAV: NavEntry[] = [
   { type: 'item', label: 'Meu Painel',    href: '/meu-painel',  icon: LayoutDashboard },
   { type: 'item', label: 'Apontamentos',  href: '/timesheets',  icon: Clock },
   { type: 'item', label: 'Despesas',      href: '/expenses',    icon: Receipt },
-  { type: 'item', label: 'Projetos',      href: '/projects',    icon: FolderOpen },
-  { type: 'item', label: 'Aprovações',    href: '/approvals',   icon: CheckSquare },
+  { type: 'item', label: 'Projetos',           href: '/projects',         icon: FolderOpen },
+  { type: 'item', label: 'Gestão de Projetos', href: '/gestao-projetos',  icon: Layers },
+  { type: 'item', label: 'Aprovações',         href: '/approvals',        icon: CheckSquare },
   {
     type: 'group',
     label: 'Dashboards',
