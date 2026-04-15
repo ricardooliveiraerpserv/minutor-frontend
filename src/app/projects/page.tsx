@@ -1238,6 +1238,7 @@ export default function ProjectsPage() {
                       {/* RowMenu */}
                       <td className="px-2 py-3 w-10">
                         <RowMenu items={[
+                          { label: 'Visualizar', icon: <Eye size={12} />, onClick: () => openView(p) },
                           ...(!isDisabled && canEdit ? [
                             { label: 'Editar', icon: <Pencil size={12} />, onClick: () => openEdit(p) },
                           ] : []),
