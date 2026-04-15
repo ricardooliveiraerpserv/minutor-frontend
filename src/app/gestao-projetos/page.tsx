@@ -68,7 +68,7 @@ function SearchSelect({ value, onChange, options, placeholder }: {
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen(o => !o)}
         className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs outline-none text-left whitespace-nowrap"
-        style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: selected ? 'var(--brand-text)' : 'var(--brand-subtle)' }}>
+        style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)', color: selected ? 'var(--brand-text)' : 'var(--brand-subtle)' }}>
         <span className="truncate">{selected ? selected.name : placeholder}</span>
         <ChevronRight size={12} className="rotate-90 shrink-0" style={{ color: 'var(--brand-subtle)' }} />
       </button>
@@ -123,7 +123,7 @@ function SimpleSelect({ value, onChange, options, placeholder }: {
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen(o => !o)}
         className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs outline-none text-left whitespace-nowrap"
-        style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: selected ? 'var(--brand-text)' : 'var(--brand-subtle)' }}>
+        style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)', color: selected ? 'var(--brand-text)' : 'var(--brand-subtle)' }}>
         <span>{selected ? selected.name : placeholder}</span>
         <ChevronRight size={12} className="rotate-90 shrink-0" style={{ color: 'var(--brand-subtle)' }} />
       </button>
