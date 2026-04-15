@@ -1170,13 +1170,8 @@ export default function ProjectsPage() {
                 {rows.length > 0 && rows.map(p => {
                   const isDisabled = p._node_state === 'DISABLED'
                   const isOnDemand = p.contract_type_display?.toLowerCase().includes('on demand')
-                  const consumedPct = isOnDemand ? 0 : calcConsumedPct(p)
-                  const barPct = consumedPct != null ? Math.min(100, Math.max(0, consumedPct)) : null
-                  const balance = p.general_hours_balance
-                  // balanceColor não mais usado inline — delegado ao SaldoCell
-                  const consumed = p.consumed_hours != null ? p.consumed_hours
-                    : p.total_logged_minutes != null ? Math.round(p.total_logged_minutes / 60 * 10) / 10 : null
                   const isBankHoursMonthly = p.contract_type_display?.toLowerCase().includes('mensal') ?? false
+                  const isParent = p._hasChildren
                   const soldBase = p.sold_hours ?? 0
                   const soldDisplay = isBankHoursMonthly && (p.accumulated_sold_hours ?? 0) > 0
                     ? p.accumulated_sold_hours!
@@ -1186,6 +1181,18 @@ export default function ProjectsPage() {
                     : null
                   const sold = soldDisplay
                   const contrib = p.total_contributions_hours ?? p.hour_contribution ?? 0
+                  // Para projetos PAI mensais: consumido total = disponível - saldo (inclui filhos)
+                  // Para os demais: consumido direto (total_logged_minutes)
+                  const consumedDirect = p.consumed_hours != null ? p.consumed_hours
+                    : p.total_logged_minutes != null ? Math.round(p.total_logged_minutes / 60 * 10) / 10 : null
+                  const totalAvailableForCalc = soldDisplay + contrib
+                  const consumedFromBalance = isBankHoursMonthly && isParent && p.general_hours_balance != null && totalAvailableForCalc > 0
+                    ? Math.round((totalAvailableForCalc - p.general_hours_balance) * 10) / 10
+                    : null
+                  const consumed = consumedFromBalance ?? consumedDirect
+                  const consumedPct = isOnDemand ? 0 : calcConsumedPct(p)
+                  const barPct = consumedPct != null ? Math.min(100, Math.max(0, consumedPct)) : null
+                  const balance = p.general_hours_balance
                   const s = p.status ?? ''
                   const statusVariant = s === 'active' || s === 'started' ? 'started'
                     : s === 'paused' ? 'paused'
