@@ -36,7 +36,7 @@ function fmt(n: number | null | undefined, dec = 0) {
 }
 
 const inputStyle = {
-  background: 'var(--brand-surface)',
+  background: 'var(--brand-bg)',
   border: '1px solid var(--brand-border)',
   color: 'var(--brand-text)',
 }
@@ -359,40 +359,49 @@ export default function GestaoProjetosPage() {
               style={{ ...inputStyle }}
             />
           </div>
-          <select
-            value={clienteFilter}
-            onChange={e => setCliente(e.target.value)}
-            className="h-9 px-3 rounded-xl text-xs outline-none"
-            style={{ ...inputStyle }}
-          >
-            <option value="">Todos os clientes</option>
-            {clientes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <select
-            value={statusFilter}
-            onChange={e => setStatus(e.target.value)}
-            className="h-9 px-3 rounded-xl text-xs outline-none"
-            style={{ ...inputStyle }}
-          >
-            <option value="">Todos os status</option>
-            <option value="started">Em Andamento</option>
-            <option value="active">Ativo</option>
-            <option value="awaiting_start">Aguardando Início</option>
-            <option value="paused">Pausado</option>
-            <option value="finished">Finalizado</option>
-            <option value="cancelled">Cancelado</option>
-          </select>
-          <select
-            value={saudeFilter}
-            onChange={e => setSaude(e.target.value)}
-            className="h-9 px-3 rounded-xl text-xs outline-none"
-            style={{ ...inputStyle }}
-          >
-            <option value="">Todas as saúdes</option>
-            <option value="green">Saudável (&lt;70%)</option>
-            <option value="yellow">Atenção (70–90%)</option>
-            <option value="red">Crítico (&gt;90%)</option>
-          </select>
+          <div className="relative">
+            <select
+              value={clienteFilter}
+              onChange={e => setCliente(e.target.value)}
+              className="h-9 pl-3 pr-8 rounded-xl text-xs outline-none appearance-none cursor-pointer"
+              style={{ ...inputStyle }}
+            >
+              <option value="">Todos os clientes</option>
+              {clientes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--brand-muted)' }} />
+          </div>
+          <div className="relative">
+            <select
+              value={statusFilter}
+              onChange={e => setStatus(e.target.value)}
+              className="h-9 pl-3 pr-8 rounded-xl text-xs outline-none appearance-none cursor-pointer"
+              style={{ ...inputStyle }}
+            >
+              <option value="">Todos os status</option>
+              <option value="started">Em Andamento</option>
+              <option value="active">Ativo</option>
+              <option value="awaiting_start">Aguardando Início</option>
+              <option value="paused">Pausado</option>
+              <option value="finished">Finalizado</option>
+              <option value="cancelled">Cancelado</option>
+            </select>
+            <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--brand-muted)' }} />
+          </div>
+          <div className="relative">
+            <select
+              value={saudeFilter}
+              onChange={e => setSaude(e.target.value)}
+              className="h-9 pl-3 pr-8 rounded-xl text-xs outline-none appearance-none cursor-pointer"
+              style={{ ...inputStyle }}
+            >
+              <option value="">Todas as saúdes</option>
+              <option value="green">Saudável (&lt;70%)</option>
+              <option value="yellow">Atenção (70–90%)</option>
+              <option value="red">Crítico (&gt;90%)</option>
+            </select>
+            <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--brand-muted)' }} />
+          </div>
         </div>
 
         {/* ── Tabela ── */}
