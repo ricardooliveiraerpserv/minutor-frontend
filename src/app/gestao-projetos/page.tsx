@@ -373,12 +373,12 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTree
         </td>
 
         {/* HS Vendidas */}
-        <td className="py-3 pr-4 text-sm text-center tabular-nums" style={{ color: 'var(--brand-muted)' }}>
+        <td className="py-3 px-4 text-sm text-center tabular-nums" style={{ color: 'var(--brand-muted)' }}>
           {fmt(project.sold_hours)}
         </td>
 
         {/* HS Consumidas */}
-        <td className="py-3 pr-4 text-sm text-center tabular-nums" style={{ color: 'var(--brand-muted)' }}>
+        <td className="py-3 px-4 text-sm text-center tabular-nums" style={{ color: 'var(--brand-muted)' }}>
           {project.consumed_hours != null
             ? fmt(project.consumed_hours)
             : project.total_logged_minutes != null
@@ -388,13 +388,13 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTree
         </td>
 
         {/* Saldo */}
-        <td className="py-3 pr-4 text-sm text-center tabular-nums font-semibold"
+        <td className="py-3 px-4 text-sm text-center tabular-nums font-semibold"
           style={{ color: saldoNeg ? '#ef4444' : 'var(--brand-text)' }}>
-          {saldo != null ? (saldoNeg ? '' : '') + fmt(saldo, 1) : '—'}
+          {saldo != null ? fmt(saldo, 1) : '—'}
         </td>
 
         {/* % Uso + barra */}
-        <td className="py-3 pr-4 min-w-[120px]">
+        <td className="py-3 px-4 min-w-[140px]">
           <div className="flex items-center gap-2">
             <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
               <div
@@ -402,7 +402,7 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTree
                 style={{ width: `${Math.min(pct, 100)}%`, background: hs.bar }}
               />
             </div>
-            <span className="text-xs tabular-nums w-9 text-right" style={{ color: hs.text }}>
+            <span className="text-xs tabular-nums w-9 text-center" style={{ color: hs.text }}>
               {project.sold_hours ? `${Math.round(pct)}%` : '—'}
             </span>
           </div>
@@ -907,10 +907,10 @@ export default function GestaoProjetosPage() {
                     <th className="w-1" />
                     <th className="py-3 pr-4 pl-2 text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Projeto</th>
                     <th className="py-3 pr-4 text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Cliente</th>
-                    <th className="py-3 pr-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>HS Vendidas</th>
-                    <th className="py-3 pr-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>HS Consumidas</th>
-                    <th className="py-3 pr-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>Saldo</th>
-                    <th className="py-3 pr-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)', minWidth: 140 }}>% Uso</th>
+                    <th className="py-3 px-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>HS Vendidas</th>
+                    <th className="py-3 px-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>HS Consumidas</th>
+                    <th className="py-3 px-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>Saldo</th>
+                    <th className="py-3 px-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)', minWidth: 140 }}>% Uso</th>
                     <th className="py-3 text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Status</th>
                   </tr>
                 </thead>

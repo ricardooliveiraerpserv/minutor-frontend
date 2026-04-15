@@ -1320,7 +1320,7 @@ function ProjectsPageInner() {
                       </td>
 
                       {/* Hs Vendidas */}
-                      <td className="px-4 py-3 text-xs text-center tabular-nums whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>
+                      <td className="py-3 px-4 text-xs text-center tabular-nums whitespace-nowrap" style={{ color: 'var(--brand-muted)', width: '110px' }}>
                         {isOnDemand ? '—' : sold > 0 ? (
                           <div className="flex flex-col items-center gap-0.5">
                             <span>{contrib > 0 ? `${sold}h (+${contrib})` : `${sold}h`}</span>
@@ -1332,7 +1332,7 @@ function ProjectsPageInner() {
                       </td>
 
                       {/* Hs Consumidas */}
-                      <td className="px-4 py-3 text-xs text-center tabular-nums whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>
+                      <td className="py-3 px-4 text-xs text-center tabular-nums whitespace-nowrap" style={{ color: 'var(--brand-muted)', width: '120px' }}>
                         {consumed != null ? `${consumed}h` : '—'}
                       </td>
 
