@@ -1156,9 +1156,9 @@ function ProjectsPageInner() {
                   <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)', minWidth: '200px' }}>Projeto</th>
                   <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '140px' }}>Cliente</th>
                   <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '150px' }}>Tipo de Contrato</th>
-                  <th className="px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '110px' }}>Hs Vendidas</th>
-                  <th className="px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '120px' }}>Hs Consumidas</th>
-                  <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '160px' }}>Saldo</th>
+                  <th className="px-4 py-3.5 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '110px' }}>Hs Vendidas</th>
+                  <th className="px-4 py-3.5 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '120px' }}>Hs Consumidas</th>
+                  <th className="px-4 py-3.5 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--brand-subtle)', width: '160px' }}>Saldo</th>
                   <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Status</th>
                 </tr>
               </thead>
@@ -1320,9 +1320,9 @@ function ProjectsPageInner() {
                       </td>
 
                       {/* Hs Vendidas */}
-                      <td className="px-4 py-3 text-xs text-right tabular-nums whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>
+                      <td className="px-4 py-3 text-xs text-center tabular-nums whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>
                         {isOnDemand ? '—' : sold > 0 ? (
-                          <div className="flex flex-col items-end gap-0.5">
+                          <div className="flex flex-col items-center gap-0.5">
                             <span>{contrib > 0 ? `${sold}h (+${contrib})` : `${sold}h`}</span>
                             {months != null && months > 0 && (
                               <span className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>{months} {months === 1 ? 'mês' : 'meses'}</span>
@@ -1332,7 +1332,7 @@ function ProjectsPageInner() {
                       </td>
 
                       {/* Hs Consumidas */}
-                      <td className="px-4 py-3 text-xs text-right tabular-nums whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>
+                      <td className="px-4 py-3 text-xs text-center tabular-nums whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>
                         {consumed != null ? `${consumed}h` : '—'}
                       </td>
 

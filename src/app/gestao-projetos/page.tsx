@@ -373,12 +373,12 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTree
         </td>
 
         {/* HS Vendidas */}
-        <td className="py-3 pr-4 text-sm text-right tabular-nums" style={{ color: 'var(--brand-muted)' }}>
+        <td className="py-3 pr-4 text-sm text-center tabular-nums" style={{ color: 'var(--brand-muted)' }}>
           {fmt(project.sold_hours)}
         </td>
 
         {/* HS Consumidas */}
-        <td className="py-3 pr-4 text-sm text-right tabular-nums" style={{ color: 'var(--brand-muted)' }}>
+        <td className="py-3 pr-4 text-sm text-center tabular-nums" style={{ color: 'var(--brand-muted)' }}>
           {project.consumed_hours != null
             ? fmt(project.consumed_hours)
             : project.total_logged_minutes != null
@@ -388,7 +388,7 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTree
         </td>
 
         {/* Saldo */}
-        <td className="py-3 pr-4 text-sm text-right tabular-nums font-semibold"
+        <td className="py-3 pr-4 text-sm text-center tabular-nums font-semibold"
           style={{ color: saldoNeg ? '#ef4444' : 'var(--brand-text)' }}>
           {saldo != null ? (saldoNeg ? '' : '') + fmt(saldo, 1) : '—'}
         </td>
@@ -907,10 +907,10 @@ export default function GestaoProjetosPage() {
                     <th className="w-1" />
                     <th className="py-3 pr-4 pl-2 text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Projeto</th>
                     <th className="py-3 pr-4 text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Cliente</th>
-                    <th className="py-3 pr-4 text-xs font-semibold text-right" style={{ color: 'var(--brand-muted)' }}>HS Vendidas</th>
-                    <th className="py-3 pr-4 text-xs font-semibold text-right" style={{ color: 'var(--brand-muted)' }}>HS Consumidas</th>
-                    <th className="py-3 pr-4 text-xs font-semibold text-right" style={{ color: 'var(--brand-muted)' }}>Saldo</th>
-                    <th className="py-3 pr-4 text-xs font-semibold" style={{ color: 'var(--brand-muted)', minWidth: 140 }}>% Uso</th>
+                    <th className="py-3 pr-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>HS Vendidas</th>
+                    <th className="py-3 pr-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>HS Consumidas</th>
+                    <th className="py-3 pr-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>Saldo</th>
+                    <th className="py-3 pr-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)', minWidth: 140 }}>% Uso</th>
                     <th className="py-3 text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Status</th>
                   </tr>
                 </thead>
