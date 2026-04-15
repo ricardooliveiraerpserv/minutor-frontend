@@ -2,6 +2,7 @@
 
 import { AppLayout } from '@/components/layout/app-layout'
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
 import { formatBRL } from '@/lib/format'
@@ -414,6 +415,8 @@ function generateProjectCode(customerName: string, projectName: string, seq: num
 
 export default function ProjectsPage() {
   const { user } = useAuth()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const isAdmin = user?.type === 'admin'
   const ep = user?.extra_permissions ?? []
   const canCreate      = isAdmin || ep.includes('projects.create')
@@ -601,6 +604,23 @@ export default function ProjectsPage() {
       }
     })
   }, [statusFilter])
+
+  // Auto-abre modal de edição quando vem de outro módulo com ?editId=X
+  useEffect(() => {
+    const editId = searchParams.get('editId')
+    if (!editId || !canEdit) return
+    api.get<any>(`/projects/${editId}`).then(r => {
+      const item = (r?.data && typeof r.data === 'object' && 'id' in r.data) ? r.data : r
+      if (item?.id) {
+        openEdit(item as Project)
+        // Remove o param da URL sem recarregar
+        const params = new URLSearchParams(window.location.search)
+        params.delete('editId')
+        router.replace('/projects' + (params.toString() ? '?' + params.toString() : ''))
+      }
+    }).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, canEdit])
 
   // Carrega opções dos filtros — uma vez por montagem (Next.js App Router remonta ao navegar)
   useEffect(() => {

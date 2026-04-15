@@ -4,10 +4,11 @@ import { AppLayout } from '@/components/layout/app-layout'
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
+import { useAuth } from '@/hooks/use-auth'
 import { Project, PaginatedResponse, HourContribution, ContractType } from '@/types'
 import { formatBRL } from '@/lib/format'
 import { toast } from 'sonner'
-import { Layers, Search, ChevronDown, ChevronRight, Users, TrendingUp, Clock, BarChart2, AlertTriangle, DollarSign, X, UserCheck, Pencil, Trash2, Plus } from 'lucide-react'
+import { Layers, Search, ChevronDown, ChevronRight, Users, TrendingUp, Clock, BarChart2, AlertTriangle, DollarSign, X, UserCheck, Pencil, Trash2, Plus, Edit2 } from 'lucide-react'
 import { PageHeader } from '@/components/ds'
 import { RowMenu } from '@/components/ui/row-menu'
 
@@ -206,9 +207,11 @@ interface ProjectRowProps {
   onMenuAction: (action: 'costs' | 'timesheets' | 'expenses' | 'team' | 'aportes', project: ProjectWithTeam) => void
   treeRow?: TreeRow
   onTreeToggle?: () => void
+  canEdit?: boolean
+  onEdit?: (project: ProjectWithTeam) => void
 }
 
-function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTreeToggle }: ProjectRowProps) {
+function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTreeToggle, canEdit, onEdit }: ProjectRowProps) {
   const consumedHours = project.consumed_hours ?? (project.total_logged_minutes != null ? project.total_logged_minutes / 60 : 0)
   const pct   = project.sold_hours ? (consumedHours / project.sold_hours) * 100 : 0
   const color = healthColor(pct)
@@ -241,6 +244,7 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTree
         {/* Menu de ações */}
         <td className="py-2 pl-2 pr-1 w-8" onClick={e => e.stopPropagation()}>
           <RowMenu items={[
+            ...(canEdit ? [{ label: 'Editar', icon: <Edit2 size={12} />, onClick: () => onEdit?.(project) }] : []),
             { label: 'Custo',                  icon: <DollarSign  size={12} />, onClick: () => onMenuAction('costs',      project) },
             { label: 'Apontamentos',           icon: <Clock       size={12} />, onClick: () => onMenuAction('timesheets', project) },
             { label: 'Despesas',               icon: <BarChart2   size={12} />, onClick: () => onMenuAction('expenses',   project) },
@@ -388,6 +392,11 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTree
 
 export default function GestaoProjetosPage() {
   const router = useRouter()
+  const { user } = useAuth()
+  const isAdmin = user?.type === 'admin'
+  const ep = user?.extra_permissions ?? []
+  const canEdit = isAdmin || ep.includes('gestao_projetos.update')
+
   const [projects, setProjects]   = useState<ProjectWithTeam[]>([])
   const [loading, setLoading]     = useState(true)
   const [search, setSearch]       = useState('')
@@ -833,6 +842,8 @@ export default function GestaoProjetosPage() {
                         onMenuAction={handleMenuAction}
                         treeRow={tr}
                         onTreeToggle={tr ? () => toggleTree(tr) : undefined}
+                        canEdit={canEdit}
+                        onEdit={p => router.push(`/projects?editId=${p.id}`)}
                       />
                     )
                   })}

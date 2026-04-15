@@ -65,6 +65,9 @@ const EXTRA_PERMISSION_OPTIONS: { value: string; label: string; group: string }[
   { value: 'projects.create',                    label: 'Incluir projetos',               group: 'Projetos' },
   { value: 'projects.update',                    label: 'Editar projetos',                group: 'Projetos' },
   { value: 'projects.view_financial',            label: 'Ver financeiro do projeto',      group: 'Projetos' },
+  // Gestão de Projetos
+  { value: 'gestao_projetos.view',               label: 'Acessar Gestão de Projetos',     group: 'Gestão de Projetos' },
+  { value: 'gestao_projetos.update',             label: 'Editar projetos na Gestão',      group: 'Gestão de Projetos' },
   // Cadastros
   { value: 'customers.manage',                   label: 'Gerenciar Clientes',             group: 'Cadastros' },
   { value: 'contracts.manage',                   label: 'Gerenciar Tipos de Contrato',    group: 'Cadastros' },

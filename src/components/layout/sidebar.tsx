@@ -151,6 +151,7 @@ function SidebarInner({ user }: { user: User }) {
 
   const isConsultor   = user?.type === 'consultor'
   const isCoordenador = user?.type === 'coordenador'
+  const ep = user?.extra_permissions ?? []
 
   const visibleNav = useMemo(() => {
     if (isCoordenador) {
@@ -194,10 +195,12 @@ function SidebarInner({ user }: { user: User }) {
       return nav
     }
     if (isConsultor) {
-      return NAV.filter(e => e.type === 'item' && (e.href === '/dashboard' || e.href === '/meu-painel'))
+      const allowed = new Set(['/dashboard', '/meu-painel'])
+      if (ep.includes('gestao_projetos.view') || ep.includes('gestao_projetos.update')) allowed.add('/gestao-projetos')
+      return NAV.filter(e => e.type === 'item' && allowed.has(e.href))
     }
     return NAV
-  }, [isCoordenador, isConsultor, user?.extra_permissions])
+  }, [isCoordenador, isConsultor, ep])
 
   // First two letters of name for avatar
   const initials = user?.name
