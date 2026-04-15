@@ -67,29 +67,24 @@ function SearchSelect({ value, onChange, options, placeholder }: {
   return (
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen(o => !o)}
-        className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs outline-none text-left whitespace-nowrap"
-        style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)', color: selected ? 'var(--brand-text)' : 'var(--brand-subtle)' }}>
+        className={`h-8 flex items-center justify-between gap-1 px-2 text-xs bg-zinc-800 border border-zinc-700 rounded-md outline-none hover:border-zinc-500 transition-colors whitespace-nowrap ${selected ? 'text-zinc-200' : 'text-zinc-500'}`}>
         <span className="truncate">{selected ? selected.name : placeholder}</span>
-        <ChevronRight size={12} className="rotate-90 shrink-0" style={{ color: 'var(--brand-subtle)' }} />
+        <ChevronRight size={12} className="rotate-90 shrink-0 text-zinc-500" />
       </button>
       {open && (
-        <div className="absolute top-full mt-1 left-0 z-50 min-w-full min-w-52 rounded-xl shadow-2xl overflow-hidden"
-          style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-          <div className="p-2 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+        <div className="absolute top-full mt-1 left-0 z-50 min-w-full min-w-52 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden">
+          <div className="p-2 border-b border-zinc-700">
             <input ref={inputRef} value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar..."
-              className="w-full px-3 py-1.5 rounded-lg text-xs outline-none"
-              style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }} />
+              className="w-full h-7 px-2 text-xs bg-zinc-800 border border-zinc-700 text-zinc-200 rounded outline-none placeholder:text-zinc-600 focus:border-zinc-500" />
           </div>
-          <div className="max-h-52 overflow-y-auto">
+          <div className="max-h-52 overflow-y-auto py-0.5">
             <button type="button" onClick={() => select('')}
-              className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors"
-              style={{ color: !value ? 'var(--brand-primary)' : 'var(--brand-subtle)' }}>{placeholder}</button>
+              className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left transition-colors ${!value ? 'text-cyan-400 bg-zinc-800' : 'text-zinc-400 hover:bg-zinc-800'}`}>{placeholder}</button>
             {filtered.length === 0
-              ? <p className="px-3 py-2 text-xs" style={{ color: 'var(--brand-subtle)' }}>Nenhum resultado</p>
+              ? <p className="px-3 py-2 text-xs text-zinc-600 italic">Nenhum resultado</p>
               : filtered.map(o => (
                 <button key={o.id} type="button" onClick={() => select(String(o.id))}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors"
-                  style={{ color: String(o.id) === value ? 'var(--brand-primary)' : 'var(--brand-text)' }}>
+                  className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left transition-colors ${String(o.id) === value ? 'text-cyan-400 bg-zinc-800' : 'text-zinc-200 hover:bg-zinc-800'}`}>
                   {o.name}
                 </button>
               ))}
@@ -122,22 +117,18 @@ function SimpleSelect({ value, onChange, options, placeholder }: {
   return (
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen(o => !o)}
-        className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs outline-none text-left whitespace-nowrap"
-        style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)', color: selected ? 'var(--brand-text)' : 'var(--brand-subtle)' }}>
+        className={`h-8 flex items-center justify-between gap-1 px-2 text-xs bg-zinc-800 border border-zinc-700 rounded-md outline-none hover:border-zinc-500 transition-colors whitespace-nowrap ${selected ? 'text-zinc-200' : 'text-zinc-500'}`}>
         <span>{selected ? selected.name : placeholder}</span>
-        <ChevronRight size={12} className="rotate-90 shrink-0" style={{ color: 'var(--brand-subtle)' }} />
+        <ChevronRight size={12} className="rotate-90 shrink-0 text-zinc-500" />
       </button>
       {open && (
-        <div className="absolute top-full mt-1 left-0 z-50 min-w-full rounded-xl shadow-2xl overflow-hidden"
-          style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-          <div className="max-h-52 overflow-y-auto">
+        <div className="absolute top-full mt-1 left-0 z-50 min-w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden">
+          <div className="max-h-52 overflow-y-auto py-0.5">
             <button type="button" onClick={() => select('')}
-              className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors"
-              style={{ color: !value ? 'var(--brand-primary)' : 'var(--brand-subtle)' }}>{placeholder}</button>
+              className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left transition-colors ${!value ? 'text-cyan-400 bg-zinc-800' : 'text-zinc-400 hover:bg-zinc-800'}`}>{placeholder}</button>
             {options.map(o => (
               <button key={o.id} type="button" onClick={() => select(o.id)}
-                className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors"
-                style={{ color: o.id === value ? 'var(--brand-primary)' : 'var(--brand-text)' }}>
+                className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left transition-colors ${o.id === value ? 'text-cyan-400 bg-zinc-800' : 'text-zinc-200 hover:bg-zinc-800'}`}>
                 {o.name}
               </button>
             ))}
