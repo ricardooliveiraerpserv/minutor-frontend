@@ -143,12 +143,42 @@ function SidebarInner({ user }: { user: User }) {
   const isCoordenador = user?.type === 'coordenador'
 
   const visibleNav = useMemo(() => {
-    if (isCoordenador) return NAV_COORDINATOR
+    if (isCoordenador) {
+      const ep = user?.extra_permissions ?? []
+      const has = (p: string) => ep.includes(p)
+      const nav: NavEntry[] = [...NAV_COORDINATOR]
+
+      // Dashboards — aparece se tiver ao menos um dashboard extra
+      const dashItems: { label: string; href: string; icon: typeof BarChart2 }[] = []
+      if (has('dashboards.bank_hours_fixed.view'))   dashItems.push({ label: 'Banco de Horas Fixo',    href: '/dashboards/bank-hours-fixed',    icon: BarChart2 })
+      if (has('dashboards.bank_hours_monthly.view')) dashItems.push({ label: 'Banco de Horas Mensais', href: '/dashboards/bank-hours-monthly',  icon: CalendarClock })
+      if (has('dashboards.on_demand.view'))          dashItems.push({ label: 'On Demand',              href: '/dashboards/on-demand',           icon: Zap })
+      if (dashItems.length > 0) nav.push({ type: 'group', label: 'Dashboards', icon: BarChart2, items: dashItems })
+
+      // Banco de Horas
+      if (has('hora_banco.view')) nav.push({ type: 'item', label: 'Banco de Horas', href: '/hora-banco', icon: Landmark })
+
+      // Cadastros — monta apenas os subitens concedidos
+      const cadastrosItems: { label: string; href: string; icon: typeof Users }[] = []
+      if (has('contracts.manage'))  cadastrosItems.push({ label: 'Tipos de Contrato',   href: '/cadastros?tab=contracts',  icon: FileType })
+      if (has('services.manage'))   cadastrosItems.push({ label: 'Tipos de Serviço',    href: '/cadastros?tab=services',   icon: Wrench })
+      if (has('customers.manage'))  cadastrosItems.push({ label: 'Clientes',            href: '/cadastros?tab=customers',  icon: Users })
+      if (has('executives.manage')) cadastrosItems.push({ label: 'Executivos',          href: '/cadastros?tab=executives', icon: Star })
+      if (has('groups.manage'))     cadastrosItems.push({ label: 'Grupos de Consultor', href: '/cadastros?tab=groups',     icon: UserCheck })
+      if (has('holidays.manage'))   cadastrosItems.push({ label: 'Feriados',            href: '/cadastros?tab=holidays',   icon: CalendarDays })
+      if (has('partners.manage'))   cadastrosItems.push({ label: 'Parceiros',           href: '/partners',                 icon: Handshake })
+      if (cadastrosItems.length > 0) nav.push({ type: 'group', label: 'Cadastros', icon: Database, items: cadastrosItems })
+
+      // Configurações
+      if (has('settings.view')) nav.push({ type: 'item', label: 'Configurações', href: '/settings', icon: Settings })
+
+      return nav
+    }
     if (isConsultor) {
       return NAV.filter(e => e.type === 'item' && (e.href === '/dashboard' || e.href === '/meu-painel'))
     }
     return NAV
-  }, [isCoordenador, isConsultor])
+  }, [isCoordenador, isConsultor, user?.extra_permissions])
 
   // First two letters of name for avatar
   const initials = user?.name
