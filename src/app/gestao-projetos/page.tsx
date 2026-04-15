@@ -233,22 +233,34 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTree
 
   const teamCount = (project.consultants?.length ?? 0) + (project.coordinators?.length ?? 0)
 
-  const isChild    = treeRow ? treeRow._level > 0 : false
-  const isInactive = isChild && project.node_state === 'DISABLED'
-  const isActive   = isChild && project.node_state !== 'DISABLED'
+  const isChild           = treeRow ? treeRow._level > 0 : false
+  const isParent          = treeRow ? treeRow._level === 0 && treeRow._hasChildren : false
+  const isInactive        = isChild && project.node_state === 'DISABLED'
+  const isActive          = isChild && project.node_state !== 'DISABLED'
+  const isParentIndirect  = isParent && (project as any).coordinator_is_direct === false
 
-  // Pai sem alocação direta — aparece como container da hierarquia mas esmaecido
-  const isParentIndirect = !isChild && treeRow?._hasChildren && (project as any).coordinator_is_direct === false
+  // ── Hierarquia visual ──────────────────────────────────────────────
+  // PAI DIRETO       → neutro, borda discreta, texto suave
+  // PAI INDIRETO     → idem + opacity reduzida (só container)
+  // FILHO ATIVO      → protagonista: fundo cyan, borda forte, glow, texto branco
+  // FILHO INATIVO    → apagado: transparente, opacity 0.4
+  const rowBg = isActive
+    ? 'rgba(0,245,255,0.06)'          // cyan glass
+    : 'transparent'
 
-  // Fundo: filho ativo → cyan sutil, filho inativo → roxo apagado, pai indireto → levemente opaco, pai direto → transparente
-  const rowBg = isChild
-    ? (isActive ? 'rgba(0,245,255,0.04)' : 'rgba(139,92,246,0.05)')
-    : isParentIndirect ? 'rgba(255,255,255,0.01)' : undefined
+  const rowBorderLeft = isActive
+    ? '3px solid #00F5FF'             // borda forte cyan
+    : isParent
+      ? '2px solid rgba(255,255,255,0.07)' // borda discreta no pai
+      : isInactive
+        ? '2px solid rgba(255,255,255,0.04)'
+        : undefined
 
-  // Borda esquerda
-  const rowBorderLeft = isChild
-    ? (isActive ? '3px solid rgba(0,245,255,0.5)' : '3px solid rgba(139,92,246,0.3)')
-    : isParentIndirect ? '3px solid rgba(255,255,255,0.08)' : undefined
+  const rowBoxShadow = isActive
+    ? 'inset 0 0 0 1px rgba(0,245,255,0.08)' // glow interno sutil
+    : undefined
+
+  const rowOpacity = isInactive ? 0.4 : isParentIndirect ? 0.6 : 1
 
   return (
     <>
@@ -258,7 +270,8 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTree
           borderColor: 'var(--brand-border)',
           background: rowBg,
           borderLeft: rowBorderLeft,
-          opacity: isInactive ? 0.45 : isParentIndirect ? 0.65 : 1,
+          boxShadow: rowBoxShadow,
+          opacity: rowOpacity,
         }}
         onClick={treeRow ? (treeRow._hasChildren ? onTreeToggle : undefined) : onToggle}
       >
@@ -298,8 +311,8 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTree
                   }
                 </button>
               ) : isChild ? (
-                // Filho: conector └─
-                <span className="shrink-0 flex items-center" style={{ width: 20, color: 'rgba(255,255,255,0.15)', fontSize: 14, lineHeight: 1 }}>└─</span>
+                // Filho: conector └─ (cyan se ativo, cinza se inativo)
+                <span className="shrink-0 flex items-center" style={{ width: 20, color: isActive ? 'rgba(0,245,255,0.4)' : 'rgba(255,255,255,0.1)', fontSize: 14, lineHeight: 1 }}>└─</span>
               ) : (
                 <span className="w-5 shrink-0" />
               )
@@ -312,23 +325,44 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTree
             )}
             <div>
               <div className="flex items-center gap-1.5">
-                <p className="text-sm font-semibold" style={{ color: isInactive ? 'var(--brand-muted)' : 'var(--brand-text)' }}>
+                <p
+                  className="text-sm font-semibold"
+                  style={{
+                    color: isActive ? '#FFFFFF'
+                      : isParent ? '#A1A1AA'        // pai: cinza — estrutura, não foco
+                      : 'var(--brand-muted)',        // filho inativo: apagado
+                  }}
+                >
                   {project.name}
                 </p>
-                {treeRow && treeRow._level === 0 && treeRow._hasChildren && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ background: 'rgba(0,245,255,0.12)', color: '#00F5FF' }}>PAI</span>
+
+                {/* Badge PAI */}
+                {isParent && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                    style={{ background: 'rgba(255,255,255,0.06)', color: '#71717A' }}>
+                    PAI
+                  </span>
                 )}
+
+                {/* Badge via filho */}
                 {isParentIndirect && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--brand-subtle)' }}>via filho</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px]"
+                    style={{ color: '#52525B', fontSize: 9 }}>
+                    via filho
+                  </span>
                 )}
+
+                {/* Badge ATIVO — protagonista */}
                 {isActive && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ background: 'rgba(0,245,255,0.12)', color: '#00F5FF' }}>ATIVO</span>
-                )}
-                {isInactive && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ background: 'rgba(139,92,246,0.12)', color: '#8B5CF6' }}>FILHO</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                    style={{ background: 'rgba(0,245,255,0.15)', color: '#00F5FF', letterSpacing: '0.03em' }}>
+                    ATIVO
+                  </span>
                 )}
               </div>
-              <p className="text-xs font-mono" style={{ color: 'var(--brand-subtle)' }}>{project.code}</p>
+              <p className="text-xs font-mono" style={{ color: isActive ? 'rgba(0,245,255,0.5)' : 'var(--brand-subtle)' }}>
+                {project.code}
+              </p>
             </div>
           </div>
         </td>
