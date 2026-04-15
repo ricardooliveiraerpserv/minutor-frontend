@@ -14,6 +14,7 @@ import { FileType, Wrench, Users, Star, UserCheck, CalendarDays, Plus, Pencil, T
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
 import { RowMenu } from '@/components/ui/row-menu'
 import type { CustomerFull, Executive, ConsultantGroup } from '@/types'
+import { useAuth } from '@/hooks/use-auth'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -986,28 +987,50 @@ function HolidaysTab() {
 
 // ─── PAGE ────────────────────────────────────────────────────────────────────
 
+// Mapa de tab → permissão extra necessária (admin vê tudo)
+const TAB_PERMISSION: Record<string, string> = {
+  contracts:  'contracts.manage',
+  services:   'services.manage',
+  customers:  'customers.manage',
+  executives: 'executives.manage',
+  groups:     'groups.manage',
+  holidays:   'holidays.manage',
+}
+
 function CadastrosContent() {
   const searchParams = useSearchParams()
-  const tabParam = searchParams.get('tab') ?? 'contracts'
-  const validTab = TABS.find(t => t.id === tabParam) ? tabParam : 'contracts'
+  const { user } = useAuth()
+
+  const isAdmin = user?.type === 'admin'
+  const ep = user?.extra_permissions ?? []
+
+  // Filtra tabs conforme permissões do usuário
+  const visibleTabs = TABS.filter(t =>
+    isAdmin || ep.includes(TAB_PERMISSION[t.id] ?? '')
+  )
+
+  const tabParam = searchParams.get('tab') ?? ''
+  const firstTab = visibleTabs[0]?.id ?? 'contracts'
+  const validTab = visibleTabs.find(t => t.id === tabParam) ? tabParam : firstTab
   const [activeTab, setActiveTab] = useState(validTab)
-  const active = TABS.find(t => t.id === activeTab)!
+  const active = TABS.find(t => t.id === activeTab) ?? TABS[0]
 
   // Sincroniza quando o parâmetro muda (navegação via sidebar)
   useEffect(() => {
-    const t = searchParams.get('tab') ?? 'contracts'
-    const valid = TABS.find(t2 => t2.id === t) ? t : 'contracts'
+    const t = searchParams.get('tab') ?? ''
+    const valid = visibleTabs.find(t2 => t2.id === t) ? t : firstTab
     setActiveTab(valid)
-  }, [searchParams])
+  }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <AppLayout>
       <div className="flex flex-col md:flex-row gap-6 p-6 max-w-6xl mx-auto w-full">
-        {/* Sidebar de navegação */}
+        {/* Sidebar de navegação — só mostra tabs permitidas */}
+        {visibleTabs.length > 1 && (
         <nav className="md:w-48 shrink-0">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2 px-3">Cadastros</p>
           <ul className="space-y-0.5">
-            {TABS.map(tab => {
+            {visibleTabs.map(tab => {
               const Icon = tab.icon
               return (
                 <li key={tab.id}>
@@ -1025,6 +1048,7 @@ function CadastrosContent() {
             })}
           </ul>
         </nav>
+        )}
 
         {/* Conteúdo */}
         <div className="flex-1 min-w-0">
