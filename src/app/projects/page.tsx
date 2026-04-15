@@ -1,7 +1,7 @@
 'use client'
 
 import { AppLayout } from '@/components/layout/app-layout'
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
@@ -413,7 +413,7 @@ function generateProjectCode(customerName: string, projectName: string, seq: num
   return `${custCode}${projCode}${String(seq).padStart(3, '0')}`.toUpperCase()
 }
 
-export default function ProjectsPage() {
+function ProjectsPageInner() {
   const { user } = useAuth()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -2293,5 +2293,13 @@ export default function ProjectsPage() {
         </div>
       )}
     </AppLayout>
+  )
+}
+
+export default function ProjectsPage() {
+  return (
+    <Suspense>
+      <ProjectsPageInner />
+    </Suspense>
   )
 }
