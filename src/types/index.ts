@@ -4,6 +4,7 @@ export interface User {
   email: string
   profile_photo_url?: string | null
   type?: string | null
+  customer_id?: number | null
   extra_permissions?: string[] | null
   consultant_type?: string | null
   daily_hours?: number | null
