@@ -26,6 +26,8 @@ interface ProjectRow {
   name: string
   code: string
   status: string
+  base_hours: number
+  contribution_hours: number
   sold_hours: number
   start_date: string | null
   in_month: boolean
@@ -265,7 +267,7 @@ export default function FechadoPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--brand-border)' }}>
-                    {['Código', 'Projeto', 'Status', 'Horas Vendidas', 'Início', 'No Mês'].map(h => (
+                    {['Código', 'Projeto', 'Status', 'Horas Base', 'Aportes', 'Total', 'Início', 'No Mês'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{h}</th>
                     ))}
                   </tr>
@@ -288,6 +290,12 @@ export default function FechadoPage() {
                         }}>
                           {row.status === 'active' ? 'Ativo' : row.status === 'closed' ? 'Encerrado' : row.status}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 tabular-nums" style={{ color: 'var(--brand-muted)' }}>
+                        {fmtH(row.base_hours)} h
+                      </td>
+                      <td className="px-4 py-3 tabular-nums" style={{ color: '#8B5CF6' }}>
+                        {fmtH(row.contribution_hours)} h
                       </td>
                       <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#00F5FF' }}>
                         {fmtH(row.sold_hours)} h
