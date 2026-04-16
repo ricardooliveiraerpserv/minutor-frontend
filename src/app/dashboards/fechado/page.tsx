@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { AppLayout } from '@/components/layout/app-layout'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
-import { CheckSquare, Clock, FolderOpen } from 'lucide-react'
+import { CheckSquare, Clock, FolderOpen, Receipt, Info } from 'lucide-react'
 import { MonthYearPicker } from '@/components/ui/month-year-picker'
 import { SearchSelect } from '@/components/ui/search-select'
 
@@ -32,6 +32,7 @@ interface SummaryData {
   month_consumed_hours: number
   project_count: number
   month_project_count: number
+  total_expenses: number
   contributed_hours_history?: ContributionItem[]
 }
 
@@ -45,6 +46,17 @@ interface ProjectRow {
   sold_hours: number
   start_date: string | null
   in_month: boolean
+}
+
+interface ExpenseRow {
+  id: number
+  project: { id: number; name: string; code: string } | null
+  user: { id: number; name: string } | null
+  category: string | null
+  description: string | null
+  amount: number
+  expense_date: string
+  status: string
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -72,10 +84,10 @@ function Tab({ label, active, onClick }: { label: string; active: boolean; onCli
 
 function MetricCard({ label, value, unit = '', icon: Icon, accent = 'default' }: {
   label: string; value: string; unit?: string
-  icon: React.ElementType; accent?: 'default' | 'primary' | 'success' | 'info'
+  icon: React.ElementType; accent?: 'default' | 'primary' | 'success' | 'info' | 'warning'
 }) {
-  const color = accent === 'primary' ? '#00F5FF' : accent === 'success' ? '#10B981' : accent === 'info' ? '#8B5CF6' : 'var(--brand-text)'
-  const bg    = accent === 'primary' ? 'rgba(0,245,255,0.08)' : accent === 'success' ? 'rgba(16,185,129,0.10)' : accent === 'info' ? 'rgba(139,92,246,0.10)' : 'rgba(255,255,255,0.04)'
+  const color = accent === 'primary' ? '#00F5FF' : accent === 'success' ? '#10B981' : accent === 'info' ? '#8B5CF6' : accent === 'warning' ? '#F59E0B' : 'var(--brand-text)'
+  const bg    = accent === 'primary' ? 'rgba(0,245,255,0.08)' : accent === 'success' ? 'rgba(16,185,129,0.10)' : accent === 'info' ? 'rgba(139,92,246,0.10)' : accent === 'warning' ? 'rgba(245,158,11,0.10)' : 'rgba(255,255,255,0.04)'
   return (
     <div className="rounded-2xl p-6 flex flex-col gap-4" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
       <div className="flex items-center justify-between">
@@ -101,6 +113,17 @@ function SkeletonCard() {
   )
 }
 
+function NoTrackingNotice() {
+  return (
+    <div className="flex items-start gap-3 px-5 py-4 rounded-2xl" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.20)' }}>
+      <Info size={16} color="#8B5CF6" className="shrink-0 mt-0.5" />
+      <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>
+        Projetos com contrato <strong style={{ color: 'var(--brand-text)' }}>Fechado</strong> não possuem acompanhamento de apontamentos de horas nem saldo de horas. O controle é feito pelo total contratado (horas base + aportes).
+      </p>
+    </div>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function FechadoPage() {
@@ -118,11 +141,13 @@ export default function FechadoPage() {
   const [refMonth, setRefMonth] = useState<number | null>(now.getMonth() + 1)
   const [refYear,  setRefYear]  = useState<number | null>(now.getFullYear())
 
-  const [summary,        setSummary]        = useState<SummaryData | null>(null)
-  const [loadingSummary, setLoadingSummary] = useState(false)
-  const [projectRows,    setProjectRows]    = useState<ProjectRow[]>([])
+  const [summary,         setSummary]         = useState<SummaryData | null>(null)
+  const [loadingSummary,  setLoadingSummary]  = useState(false)
+  const [projectRows,     setProjectRows]     = useState<ProjectRow[]>([])
   const [loadingProjects, setLoadingProjects] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'projects'>('overview')
+  const [expenseRows,     setExpenseRows]     = useState<ExpenseRow[]>([])
+  const [loadingExpenses, setLoadingExpenses] = useState(false)
+  const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'expenses'>('overview')
 
   // Load customers & executives (admin only)
   useEffect(() => {
@@ -171,8 +196,26 @@ export default function FechadoPage() {
       .finally(() => setLoadingProjects(false))
   }, [buildParams])
 
+  const fetchExpenses = useCallback(() => {
+    setLoadingExpenses(true)
+    api.get<any>(`/dashboards/fechado/expenses?${buildParams()}`)
+      .then(r => setExpenseRows(Array.isArray(r?.data) ? r.data : []))
+      .catch(() => setExpenseRows([]))
+      .finally(() => setLoadingExpenses(false))
+  }, [buildParams])
+
   useEffect(() => { fetchSummary() }, [fetchSummary])
   useEffect(() => { if (activeTab === 'projects') fetchProjects() }, [activeTab, fetchProjects])
+  useEffect(() => { if (activeTab === 'expenses') fetchExpenses() }, [activeTab, fetchExpenses])
+
+  const statusLabel: Record<string, string> = {
+    approved: 'Aprovado', pending: 'Pendente', rejected: 'Rejeitado',
+    adjustment_requested: 'Ajuste', cancelled: 'Cancelado',
+  }
+  const statusColor: Record<string, string> = {
+    approved: '#10B981', pending: '#F59E0B', rejected: '#EF4444',
+    adjustment_requested: '#F59E0B', cancelled: 'var(--brand-muted)',
+  }
 
   return (
     <AppLayout title="Dashboard — Fechado">
@@ -236,17 +279,20 @@ export default function FechadoPage() {
         <div className="flex gap-1 p-1 rounded-2xl w-fit" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
           <Tab label="Visão Geral" active={activeTab === 'overview'}  onClick={() => setActiveTab('overview')} />
           <Tab label="Projetos"    active={activeTab === 'projects'}  onClick={() => setActiveTab('projects')} />
+          <Tab label="Despesas"    active={activeTab === 'expenses'}  onClick={() => setActiveTab('expenses')} />
         </div>
 
         {/* ── VISÃO GERAL ── */}
         {activeTab === 'overview' && (
           <div className="space-y-4">
             {loadingSummary ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {Array.from({ length: 2 }).map((_, i) => <SkeletonCard key={i} />)}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
               </div>
             ) : summary ? (
               <div className="space-y-4">
+                <NoTrackingNotice />
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <MetricCard
                     label="Horas Contratadas"
@@ -270,13 +316,13 @@ export default function FechadoPage() {
                     accent="primary"
                   />
                 </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
                   <MetricCard
-                    label={`Horas Vendidas (Mês ${refMonth ?? ''}/${refYear ?? ''})`}
-                    value={fmtH(summary.month_consumed_hours)}
-                    unit="h"
-                    icon={Clock}
-                    accent="info"
+                    label="Total em Despesas"
+                    value={fmtBRL(summary.total_expenses)}
+                    icon={Receipt}
+                    accent="warning"
                   />
                 </div>
 
@@ -325,61 +371,103 @@ export default function FechadoPage() {
 
         {/* ── PROJETOS ── */}
         {activeTab === 'projects' && (
+          <div className="space-y-4">
+            <NoTrackingNotice />
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+              {loadingProjects ? (
+                <div className="p-10 text-center">
+                  <div className="animate-pulse h-4 w-32 mx-auto rounded" style={{ background: 'var(--brand-border)' }} />
+                </div>
+              ) : projectRows.length === 0 ? (
+                <div className="p-10 text-center">
+                  <FolderOpen size={32} className="mx-auto mb-3" style={{ color: 'var(--brand-muted)' }} />
+                  <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>Nenhum projeto fechado encontrado.</p>
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--brand-border)' }}>
+                      {['Código', 'Projeto', 'Status', 'Horas Base', 'Aportes', 'Total', 'Início'].map(h => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {projectRows.map((row, idx) => (
+                      <tr
+                        key={row.id}
+                        style={{ borderBottom: idx < projectRows.length - 1 ? '1px solid var(--brand-border)' : undefined }}
+                      >
+                        <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--brand-muted)' }}>{row.code}</td>
+                        <td className="px-4 py-3 font-medium" style={{ color: 'var(--brand-text)' }}>{row.name}</td>
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-0.5 rounded text-xs font-semibold" style={{
+                            background: row.status === 'active' ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.06)',
+                            color: row.status === 'active' ? '#10B981' : 'var(--brand-muted)',
+                          }}>
+                            {row.status === 'active' ? 'Ativo' : row.status === 'closed' ? 'Encerrado' : row.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 tabular-nums" style={{ color: 'var(--brand-muted)' }}>{fmtH(row.base_hours)} h</td>
+                        <td className="px-4 py-3 tabular-nums" style={{ color: '#8B5CF6' }}>{fmtH(row.contribution_hours)} h</td>
+                        <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#00F5FF' }}>{fmtH(row.sold_hours)} h</td>
+                        <td className="px-4 py-3 tabular-nums" style={{ color: 'var(--brand-muted)' }}>
+                          {row.start_date ? new Date(row.start_date + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── DESPESAS ── */}
+        {activeTab === 'expenses' && (
           <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-            {loadingProjects ? (
+            {loadingExpenses ? (
               <div className="p-10 text-center">
                 <div className="animate-pulse h-4 w-32 mx-auto rounded" style={{ background: 'var(--brand-border)' }} />
               </div>
-            ) : projectRows.length === 0 ? (
+            ) : expenseRows.length === 0 ? (
               <div className="p-10 text-center">
-                <FolderOpen size={32} className="mx-auto mb-3" style={{ color: 'var(--brand-muted)' }} />
-                <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>Nenhum projeto fechado encontrado.</p>
+                <Receipt size={32} className="mx-auto mb-3" style={{ color: 'var(--brand-muted)' }} />
+                <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>Nenhuma despesa encontrada.</p>
               </div>
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--brand-border)' }}>
-                    {['Código', 'Projeto', 'Status', 'Horas Base', 'Aportes', 'Total', 'Início', 'No Mês'].map(h => (
+                  <tr style={{ borderBottom: '1px solid var(--brand-border)', background: 'rgba(255,255,255,0.02)' }}>
+                    {['Data', 'Projeto', 'Colaborador', 'Categoria', 'Descrição', 'Valor', 'Status'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {projectRows.map((row, idx) => (
+                  {expenseRows.map((row, idx) => (
                     <tr
                       key={row.id}
-                      style={{
-                        borderBottom: idx < projectRows.length - 1 ? '1px solid var(--brand-border)' : undefined,
-                        background: row.in_month ? 'rgba(139,92,246,0.04)' : undefined,
-                      }}
+                      style={{ borderBottom: idx < expenseRows.length - 1 ? '1px solid var(--brand-border)' : undefined }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,245,255,0.02)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
-                      <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--brand-muted)' }}>{row.code}</td>
-                      <td className="px-4 py-3 font-medium" style={{ color: 'var(--brand-text)' }}>{row.name}</td>
+                      <td className="px-4 py-3 tabular-nums" style={{ color: 'var(--brand-muted)' }}>{fmtDate(row.expense_date)}</td>
+                      <td className="px-4 py-3" style={{ color: 'var(--brand-text)' }}>
+                        <span className="font-mono text-xs mr-1" style={{ color: 'var(--brand-muted)' }}>{row.project?.code}</span>
+                        {row.project?.name}
+                      </td>
+                      <td className="px-4 py-3" style={{ color: 'var(--brand-muted)' }}>{row.user?.name ?? '—'}</td>
+                      <td className="px-4 py-3" style={{ color: 'var(--brand-muted)' }}>{row.category ?? '—'}</td>
+                      <td className="px-4 py-3 max-w-48 truncate" style={{ color: 'var(--brand-muted)' }}>{row.description || '—'}</td>
+                      <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#F59E0B' }}>{fmtBRL(row.amount)}</td>
                       <td className="px-4 py-3">
                         <span className="px-2 py-0.5 rounded text-xs font-semibold" style={{
-                          background: row.status === 'active' ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.06)',
-                          color: row.status === 'active' ? '#10B981' : 'var(--brand-muted)',
+                          background: `${statusColor[row.status] ?? 'var(--brand-muted)'}20`,
+                          color: statusColor[row.status] ?? 'var(--brand-muted)',
                         }}>
-                          {row.status === 'active' ? 'Ativo' : row.status === 'closed' ? 'Encerrado' : row.status}
+                          {statusLabel[row.status] ?? row.status}
                         </span>
-                      </td>
-                      <td className="px-4 py-3 tabular-nums" style={{ color: 'var(--brand-muted)' }}>
-                        {fmtH(row.base_hours)} h
-                      </td>
-                      <td className="px-4 py-3 tabular-nums" style={{ color: '#8B5CF6' }}>
-                        {fmtH(row.contribution_hours)} h
-                      </td>
-                      <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#00F5FF' }}>
-                        {fmtH(row.sold_hours)} h
-                      </td>
-                      <td className="px-4 py-3 tabular-nums" style={{ color: 'var(--brand-muted)' }}>
-                        {row.start_date ? new Date(row.start_date + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        {row.in_month
-                          ? <span className="px-2 py-0.5 rounded text-xs font-bold" style={{ background: 'rgba(139,92,246,0.12)', color: '#8B5CF6' }}>Sim</span>
-                          : <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>—</span>
-                        }
                       </td>
                     </tr>
                   ))}
