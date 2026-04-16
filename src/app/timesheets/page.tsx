@@ -435,7 +435,7 @@ function TimesheetViewModal({ ts, onClose, onEdit }: { ts: Timesheet; onClose: (
 
 interface RowMenuItem { label: string; icon: React.ReactNode; onClick: () => void; danger?: boolean }
 
-function RowActions({ id, onView, onDeleted }: { id: number; onView: () => void; onDeleted: () => void }) {
+function RowActions({ id, onView, onDeleted, viewOnly }: { id: number; onView: () => void; onDeleted: () => void; viewOnly?: boolean }) {
   const [deleting, setDeleting] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
 
@@ -451,11 +451,13 @@ function RowActions({ id, onView, onDeleted }: { id: number; onView: () => void;
     } finally { setDeleting(false) }
   }
 
-  const items: RowMenuItem[] = [
-    { label: 'Visualizar', icon: <Eye size={12} />, onClick: onView },
-    { label: 'Editar',     icon: <Pencil size={12} />, onClick: () => { window.location.href = `/timesheets/${id}/edit` } },
-    { label: deleting ? 'Excluindo...' : 'Excluir', icon: <Trash2 size={12} />, onClick: () => setDeleteConfirm(true), danger: true },
-  ]
+  const items: RowMenuItem[] = viewOnly
+    ? [{ label: 'Visualizar', icon: <Eye size={12} />, onClick: onView }]
+    : [
+        { label: 'Visualizar', icon: <Eye size={12} />, onClick: onView },
+        { label: 'Editar',     icon: <Pencil size={12} />, onClick: () => { window.location.href = `/timesheets/${id}/edit` } },
+        { label: deleting ? 'Excluindo...' : 'Excluir', icon: <Trash2 size={12} />, onClick: () => setDeleteConfirm(true), danger: true },
+      ]
 
   return (
     <>
@@ -1088,7 +1090,7 @@ function TimesheetsPageContent() {
               ) : data?.items.map(ts => (
                 <Tr key={ts.id}>
                   <Td className="w-10">
-                    <RowActions id={ts.id} onView={() => openView(ts)} onDeleted={refetch} />
+                    <RowActions id={ts.id} onView={() => openView(ts)} onDeleted={refetch} viewOnly={isCliente} />
                   </Td>
                   <Td className="whitespace-nowrap font-medium">{formatDate(ts.date)}</Td>
                   <Td>
