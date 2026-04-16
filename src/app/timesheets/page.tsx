@@ -385,6 +385,16 @@ function TimesheetViewModal({ ts, onClose, onEdit }: { ts: Timesheet; onClose: (
                 </p>
               </InfoRowModal>
             )}
+            {ts.ticket_solicitante?.name && (
+              <InfoRowModal icon={Ticket} label="Solicitante">
+                <p className="text-xs font-medium" style={{ color: 'var(--brand-text)' }}>
+                  {ts.ticket_solicitante.name}
+                  {ts.ticket_solicitante.organization && (
+                    <span className="ml-2" style={{ color: 'var(--brand-muted)' }}>— {ts.ticket_solicitante.organization}</span>
+                  )}
+                </p>
+              </InfoRowModal>
+            )}
             {ts.movidesk_appointment_id && (
               <InfoRowModal icon={Hash} label="ID Movidesk" value={String(ts.movidesk_appointment_id)} />
             )}
@@ -1084,6 +1094,7 @@ function TimesheetsPageContent() {
                 <Th sortable active={sortField === 'user.name'}     dir={sortDir} onClick={() => handleSort('user.name')}>Colaborador</Th>
                 <Th sortable active={sortField === 'project.name'}  dir={sortDir} onClick={() => handleSort('project.name')}>Projeto</Th>
                 <Th className="hidden lg:table-cell">Título</Th>
+                <Th className="hidden xl:table-cell">Solicitante</Th>
                 <Th className="hidden xl:table-cell">Contrato</Th>
                 <Th>Status</Th>
               </tr>
@@ -1135,6 +1146,9 @@ function TimesheetsPageContent() {
                   </Td>
                   <Td muted className="hidden lg:table-cell truncate max-w-[160px]">
                     {ts.ticket_subject ?? '—'}
+                  </Td>
+                  <Td muted className="hidden xl:table-cell truncate max-w-[140px]">
+                    {ts.ticket_solicitante?.name ?? '—'}
                   </Td>
                   <Td muted className="hidden xl:table-cell truncate max-w-[140px]">
                     {ts.project?.contract_type_display ?? '—'}

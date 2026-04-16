@@ -74,6 +74,7 @@ export interface Timesheet {
   observation?: string
   ticket?: string
   ticket_subject?: string
+  ticket_solicitante?: { name?: string; email?: string; organization?: string } | null
   status: 'pending' | 'approved' | 'rejected' | 'conflicted'
   status_display: string
   rejection_reason?: string
