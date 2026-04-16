@@ -26,6 +26,8 @@ interface ContributionItem {
 }
 
 interface SummaryData {
+  base_hours: number
+  contribution_hours: number
   consumed_hours: number
   month_consumed_hours: number
   project_count: number
@@ -245,14 +247,30 @@ export default function FechadoPage() {
               </div>
             ) : summary ? (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <MetricCard
-                    label="Horas Vendidas (Acumulado)"
+                    label="Horas Contratadas"
+                    value={fmtH(summary.base_hours)}
+                    unit="h"
+                    icon={Clock}
+                    accent="default"
+                  />
+                  <MetricCard
+                    label="Aportes"
+                    value={fmtH(summary.contribution_hours)}
+                    unit="h"
+                    icon={Clock}
+                    accent="success"
+                  />
+                  <MetricCard
+                    label="Total Contratado"
                     value={fmtH(summary.consumed_hours)}
                     unit="h"
                     icon={Clock}
                     accent="primary"
                   />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
                   <MetricCard
                     label={`Horas Vendidas (Mês ${refMonth ?? ''}/${refYear ?? ''})`}
                     value={fmtH(summary.month_consumed_hours)}
