@@ -1083,9 +1083,8 @@ function TimesheetsPageContent() {
                 <Th className="hidden sm:table-cell">Origem</Th>
                 <Th sortable active={sortField === 'user.name'}     dir={sortDir} onClick={() => handleSort('user.name')}>Colaborador</Th>
                 <Th sortable active={sortField === 'project.name'}  dir={sortDir} onClick={() => handleSort('project.name')}>Projeto</Th>
-                <Th sortable active={sortField === 'customer.name'} dir={sortDir} onClick={() => handleSort('customer.name')} className="hidden lg:table-cell">Cliente</Th>
+                <Th className="hidden lg:table-cell">Título</Th>
                 <Th className="hidden xl:table-cell">Contrato</Th>
-                <Th className="hidden xl:table-cell">Título</Th>
                 <Th>Status</Th>
               </tr>
             </Thead>
@@ -1134,14 +1133,11 @@ function TimesheetsPageContent() {
                       {ts.project?.name ?? `Projeto #${ts.project_id}`}
                     </button>
                   </Td>
-                  <Td muted className="hidden lg:table-cell truncate max-w-[140px]">
-                    {ts.customer?.name ?? ts.project?.customer?.name ?? '—'}
+                  <Td muted className="hidden lg:table-cell truncate max-w-[160px]">
+                    {ts.ticket_subject ?? '—'}
                   </Td>
                   <Td muted className="hidden xl:table-cell truncate max-w-[140px]">
                     {ts.project?.contract_type_display ?? '—'}
-                  </Td>
-                  <Td muted className="hidden xl:table-cell truncate max-w-[160px]">
-                    {ts.ticket_subject ?? '—'}
                   </Td>
                   <Td>
                     <Badge variant={ts.status}>{ts.status_display ?? ts.status}</Badge>
