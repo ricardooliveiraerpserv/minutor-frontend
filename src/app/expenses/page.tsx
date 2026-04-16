@@ -437,10 +437,22 @@ export default function ExpensesPage() {
   const [consultants,      setConsultants]      = useState<SelectOption[]>([])
   const [coordinators,     setCoordinators]     = useState<SelectOption[]>([])
   const [executives,       setExecutives]       = useState<SelectOption[]>([])
-  const [clienteProjects,  setClienteProjects]  = useState<SelectOption[]>([])
+  interface ClienteProject { id: number; name: string; contract_type_id?: number; contract_type_display?: string }
+  const [clienteProjects,  setClienteProjects]  = useState<ClienteProject[]>([])
   const [contractTypeId,   setContractTypeId]   = useState('')
-  const [contractTypes,    setContractTypes]    = useState<SelectOption[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const clienteContractTypes = useMemo(() => {
+    const seen = new Set<number>()
+    const result: { id: number; name: string }[] = []
+    for (const p of clienteProjects) {
+      if (p.contract_type_id && !seen.has(p.contract_type_id)) {
+        seen.add(p.contract_type_id)
+        result.push({ id: p.contract_type_id, name: p.contract_type_display ?? String(p.contract_type_id) })
+      }
+    }
+    return result
+  }, [clienteProjects])
 
   const params = useMemo(() => {
     const p = new URLSearchParams({ page: String(page), per_page: '20' })
@@ -481,10 +493,8 @@ export default function ExpensesPage() {
     if (isCliente && user?.customer_id) {
       Promise.allSettled([
         api.get<any>(`/projects?pageSize=200&customer_id=${user.customer_id}`),
-        api.get<any>('/contract-types?pageSize=100'),
-      ]).then(([proj, ct]) => {
+      ]).then(([proj]) => {
         setClienteProjects(items(proj))
-        setContractTypes(items(ct))
       })
     } else {
       Promise.allSettled([
@@ -614,9 +624,8 @@ export default function ExpensesPage() {
         <div className="p-4 rounded-2xl mb-4 space-y-3"
           style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
           {isCliente ? (
-            <div className="grid grid-cols-2 md:grid-cols-2 gap-2">
-              <SearchSelect value={projectId}       onChange={v => { setProjectId(v);      setPage(1) }} options={clienteProjects} placeholder="Todos os projetos" />
-              <SearchSelect value={contractTypeId}  onChange={v => { setContractTypeId(v); setPage(1) }} options={contractTypes}   placeholder="Tipo de contrato"  />
+            <div className="grid grid-cols-1 gap-2">
+              <SearchSelect value={projectId} onChange={v => { setProjectId(v); setPage(1) }} options={clienteProjects} placeholder="Todos os projetos" />
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
@@ -655,6 +664,33 @@ export default function ExpensesPage() {
             )}
           </div>
         </div>
+
+        {/* Pills de tipo de contrato — apenas para cliente */}
+        {isCliente && clienteContractTypes.length > 0 && (
+          <div className="flex items-center gap-1 p-1 rounded-xl w-fit mb-4"
+            style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+            <button
+              onClick={() => { setContractTypeId(''); setPage(1) }}
+              className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all"
+              style={!contractTypeId
+                ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
+                : { color: 'var(--brand-muted)', background: 'transparent' }
+              }>
+              Total Geral
+            </button>
+            {clienteContractTypes.map(ct => (
+              <button key={ct.id}
+                onClick={() => { setContractTypeId(String(ct.id)); setPage(1) }}
+                className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all"
+                style={contractTypeId === String(ct.id)
+                  ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
+                  : { color: 'var(--brand-muted)', background: 'transparent' }
+                }>
+                {ct.name}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Status pills — oculto para cliente */}
         {!isCliente && (

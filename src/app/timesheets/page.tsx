@@ -833,7 +833,20 @@ function TimesheetsPageContent() {
   const contractTypeList: SelectOption[] = Array.isArray(contractTypes)
     ? contractTypes : (contractTypes as any)?.items ?? []
 
-  const [clienteProjects, setClienteProjects] = useState<SelectOption[]>([])
+  interface ClienteProject { id: number; name: string; contract_type_id?: number; contract_type_display?: string }
+  const [clienteProjects, setClienteProjects] = useState<ClienteProject[]>([])
+
+  const clienteContractTypes = useMemo(() => {
+    const seen = new Set<number>()
+    const result: { id: number; name: string }[] = []
+    for (const p of clienteProjects) {
+      if (p.contract_type_id && !seen.has(p.contract_type_id)) {
+        seen.add(p.contract_type_id)
+        result.push({ id: p.contract_type_id, name: p.contract_type_display ?? String(p.contract_type_id) })
+      }
+    }
+    return result
+  }, [clienteProjects])
 
   // Carrega clientes e executivos
   useEffect(() => {
@@ -951,24 +964,13 @@ function TimesheetsPageContent() {
           {/* Linha 1: selects */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
             {isCliente ? (
-              // Filtros para cliente: apenas Projeto, Tipo de contrato, Ticket
+              // Filtros para cliente: apenas Projeto
               <>
                 <SearchSelect
                   value={projectId}
                   onChange={v => { setProjectId(v); resetPage() }}
                   options={clienteProjects}
                   placeholder="Todos os projetos"
-                />
-                <SearchSelect
-                  value={contractTypeId}
-                  onChange={v => { setContractTypeId(v); resetPage() }}
-                  options={contractTypeList}
-                  placeholder="Tipo de contrato"
-                />
-                <TextInput
-                  placeholder="Nº ticket..."
-                  value={ticket}
-                  onChange={e => { setTicket(e.target.value); resetPage() }}
                 />
               </>
             ) : (
@@ -1059,6 +1061,33 @@ function TimesheetsPageContent() {
             )}
           </div>
         </div>
+
+        {/* Pills de tipo de contrato — apenas para cliente */}
+        {isCliente && clienteContractTypes.length > 0 && (
+          <div className="flex items-center gap-1 p-1 rounded-xl w-fit mb-4"
+            style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+            <button
+              onClick={() => { setContractTypeId(''); resetPage() }}
+              className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all"
+              style={!contractTypeId
+                ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
+                : { color: 'var(--brand-muted)', background: 'transparent' }
+              }>
+              Total Geral
+            </button>
+            {clienteContractTypes.map(ct => (
+              <button key={ct.id}
+                onClick={() => { setContractTypeId(String(ct.id)); resetPage() }}
+                className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all"
+                style={contractTypeId === String(ct.id)
+                  ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
+                  : { color: 'var(--brand-muted)', background: 'transparent' }
+                }>
+                {ct.name}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Status pills — oculto para clientes */}
         {!isCliente && <div className="flex items-center gap-1 p-1 rounded-xl w-fit mb-6" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
