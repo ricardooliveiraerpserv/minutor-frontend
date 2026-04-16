@@ -26,6 +26,8 @@ import {
   UserCheck,
   CalendarDays,
   Layers,
+  TrendingUp,
+  Building2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState, useMemo, Suspense } from 'react'
@@ -78,21 +80,20 @@ type NavGroup = {
 type NavEntry = NavItem | NavGroup
 
 const NAV_COORDINATOR: NavEntry[] = [
-  { type: 'item', label: 'Início',              href: '/dashboard',        icon: Home },
-  { type: 'item', label: 'Meu Painel',          href: '/meu-painel',       icon: LayoutDashboard },
-  { type: 'item', label: 'Apontamentos',        href: '/timesheets',       icon: Clock },
-  { type: 'item', label: 'Despesas',            href: '/expenses',         icon: Receipt },
-  { type: 'item', label: 'Gestão de Projetos',  href: '/gestao-projetos',  icon: Layers },
-  { type: 'item', label: 'Aprovações',          href: '/approvals',        icon: CheckSquare },
+  { type: 'item', label: 'Início',                   href: '/dashboard',        icon: Home },
+  { type: 'item', label: 'Meu Painel',               href: '/meu-painel',       icon: LayoutDashboard },
+  { type: 'item', label: 'Apontamentos',             href: '/timesheets',       icon: Clock },
+  { type: 'item', label: 'Despesas',                 href: '/expenses',         icon: Receipt },
+  { type: 'item', label: 'Gestão de Projetos',       href: '/gestao-projetos',  icon: Layers },
+  { type: 'item', label: 'Indicadores Projetos',     href: '/indicadores',      icon: TrendingUp },
+  { type: 'item', label: 'Portal do Cliente',        href: '/portal-cliente',   icon: Building2 },
+  { type: 'item', label: 'Aprovações',               href: '/approvals',        icon: CheckSquare },
 ]
 
-const NAV: NavEntry[] = [
-  { type: 'item', label: 'Início',        href: '/dashboard',   icon: Home },
-  { type: 'item', label: 'Meu Painel',    href: '/meu-painel',  icon: LayoutDashboard },
-  { type: 'item', label: 'Apontamentos',  href: '/timesheets',  icon: Clock },
-  { type: 'item', label: 'Despesas',      href: '/expenses',    icon: Receipt },
-  { type: 'item', label: 'Gestão de Projetos', href: '/gestao-projetos',  icon: Layers },
-  { type: 'item', label: 'Aprovações',         href: '/approvals',        icon: CheckSquare },
+const NAV_CLIENTE: NavEntry[] = [
+  { type: 'item', label: 'Portal',        href: '/portal-cliente', icon: Building2 },
+  { type: 'item', label: 'Apontamentos',  href: '/timesheets',     icon: Clock },
+  { type: 'item', label: 'Despesas',      href: '/expenses',       icon: Receipt },
   {
     type: 'group',
     label: 'Dashboards',
@@ -101,6 +102,29 @@ const NAV: NavEntry[] = [
       { label: 'Banco de Horas Fixo',    href: '/dashboards/bank-hours-fixed',   icon: BarChart2 },
       { label: 'Banco de Horas Mensais', href: '/dashboards/bank-hours-monthly', icon: CalendarClock },
       { label: 'On Demand',              href: '/dashboards/on-demand',           icon: Zap },
+      { label: 'Fechado',                href: '/dashboards/fechado',             icon: CheckSquare },
+    ],
+  },
+]
+
+const NAV: NavEntry[] = [
+  { type: 'item', label: 'Início',                   href: '/dashboard',        icon: Home },
+  { type: 'item', label: 'Meu Painel',               href: '/meu-painel',       icon: LayoutDashboard },
+  { type: 'item', label: 'Apontamentos',             href: '/timesheets',       icon: Clock },
+  { type: 'item', label: 'Despesas',                 href: '/expenses',         icon: Receipt },
+  { type: 'item', label: 'Gestão de Projetos',       href: '/gestao-projetos',  icon: Layers },
+  { type: 'item', label: 'Indicadores Projetos',     href: '/indicadores',      icon: TrendingUp },
+  { type: 'item', label: 'Portal do Cliente',        href: '/portal-cliente',   icon: Building2 },
+  { type: 'item', label: 'Aprovações',               href: '/approvals',        icon: CheckSquare },
+  {
+    type: 'group',
+    label: 'Dashboards',
+    icon: BarChart2,
+    items: [
+      { label: 'Banco de Horas Fixo',    href: '/dashboards/bank-hours-fixed',   icon: BarChart2 },
+      { label: 'Banco de Horas Mensais', href: '/dashboards/bank-hours-monthly', icon: CalendarClock },
+      { label: 'On Demand',              href: '/dashboards/on-demand',           icon: Zap },
+      { label: 'Fechado',                href: '/dashboards/fechado',             icon: CheckSquare },
     ],
   },
   { type: 'item', label: 'Banco de Horas', href: '/hora-banco',  icon: Landmark },
@@ -151,6 +175,7 @@ function SidebarInner({ user }: { user: User }) {
 
   const isConsultor   = user?.type === 'consultor'
   const isCoordenador = user?.type === 'coordenador'
+  const isCliente     = user?.type === 'cliente'
   const ep = user?.extra_permissions ?? []
 
   const visibleNav = useMemo(() => {
@@ -193,6 +218,12 @@ function SidebarInner({ user }: { user: User }) {
       if (has('settings.view')) nav.push({ type: 'item', label: 'Configurações', href: '/settings', icon: Settings })
 
       return nav
+    }
+    if (isCliente) {
+      // Mostra todos os dashboards disponíveis para o cliente.
+      // O backend filtra os projetos por customer_id — dashboards sem projetos
+      // simplesmente aparecem com dropdown vazio, sem necessidade de cache.
+      return NAV_CLIENTE
     }
     if (isConsultor) {
       const allowed = new Set(['/dashboard', '/meu-painel'])
