@@ -692,20 +692,32 @@ function TimesheetsPageContent() {
   })
   const [modalProjects, setModalProjects] = useState<SelectOption[]>([])
   const [newSaving, setNewSaving] = useState(false)
+  // tracks which field was last manually changed in Horário mode
+  const [timeDriver, setTimeDriver] = useState<'end' | 'total'>('end')
 
-  // Horário mode: auto-calc total from start+end
+  // Horário mode: Início+Fim → Total  OR  Início+Total → Fim
   useEffect(() => {
     if (newUseTotal) return
-    const s = parseHHMM(newForm.start_time), e = parseHHMM(newForm.end_time)
-    if (s !== null && e !== null && e > s) {
-      const diff = e - s
-      const computed = `${Math.floor(diff / 60)}:${String(diff % 60).padStart(2, '0')}`
-      setNewForm(f => f.total_hours === computed ? f : { ...f, total_hours: computed })
+    if (timeDriver === 'end') {
+      const s = parseHHMM(newForm.start_time), e = parseHHMM(newForm.end_time)
+      if (s !== null && e !== null && e > s) {
+        const diff = e - s
+        const computed = `${Math.floor(diff / 60)}:${String(diff % 60).padStart(2, '0')}`
+        setNewForm(f => f.total_hours === computed ? f : { ...f, total_hours: computed })
+      } else {
+        setNewForm(f => f.total_hours ? { ...f, total_hours: '' } : f)
+      }
     } else {
-      setNewForm(f => f.total_hours ? { ...f, total_hours: '' } : f)
+      const s = parseHHMM(newForm.start_time), t = parseHHMM(newForm.total_hours)
+      if (s !== null && t !== null) {
+        const computed = addMinutes(newForm.start_time, t)
+        setNewForm(f => f.end_time === computed ? f : { ...f, end_time: computed })
+      } else {
+        setNewForm(f => f.end_time ? { ...f, end_time: '' } : f)
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [newForm.start_time, newForm.end_time, newUseTotal])
+  }, [newForm.start_time, newForm.end_time, newForm.total_hours, newUseTotal, timeDriver])
 
   // Load modal projects when customer changes
   useEffect(() => {
@@ -720,6 +732,7 @@ function TimesheetsPageContent() {
 
   const openNewModal = () => {
     setNewUseTotal(false)
+    setTimeDriver('end')
     setNewForm({
       user_id: '', modal_customer_id: '', project_id: '',
       date: new Date().toISOString().split('T')[0],
@@ -1159,7 +1172,7 @@ function TimesheetsPageContent() {
                 })}
               </div>
 
-              {/* Modo Horário: Início + Fim (manual) + Total (auto) */}
+              {/* Modo Horário: Início + Fim + Total (todos editáveis, último editado auto-calcula o outro) */}
               {!newUseTotal && (
                 <div className="grid grid-cols-3 gap-2">
                   <div>
@@ -1169,17 +1182,16 @@ function TimesheetsPageContent() {
                       className="mt-1 w-full px-3 py-2 rounded-xl text-sm outline-none bg-zinc-800 border border-zinc-700 text-white" />
                   </div>
                   <div>
-                    <Label className="text-xs text-zinc-400">Fim *</Label>
+                    <Label className="text-xs text-zinc-400">Fim {timeDriver === 'end' ? '*' : ''}</Label>
                     <input type="time" value={newForm.end_time}
-                      onChange={e => setNewForm(f => ({ ...f, end_time: e.target.value }))}
+                      onChange={e => { setTimeDriver('end'); setNewForm(f => ({ ...f, end_time: e.target.value })) }}
                       className="mt-1 w-full px-3 py-2 rounded-xl text-sm outline-none bg-zinc-800 border border-zinc-700 text-white" />
                   </div>
                   <div>
-                    <Label className="text-xs text-zinc-500">Total</Label>
-                    <div className="mt-1 px-3 py-2 rounded-xl text-sm bg-zinc-900 border border-zinc-800"
-                      style={{ color: newForm.total_hours ? 'var(--brand-primary)' : 'var(--brand-subtle)' }}>
-                      {newForm.total_hours || '—'}
-                    </div>
+                    <Label className="text-xs text-zinc-400">Total {timeDriver === 'total' ? '*' : ''}</Label>
+                    <input type="text" value={newForm.total_hours} placeholder="ex: 2:30"
+                      onChange={e => { setTimeDriver('total'); setNewForm(f => ({ ...f, total_hours: e.target.value })) }}
+                      className="mt-1 w-full px-3 py-2 rounded-xl text-sm outline-none bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-600" />
                   </div>
                 </div>
               )}
