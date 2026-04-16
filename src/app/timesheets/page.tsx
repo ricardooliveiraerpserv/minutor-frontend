@@ -1120,8 +1120,14 @@ function TimesheetsPageContent() {
                   <Td muted className="hidden lg:table-cell font-mono">
                     {ts.ticket
                       ? ts.origin === 'webhook'
-                        ? <a href={`https://erpserv.movidesk.com/Ticket/Edit/${ts.ticket}`} target="_blank" rel="noopener noreferrer"
-                            className="hover:underline" style={{ color: 'var(--brand-primary)' }}>#{ts.ticket}</a>
+                        ? <a
+                            href={`https://erpserv.movidesk.com/Ticket/Edit/${ts.ticket}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className="hover:underline cursor-pointer"
+                            style={{ color: 'var(--brand-primary)', pointerEvents: 'auto' }}
+                          >#{ts.ticket}</a>
                         : `#${ts.ticket}`
                       : '—'}
                   </Td>
