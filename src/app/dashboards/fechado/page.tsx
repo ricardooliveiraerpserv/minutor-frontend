@@ -14,11 +14,23 @@ interface Customer  { id: number; name: string }
 interface Project   { id: number; name: string; code: string }
 interface Executive { id: number; name: string }
 
+interface ContributionItem {
+  id: string
+  project: { id: number; name: string; code: string } | null
+  contributed_hours: number
+  hourly_rate: number
+  total_value: number
+  description: string | null
+  changed_by: { name: string } | null
+  created_at: string
+}
+
 interface SummaryData {
   consumed_hours: number
   month_consumed_hours: number
   project_count: number
   month_project_count: number
+  contributed_hours_history?: ContributionItem[]
 }
 
 interface ProjectRow {
@@ -36,6 +48,11 @@ interface ProjectRow {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtH(h: number | null | undefined) { return (h ?? 0).toFixed(1) }
+function fmtBRL(v: number | null | undefined) {
+  if (v == null) return '—'
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+function fmtDate(s: string) { return new Date(s).toLocaleDateString('pt-BR') }
 
 // ─── Components ──────────────────────────────────────────────────────────────
 
@@ -227,21 +244,58 @@ export default function FechadoPage() {
                 {Array.from({ length: 2 }).map((_, i) => <SkeletonCard key={i} />)}
               </div>
             ) : summary ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <MetricCard
-                  label="Horas Vendidas (Acumulado)"
-                  value={fmtH(summary.consumed_hours)}
-                  unit="h"
-                  icon={Clock}
-                  accent="primary"
-                />
-                <MetricCard
-                  label={`Horas Vendidas (Mês ${refMonth ?? ''}/${refYear ?? ''})`}
-                  value={fmtH(summary.month_consumed_hours)}
-                  unit="h"
-                  icon={Clock}
-                  accent="info"
-                />
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <MetricCard
+                    label="Horas Vendidas (Acumulado)"
+                    value={fmtH(summary.consumed_hours)}
+                    unit="h"
+                    icon={Clock}
+                    accent="primary"
+                  />
+                  <MetricCard
+                    label={`Horas Vendidas (Mês ${refMonth ?? ''}/${refYear ?? ''})`}
+                    value={fmtH(summary.month_consumed_hours)}
+                    unit="h"
+                    icon={Clock}
+                    accent="info"
+                  />
+                </div>
+
+                {(summary.contributed_hours_history?.length ?? 0) > 0 && (
+                  <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                    <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+                      <h3 className="text-sm font-bold" style={{ color: 'var(--brand-text)' }}>Histórico de Aporte de Horas</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead style={{ borderBottom: '1px solid var(--brand-border)', background: 'rgba(255,255,255,0.02)' }}>
+                          <tr>
+                            {['Projeto', 'Horas', 'Valor/h', 'Total', 'Descrição', 'Data', 'Por'].map(col => (
+                              <th key={col} className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{col}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {summary.contributed_hours_history!.map(item => (
+                            <tr key={item.id} style={{ borderBottom: '1px solid var(--brand-border)' }}
+                              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,245,255,0.03)')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                            >
+                              <td className="px-5 py-3" style={{ color: 'var(--brand-text)' }}>{item.project?.code} — {item.project?.name}</td>
+                              <td className="px-5 py-3 font-bold" style={{ color: '#00F5FF' }}>{item.contributed_hours}h</td>
+                              <td className="px-5 py-3" style={{ color: 'var(--brand-muted)' }}>{fmtBRL(item.hourly_rate)}</td>
+                              <td className="px-5 py-3" style={{ color: 'var(--brand-muted)' }}>{fmtBRL(item.total_value)}</td>
+                              <td className="px-5 py-3 max-w-48 truncate" style={{ color: 'var(--brand-muted)' }}>{item.description || '—'}</td>
+                              <td className="px-5 py-3" style={{ color: 'var(--brand-muted)' }}>{fmtDate(item.created_at)}</td>
+                              <td className="px-5 py-3" style={{ color: 'var(--brand-muted)' }}>{item.changed_by?.name ?? '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="rounded-2xl p-10 text-center" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
