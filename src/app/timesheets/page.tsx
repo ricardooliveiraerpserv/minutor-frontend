@@ -1078,13 +1078,13 @@ function TimesheetsPageContent() {
               <tr>
                 <Th className="w-10" />
                 <Th sortable active={sortField === 'date'}          dir={sortDir} onClick={() => handleSort('date')}>Data</Th>
+                <Th className="hidden lg:table-cell">Ticket #</Th>
                 <Th right sortable active={sortField === 'effort_hours'} dir={sortDir} onClick={() => handleSort('effort_hours')}>Tempo</Th>
                 <Th className="hidden sm:table-cell">Origem</Th>
                 <Th sortable active={sortField === 'user.name'}     dir={sortDir} onClick={() => handleSort('user.name')}>Colaborador</Th>
                 <Th sortable active={sortField === 'project.name'}  dir={sortDir} onClick={() => handleSort('project.name')}>Projeto</Th>
                 <Th sortable active={sortField === 'customer.name'} dir={sortDir} onClick={() => handleSort('customer.name')} className="hidden lg:table-cell">Cliente</Th>
                 <Th className="hidden xl:table-cell">Contrato</Th>
-                <Th className="hidden lg:table-cell">Ticket #</Th>
                 <Th className="hidden xl:table-cell">Título</Th>
                 <Th>Status</Th>
               </tr>
@@ -1102,6 +1102,20 @@ function TimesheetsPageContent() {
                     <RowActions id={ts.id} onView={() => openView(ts)} onDeleted={refetch} viewOnly={isCliente} />
                   </Td>
                   <Td className="whitespace-nowrap font-medium">{formatDate(ts.date)}</Td>
+                  <Td muted className="hidden lg:table-cell font-mono">
+                    {ts.ticket
+                      ? ts.ticket.length >= 5
+                        ? <a
+                            href={`https://erpserv.movidesk.com/Ticket/Edit/${ts.ticket}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className="hover:underline cursor-pointer"
+                            style={{ color: 'var(--brand-primary)', pointerEvents: 'auto' }}
+                          >#{ts.ticket}</a>
+                        : `#${ts.ticket}`
+                      : '—'}
+                  </Td>
                   <Td right mono className="font-semibold" style={{ color: 'var(--brand-primary)' }}>
                     {formatMinutes(ts.effort_minutes)}
                   </Td>
@@ -1125,20 +1139,6 @@ function TimesheetsPageContent() {
                   </Td>
                   <Td muted className="hidden xl:table-cell truncate max-w-[140px]">
                     {ts.project?.contract_type_display ?? '—'}
-                  </Td>
-                  <Td muted className="hidden lg:table-cell font-mono">
-                    {ts.ticket
-                      ? ts.ticket.length >= 5
-                        ? <a
-                            href={`https://erpserv.movidesk.com/Ticket/Edit/${ts.ticket}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={e => e.stopPropagation()}
-                            className="hover:underline cursor-pointer"
-                            style={{ color: 'var(--brand-primary)', pointerEvents: 'auto' }}
-                          >#{ts.ticket}</a>
-                        : `#${ts.ticket}`
-                      : '—'}
                   </Td>
                   <Td muted className="hidden xl:table-cell truncate max-w-[160px]">
                     {ts.ticket_subject ?? '—'}
