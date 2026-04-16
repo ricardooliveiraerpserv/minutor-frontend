@@ -52,7 +52,7 @@ function OriginBadge({ origin }: { origin?: string }) {
       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
       style={{ background: 'rgba(139,92,246,0.12)', color: '#8B5CF6' }}
     >
-      <Webhook size={9} /> Auto
+      <Webhook size={9} /> Movidesk
     </span>
   )
   return (
