@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/app-layout'
 import { api } from '@/lib/api'
@@ -8,11 +9,12 @@ import { useAuth } from '@/hooks/use-auth'
 import {
   AlertTriangle, TrendingUp, Clock, Users, ChevronDown,
   FileText, CheckCircle, X, Search, ChevronRight,
-  BarChart2, CalendarClock, Zap, Layers,
+  BarChart2, CalendarClock, Zap, Layers, LayoutGrid, List, FolderOpen,
 } from 'lucide-react'
 import { MonthYearPicker } from '@/components/ui/month-year-picker'
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine,
+  LineChart, Line,
 } from 'recharts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -117,18 +119,29 @@ function ProgressBar({ pct, status }: { pct: number; status: string }) {
   )
 }
 
-// ─── SearchableSelect ─────────────────────────────────────────────────────────
+// ─── MultiCustomerSelect ──────────────────────────────────────────────────────
 
-function SearchableSelect({ value, onChange, placeholder, options }: {
-  value: string; onChange: (v: string) => void
-  placeholder: string; options: { value: string; label: string }[]
+function MultiCustomerSelect({ selected, onChange, options }: {
+  selected: string[]
+  onChange: (v: string[]) => void
+  options: { value: string; label: string }[]
 }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const ref = useRef<HTMLDivElement>(null)
 
   const filtered = useMemo(() => options.filter(o => o.label.toLowerCase().includes(q.toLowerCase())), [options, q])
-  const selected = options.find(o => o.value === value)
+  const isAll = selected.length === 0
+
+  const toggle = (v: string) => {
+    onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v])
+  }
+
+  const label = isAll
+    ? 'Todos os clientes'
+    : selected.length === 1
+      ? (options.find(o => o.value === selected[0])?.label ?? '1 cliente')
+      : `${selected.length} clientes selecionados`
 
   useEffect(() => {
     const handle = (e: MouseEvent) => {
@@ -145,16 +158,23 @@ function SearchableSelect({ value, onChange, placeholder, options }: {
         onClick={() => { setOpen(v => !v); setQ('') }}
         className="flex items-center gap-2 pl-4 pr-3 py-2.5 text-sm rounded-xl outline-none cursor-pointer"
         style={{
-          background: 'rgba(255,255,255,0.06)', border: '1px solid var(--brand-border)',
-          color: value ? 'var(--brand-text)' : 'var(--brand-subtle)', minWidth: 200,
+          background: 'rgba(255,255,255,0.06)', border: `1px solid ${!isAll ? 'var(--brand-primary)' : 'var(--brand-border)'}`,
+          color: isAll ? 'var(--brand-subtle)' : 'var(--brand-text)', minWidth: 220,
         }}
       >
-        <span className="flex-1 text-left truncate font-medium">{selected?.label ?? placeholder}</span>
+        <span className="flex-1 text-left truncate font-medium">{label}</span>
+        {!isAll && (
+          <span onClick={e => { e.stopPropagation(); onChange([]) }}
+            className="shrink-0 p-0.5 rounded hover:bg-white/10 transition-colors"
+            style={{ color: 'var(--brand-subtle)' }}>
+            <X size={12} />
+          </span>
+        )}
         <ChevronDown size={14} style={{ color: 'var(--brand-subtle)', flexShrink: 0 }} />
       </button>
       {open && (
         <div className="absolute z-50 mt-1 rounded-xl shadow-2xl overflow-hidden"
-          style={{ background: '#1c1c1e', border: '1px solid rgba(255,255,255,0.10)', minWidth: 240 }}>
+          style={{ background: '#1c1c1e', border: '1px solid rgba(255,255,255,0.10)', minWidth: 260 }}>
           <div className="p-2 border-b" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
             <div className="relative">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--brand-subtle)' }} />
@@ -163,21 +183,37 @@ function SearchableSelect({ value, onChange, placeholder, options }: {
                 style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--brand-text)' }} />
             </div>
           </div>
-          <div className="overflow-y-auto" style={{ maxHeight: 240 }}>
-            <button type="button" onClick={() => { onChange(''); setOpen(false); setQ('') }}
-              className="w-full text-left px-3 py-2 text-sm hover:bg-white/[0.06] transition-colors"
-              style={{ color: value === '' ? '#00F5FF' : 'var(--brand-muted)' }}>
-              {placeholder}
+          <div className="overflow-y-auto" style={{ maxHeight: 280 }}>
+            {/* Todos */}
+            <button type="button" onClick={() => { onChange([]); setOpen(false); setQ('') }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-white/[0.06] transition-colors border-b"
+              style={{ color: isAll ? '#00F5FF' : 'var(--brand-muted)', borderColor: 'rgba(255,255,255,0.06)' }}>
+              <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${isAll ? 'border-[#00F5FF] bg-[#00F5FF]' : 'border-zinc-600'}`}>
+                {isAll && <CheckCircle size={10} className="text-black" />}
+              </div>
+              Todos os clientes
             </button>
-            {filtered.map(o => (
-              <button key={o.value} type="button" onClick={() => { onChange(o.value); setOpen(false); setQ('') }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-white/[0.06] transition-colors"
-                style={{ color: value === o.value ? '#00F5FF' : 'var(--brand-text)' }}>
-                {o.label}
-              </button>
-            ))}
+            {filtered.map(o => {
+              const checked = selected.includes(o.value)
+              return (
+                <button key={o.value} type="button" onClick={() => toggle(o.value)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-white/[0.06] transition-colors"
+                  style={{ color: checked ? '#00F5FF' : 'var(--brand-text)' }}>
+                  <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${checked ? 'border-[#00F5FF] bg-[#00F5FF]' : 'border-zinc-600'}`}>
+                    {checked && <CheckCircle size={10} className="text-black" />}
+                  </div>
+                  {o.label}
+                </button>
+              )
+            })}
             {filtered.length === 0 && <p className="px-3 py-3 text-xs text-center" style={{ color: 'var(--brand-subtle)' }}>Nenhum resultado</p>}
           </div>
+          {selected.length > 0 && (
+            <div className="p-2 border-t flex justify-between items-center" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+              <span className="text-xs" style={{ color: 'var(--brand-subtle)' }}>{selected.length} selecionado{selected.length !== 1 ? 's' : ''}</span>
+              <button type="button" onClick={() => onChange([])} className="text-xs" style={{ color: '#00F5FF' }}>Limpar</button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -193,24 +229,148 @@ const PERIODS = [
   { value: 'year',    label: 'Este ano' },
 ]
 
+// ── IndSearchSelect (filtros do Indicadores) ─────────────────────────────────
+
+function IndSearchSelect({ value, onChange, placeholder, options }: {
+  value: string; onChange: (v: string) => void; placeholder: string; options: { value: string; label: string }[]
+}) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+  const filtered = useMemo(() => options.filter(o => o.label.toLowerCase().includes(q.toLowerCase())), [options, q])
+  const selected = options.find(o => o.value === value)
+
+  useEffect(() => {
+    const handle = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setQ('') } }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => { setOpen(v => !v); setQ('') }}
+        className="flex items-center gap-2 pl-3 pr-2 py-2 text-sm rounded-lg outline-none cursor-pointer whitespace-nowrap"
+        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--brand-border)', color: value ? 'var(--brand-text)' : 'var(--brand-subtle)', minWidth: 160 }}>
+        <span className="flex-1 text-left truncate">{selected?.label ?? placeholder}</span>
+        <ChevronDown size={12} style={{ color: 'var(--brand-subtle)', flexShrink: 0 }} />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 rounded-xl shadow-xl overflow-hidden" style={{ background: '#1c1c1e', border: '1px solid rgba(255,255,255,0.10)', minWidth: 220, maxWidth: 320 }}>
+          <div className="p-2 border-b" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+            <div className="relative">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--brand-subtle)' }} />
+              <input autoFocus type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar..."
+                className="w-full pl-7 pr-2 py-1.5 text-sm rounded-lg outline-none" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--brand-text)' }} />
+            </div>
+          </div>
+          <div className="overflow-y-auto" style={{ maxHeight: 220 }}>
+            <button type="button" onClick={() => { onChange(''); setOpen(false); setQ('') }}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-white/[0.06] transition-colors"
+              style={{ color: value === '' ? '#00F5FF' : 'var(--brand-muted)' }}>{placeholder}</button>
+            {filtered.map(o => (
+              <button key={o.value} type="button" onClick={() => { onChange(o.value); setOpen(false); setQ('') }}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-white/[0.06] transition-colors"
+                style={{ color: value === o.value ? '#00F5FF' : 'var(--brand-text)' }}>{o.label}</button>
+            ))}
+            {filtered.length === 0 && <p className="px-3 py-3 text-xs text-center" style={{ color: 'var(--brand-subtle)' }}>Nenhum resultado</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Indicadores helpers ──────────────────────────────────────────────────────
+
+const IND_CACHE_TTL = 5 * 60 * 1000
+function indCacheGet<T>(key: string): T | null {
+  try {
+    const raw = sessionStorage.getItem(key)
+    if (!raw) return null
+    const { data, ts } = JSON.parse(raw)
+    if (Date.now() - ts > IND_CACHE_TTL) { sessionStorage.removeItem(key); return null }
+    return data as T
+  } catch { return null }
+}
+function indCacheSet(key: string, data: unknown) {
+  try { sessionStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })) } catch {}
+}
+
+function healthColorInd(pct: number | undefined): 'green' | 'yellow' | 'red' {
+  if (pct == null) return 'green'
+  if (pct >= 90) return 'red'
+  if (pct >= 70) return 'yellow'
+  return 'green'
+}
+const HSI = {
+  green:  { bar: '#22c55e', badge: 'rgba(34,197,94,0.12)',  text: '#86efac' },
+  yellow: { bar: '#f59e0b', badge: 'rgba(245,158,11,0.12)', text: '#fcd34d' },
+  red:    { bar: '#ef4444', badge: 'rgba(239,68,68,0.12)',  text: '#fca5a5' },
+}
+
+function IndChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-xl p-3 text-sm shadow-lg" style={{ background: '#1c1c1e', border: '1px solid rgba(255,255,255,0.10)', color: '#E4E4E7' }}>
+      <p className="font-semibold mb-1.5" style={{ color: '#A1A1AA' }}>{label}</p>
+      {payload.map((p: any) => (
+        <p key={p.dataKey} className="tabular-nums" style={{ color: p.stroke }}>
+          {p.name}: <strong>{fmt(p.value ?? 0)}</strong>{p.dataKey === 'hours' ? 'h' : ''}
+        </p>
+      ))}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function PortalClientePage() {
   const { user } = useAuth()
+  const router = useRouter()
   const isCliente = user?.type === 'cliente'
 
   const [customers, setCustomers] = useState<{ value: string; label: string }[]>([])
-  const [customerId, setCustomerId] = useState('')
+  const [customerIds, setCustomerIds] = useState<string[]>([])
+  const [multiData, setMultiData] = useState<(PortalData & { _cid: string })[]>([])
+  const [multiLoading, setMultiLoading] = useState(false)
   const [period, setPeriod] = useState('all')
+
+  // single-customer derived (existing code path)
+  const customerId = customerIds.length === 1 ? customerIds[0] : ''
   const [filterMonth, setFilterMonth] = useState<number | null>(new Date().getMonth() + 1)
   const [filterYear, setFilterYear]   = useState<number | null>(new Date().getFullYear())
   const [data, setData] = useState<PortalData | null>(null)
   const [loading, setLoading] = useState(false)
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set())
   const [projectFilter, setProjectFilter] = useState<number | null>(null)
+  const [healthFilter, setHealthFilter] = useState<'all' | 'ok' | 'warning' | 'critical'>('all')
+  const [viewMode, setViewMode] = useState<'card' | 'linear'>('card')
+  const [activeTab, setActiveTab] = useState<'portal' | 'indicadores'>('portal')
+
+  // ── Indicadores state ──
+  const normalizeInd = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const IND_EXCLUDED = ['sustentacao']
+  const [indProjects, setIndProjects] = useState<any[]>(() => indCacheGet<any[]>('ind_projects') ?? [])
+  const [indTeamProjects, setIndTeamProjects] = useState<any[]>(() => indCacheGet<any[]>('ind_team') ?? [])
+  const [indPendingTs, setIndPendingTs] = useState(0)
+  const [indPendingExp, setIndPendingExp] = useState(0)
+  const [indMonthlyData, setIndMonthlyData] = useState<any[] | null>(() => indCacheGet<any[]>('ind_chart'))
+  const [indLoading, setIndLoading] = useState(false)
+  const [indChartLoading, setIndChartLoading] = useState(false)
+  const [indTeamLoading, setIndTeamLoading] = useState(false)
+  const indLoadedRef = useRef(indCacheGet('ind_projects') !== null)
+  const [indCFilter, setIndCFilter] = useState('')
+  const [indPFilter, setIndPFilter] = useState('')
+  const [indContractFilter, setIndContractFilter] = useState('')
+  const [indStatusFilter, setIndStatusFilter] = useState('active')
+  const [indHealthFilter, setIndHealthFilter] = useState<'all' | 'green' | 'yellow' | 'red'>('all')
+  const [indViewMode, setIndViewMode] = useState<'list' | 'card'>('list')
+  const [indExecFilter, setIndExecFilter] = useState('')
 
   // Para cliente: usa o customer_id do próprio usuário automaticamente
   useEffect(() => {
     if (isCliente && user?.customer_id) {
-      setCustomerId(String(user.customer_id))
+      setCustomerIds([String(user.customer_id)])
     }
   }, [isCliente, user?.customer_id])
 
@@ -245,6 +405,26 @@ export default function PortalClientePage() {
       .catch(() => setData(null))
       .finally(() => setLoading(false))
   }, [customerId, period, filterMonth, filterYear])
+
+  // Multi-customer load (Todos or >1 selected)
+  const isMultiMode = !isCliente && customerIds.length !== 1
+  useEffect(() => {
+    if (!isMultiMode) { setMultiData([]); return }
+    const ids = customerIds.length === 0
+      ? customers.slice(0, 25).map(c => c.value)
+      : customerIds
+    if (!ids.length) { setMultiData([]); return }
+    setMultiLoading(true)
+    Promise.all(ids.map(cid => {
+      const qs = new URLSearchParams({ customer_id: cid, period })
+      if (filterMonth && filterYear) { qs.set('filter_month', String(filterMonth)); qs.set('filter_year', String(filterYear)) }
+      return api.get<PortalData>(`/client/portal?${qs}`)
+        .then(r => ({ ...r, _cid: cid }))
+        .catch(() => null)
+    })).then(results => {
+      setMultiData(results.filter(Boolean) as (PortalData & { _cid: string })[])
+    }).finally(() => setMultiLoading(false))
+  }, [isMultiMode, customerIds, customers, period, filterMonth, filterYear])
 
   // Reset project filter when customer or data changes
   useEffect(() => { setProjectFilter(null) }, [customerId])
@@ -316,6 +496,178 @@ export default function PortalClientePage() {
     }
   }, [projectFilter, d])
 
+  // ── Indicadores: carrega lazy quando aba abre ──────────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'indicadores' || indLoadedRef.current) return
+    indLoadedRef.current = true  // marca antes de qualquer setState para não re-disparar
+
+    setIndLoading(true); setIndChartLoading(true); setIndTeamLoading(true)
+
+    const CHART_URLS = [
+      '/dashboards/bank-hours-fixed/indicators/monthly-consumption',
+      '/dashboards/bank-hours-monthly/indicators/monthly-consumption',
+      '/dashboards/on-demand/indicators/monthly-consumption',
+    ]
+    const projPromise   = api.get<any>('/projects?pageSize=300&gestao=true&with_team=false')
+    const tsPromise     = api.get<any>('/approvals/timesheets?per_page=1&status=pending')
+    const expPromise    = api.get<any>('/approvals/expenses?per_page=1&status=pending')
+    const chartPromises = CHART_URLS.map(url => api.get<any>(url))
+
+    Promise.allSettled([projPromise, tsPromise, expPromise]).then(([projRes, tsRes, expRes]) => {
+      if (projRes.status === 'fulfilled') {
+        const items = (projRes.value?.items ?? []).filter(
+          (p: any) => !IND_EXCLUDED.includes(normalizeInd(p.contract_type_display ?? ''))
+        )
+        setIndProjects(items); indCacheSet('ind_projects', items)
+      }
+      if (tsRes.status === 'fulfilled') {
+        const dv = tsRes.value
+        setIndPendingTs(dv?.pagination?.total ?? dv?.meta?.total ?? dv?.total ?? 0)
+      }
+      if (expRes.status === 'fulfilled') {
+        const dv = expRes.value
+        setIndPendingExp(dv?.pagination?.total ?? dv?.meta?.total ?? dv?.total ?? 0)
+      }
+      setIndLoading(false)
+
+      api.get<any>('/projects?pageSize=300&gestao=true')
+        .then(res => {
+          const items = (res?.items ?? []).filter(
+            (p: any) => !IND_EXCLUDED.includes(normalizeInd(p.contract_type_display ?? ''))
+          )
+          setIndTeamProjects(items); indCacheSet('ind_team', items)
+        })
+        .catch(() => {})
+        .finally(() => setIndTeamLoading(false))
+    })
+
+    Promise.allSettled(chartPromises).then(results => {
+      const map = new Map<string, number>()
+      for (const r of results) {
+        if (r.status !== 'fulfilled') continue
+        const arr: any[] = Array.isArray(r.value) ? r.value : r.value?.data ?? []
+        for (const dv of arr) {
+          const month = dv.month ?? ''
+          const h = Number(dv.consumed_hours ?? dv.hours ?? 0)
+          map.set(month, (map.get(month) ?? 0) + h)
+        }
+      }
+      if (map.size > 0) {
+        const sorted = [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
+          .map(([month, hours]) => ({ month, hours: Math.round(hours * 10) / 10 }))
+        setIndMonthlyData(sorted); indCacheSet('ind_chart', sorted)
+      } else { setIndMonthlyData(null) }
+      setIndChartLoading(false)
+    })
+  }, [activeTab])
+
+  // ── Indicadores computed ──
+  const indContractTypes = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of indProjects) if (p.contract_type_display) set.add(p.contract_type_display)
+    return Array.from(set).sort()
+  }, [indProjects])
+
+  const indClienteOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const p of indProjects) if (p.customer?.id && p.customer?.name) map.set(String(p.customer.id), p.customer.name)
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({ value, label }))
+  }, [indProjects])
+
+  const indProjetoOptions = useMemo(() =>
+    indProjects.map(p => ({ value: String(p.id), label: `${p.code ? `[${p.code}] ` : ''}${p.name}` }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+    [indProjects]
+  )
+
+  const indExecOptions = useMemo(() => {
+    const map = new Map<number, string>()
+    for (const p of indProjects) for (const c of p.coordinators ?? []) if (c.id && c.name) map.set(c.id, c.name)
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1])).map(([id, name]) => ({ value: String(id), label: name }))
+  }, [indProjects])
+
+  const IND_STATUS_LABELS: Record<string, string> = {
+    active: 'Ativo', awaiting_start: 'Aguardando início', started: 'Iniciado',
+    paused: 'Pausado', cancelled: 'Cancelado', finished: 'Finalizado',
+  }
+  const indStatusOptions = Object.entries(IND_STATUS_LABELS).map(([value, label]) => ({ value, label }))
+
+  const indFiltered = useMemo(() => indProjects.filter(p => {
+    if (indCFilter && String(p.customer?.id) !== indCFilter) return false
+    if (indPFilter && String(p.id) !== indPFilter) return false
+    if (indContractFilter && p.contract_type_display !== indContractFilter) return false
+    if (indStatusFilter && p.status !== indStatusFilter) return false
+    if (indExecFilter && !(p.coordinators ?? []).some((c: any) => String(c.id) === indExecFilter)) return false
+    if (indHealthFilter !== 'all' && healthColorInd(p.balance_percentage) !== indHealthFilter) return false
+    return true
+  }), [indProjects, indCFilter, indPFilter, indContractFilter, indStatusFilter, indExecFilter, indHealthFilter])
+
+  const indKpis = useMemo(() => {
+    const saldoTotal = indFiltered.reduce((acc, p) => acc + (p.general_hours_balance ?? 0), 0)
+    const withHours = indFiltered.filter(p => (p.sold_hours ?? 0) > 0)
+    const consumoMedio = withHours.length ? withHours.reduce((acc, p) => acc + (p.balance_percentage ?? 0), 0) / withHours.length : 0
+    const emRisco = indFiltered.filter(p => (p.balance_percentage ?? 0) >= 90).length
+    return { saldoTotal, consumoMedio, emRisco, totalProjetos: indFiltered.length }
+  }, [indFiltered])
+
+  const indAlerts = useMemo(() => {
+    const list: any[] = []
+    for (const p of indFiltered) {
+      if ((p.general_hours_balance ?? 0) < 0)
+        list.push({ type: 'red', icon: 'alert', title: p.name, msg: `Saldo negativo (${Math.round(p.general_hours_balance ?? 0)}h)`, href: null, projectId: p.id })
+      else if ((p.balance_percentage ?? 0) >= 90)
+        list.push({ type: 'red', icon: 'alert', title: p.name, msg: `${Math.round(p.balance_percentage ?? 0)}% consumido — risco crítico`, href: null, projectId: p.id })
+    }
+    for (const p of indFiltered) {
+      const pct = p.balance_percentage ?? 0
+      if (pct >= 70 && pct < 90 && (p.general_hours_balance ?? 0) >= 0)
+        list.push({ type: 'yellow', icon: 'warning', title: p.name, msg: `${Math.round(pct)}% consumido — atenção`, href: null, projectId: p.id })
+    }
+    if (indPendingTs > 0) list.push({ type: 'yellow', icon: 'clock', title: 'Apontamentos pendentes', msg: `${indPendingTs} apontamento(s) aguardando aprovação`, href: '/approvals' })
+    if (indPendingExp > 0) list.push({ type: 'yellow', icon: 'receipt', title: 'Despesas pendentes', msg: `${indPendingExp} despesa(s) aguardando aprovação`, href: '/approvals' })
+    return list
+  }, [indFiltered, indPendingTs, indPendingExp])
+
+  const indCritical = useMemo(() =>
+    [...indFiltered].sort((a, b) => (a.general_hours_balance ?? 0) - (b.general_hours_balance ?? 0)).slice(0, 20),
+    [indFiltered]
+  )
+
+  const indConsultants = useMemo(() => {
+    const map = new Map<number, { id: number; name: string; projects: number; role: string }>()
+    const filtered = indTeamProjects.filter(p => {
+      if (indCFilter && String(p.customer?.id) !== indCFilter) return false
+      if (indPFilter && String(p.id) !== indPFilter) return false
+      if (indContractFilter && p.contract_type_display !== indContractFilter) return false
+      if (indStatusFilter && p.status !== indStatusFilter) return false
+      if (indExecFilter && !(p.coordinators ?? []).some((c: any) => String(c.id) === indExecFilter)) return false
+      return true
+    })
+    for (const p of filtered) {
+      for (const c of [...(p.consultants ?? []), ...(p.coordinators ?? [])]) {
+        if (!map.has(c.id)) map.set(c.id, { id: c.id, name: c.name, projects: 0, role: p.coordinators?.some((co: any) => co.id === c.id) ? 'Coordenador' : 'Consultor' })
+        map.get(c.id)!.projects++
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.projects - a.projects)
+  }, [indTeamProjects, indCFilter, indPFilter, indContractFilter, indStatusFilter, indExecFilter])
+
+  const indChartKpis = useMemo(() => {
+    if (!indMonthlyData?.length) return null
+    const hours = indMonthlyData.map(d => d.hours ?? 0)
+    const mediaHoras = hours.reduce((a, b) => a + b, 0) / hours.length
+    const mesesComDados = hours.filter(h => h > 0).length
+    let tendencia = '—'
+    if (hours.length >= 6) {
+      const last3 = hours.slice(-3).reduce((a, b) => a + b, 0) / 3
+      const prev3 = hours.slice(-6, -3).reduce((a, b) => a + b, 0) / 3
+      if (prev3 > 0) { const diff = ((last3 - prev3) / prev3) * 100; tendencia = (diff >= 0 ? '+' : '') + fmt(diff) + '%' }
+    }
+    return { mediaHoras, mesesComDados, tendencia }
+  }, [indMonthlyData])
+
+  const indHasFilter = indCFilter !== '' || indPFilter !== '' || indContractFilter !== '' || indStatusFilter !== 'active' || indExecFilter !== '' || indHealthFilter !== 'all'
+
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto">
@@ -323,40 +675,34 @@ export default function PortalClientePage() {
 
           {/* ── Header ── */}
           <div className="flex flex-wrap items-center gap-3 justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: 'rgba(0,245,255,0.12)' }}>
-                <Users size={20} style={{ color: '#00F5FF' }} />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">
-                  {d?.customer?.name ?? 'Visão Executiva'}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--brand-primary)' }}>
+                Portal do Cliente
+              </p>
+              {isMultiMode ? (
+                <h1 className="text-3xl font-bold text-white leading-tight">
+                  {customerIds.length === 0 ? 'Todos os Clientes' : `${customerIds.length} Clientes`}
                 </h1>
-                <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>
-                  Visão Executiva · consumo, tendência e saúde do contrato
-                </p>
-              </div>
+              ) : d?.customer?.name ? (
+                <h1 className="text-3xl font-bold text-white leading-tight">{d.customer.name}</h1>
+              ) : (
+                <div className="h-9 w-48 rounded-lg animate-pulse" style={{ background: 'var(--brand-surface)' }} />
+              )}
+              <p className="text-sm mt-1" style={{ color: 'var(--brand-muted)' }}>
+                Visão Executiva · consumo, tendência e saúde do contrato
+              </p>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
               {!isCliente && (
-                <SearchableSelect
-                  value={customerId}
-                  onChange={setCustomerId}
-                  placeholder="Selecionar cliente..."
+                <MultiCustomerSelect
+                  selected={customerIds}
+                  onChange={setCustomerIds}
                   options={customers}
                 />
               )}
-              <MonthYearPicker
-                month={filterMonth}
-                year={filterYear}
-                placeholder="Mês p/ consumo"
-                onChange={(m, y) => {
-                  if (m === 0 && y === 0) { setFilterMonth(null); setFilterYear(null) }
-                  else { setFilterMonth(m); setFilterYear(y) }
-                }}
-              />
-              {projectOptions.length > 0 && (
+
+              {!isMultiMode && projectOptions.length > 0 && (
                 <div className="relative">
                   <select
                     value={projectFilter ?? ''}
@@ -372,32 +718,193 @@ export default function PortalClientePage() {
                   <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--brand-subtle)' }} />
                 </div>
               )}
-              <div className="relative">
-                <select
-                  value={period}
-                  onChange={e => setPeriod(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-2.5 text-sm rounded-xl outline-none cursor-pointer font-medium"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}
-                >
-                  {PERIODS.map(p => <option key={p.value} value={p.value} style={{ background: '#161618' }}>{p.label}</option>)}
-                </select>
-                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--brand-subtle)' }} />
-              </div>
+
+              {/* Health pills + view toggle — apenas multi-mode */}
+              {isMultiMode && (<>
+                <div className="flex items-center gap-1 p-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--brand-border)' }}>
+                  {([
+                    { key: 'all',      label: 'Todos',    color: '#00F5FF' },
+                    { key: 'ok',       label: 'Saudável', color: '#22c55e' },
+                    { key: 'warning',  label: 'Atenção',  color: '#f59e0b' },
+                    { key: 'critical', label: 'Crítico',  color: '#ef4444' },
+                  ] as const).map(btn => {
+                    const active = healthFilter === btn.key
+                    return (
+                      <button key={btn.key} type="button" onClick={() => setHealthFilter(btn.key)}
+                        className="px-3 py-1.5 rounded-full text-sm font-semibold transition-all"
+                        style={active
+                          ? { background: btn.color, color: btn.key === 'all' ? '#0A0A0B' : '#fff' }
+                          : { color: btn.color, background: 'transparent' }
+                        }>
+                        {btn.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                {/* View toggle */}
+                <div className="flex items-center rounded-xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
+                  <button type="button" onClick={() => setViewMode('card')}
+                    className="p-2.5 transition-all"
+                    style={viewMode === 'card'
+                      ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
+                      : { background: 'rgba(255,255,255,0.04)', color: 'var(--brand-subtle)' }
+                    }>
+                    <LayoutGrid size={15} />
+                  </button>
+                  <button type="button" onClick={() => setViewMode('linear')}
+                    className="p-2.5 transition-all"
+                    style={viewMode === 'linear'
+                      ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
+                      : { background: 'rgba(255,255,255,0.04)', color: 'var(--brand-subtle)' }
+                    }>
+                    <List size={15} />
+                  </button>
+                </div>
+              </>)}
             </div>
           </div>
 
-          {/* ── Empty state ── */}
-          {!customerId && !isCliente && (
-            <div className="flex flex-col items-center gap-3 py-20 rounded-2xl border"
-              style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
-              <Users size={40} style={{ color: 'var(--brand-subtle)' }} />
-              <p className="text-base font-semibold" style={{ color: 'var(--brand-muted)' }}>
-                Selecione um cliente para visualizar o portal
-              </p>
+          {/* ── Tabs ── */}
+          {!isCliente && (
+            <div className="flex gap-1 p-1 rounded-2xl" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+              {([
+                { key: 'portal', label: 'Visão Executiva' },
+                { key: 'indicadores', label: 'Indicadores de Gestão' },
+              ] as const).map(tab => (
+                <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)}
+                  className="px-5 py-2 rounded-xl text-sm font-semibold transition-all"
+                  style={activeTab === tab.key
+                    ? { background: '#00F5FF', color: '#0A0A0B' }
+                    : { color: 'var(--brand-muted)', background: 'transparent' }
+                  }>
+                  {tab.label}
+                </button>
+              ))}
             </div>
           )}
 
-          {customerId && (
+          {/* ── Portal tab content ── */}
+          {(activeTab === 'portal' || isCliente) && <>
+
+          {/* ── Multi-customer grid ── */}
+          {isMultiMode && (
+            <div>
+              {multiLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="h-36 rounded-2xl animate-pulse" style={{ background: 'var(--brand-surface)' }} />
+                  ))}
+                </div>
+              ) : multiData.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 py-20 rounded-2xl border"
+                  style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
+                  <Users size={40} style={{ color: 'var(--brand-subtle)' }} />
+                  <p className="text-base font-semibold" style={{ color: 'var(--brand-muted)' }}>Nenhum dado disponível</p>
+                </div>
+              ) : viewMode === 'card' ? (
+                /* ── Card grid ── */
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {(healthFilter === 'all' ? multiData : multiData.filter(md => md.overview?.status === healthFilter)).map(md => {
+                    const ov = md.overview
+                    const pct = ov?.consumption_pct ?? 0
+                    const statusColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#22c55e'
+                    return (
+                      <button key={md._cid} type="button"
+                        onClick={() => setCustomerIds([md._cid])}
+                        className="text-left rounded-2xl p-5 flex flex-col gap-3 transition-all hover:scale-[1.01]"
+                        style={{ background: 'var(--brand-surface)', border: `1px solid var(--brand-border)` }}>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-bold text-white leading-tight">{md.customer?.name}</p>
+                          <span className="shrink-0 w-2.5 h-2.5 rounded-full mt-1" style={{ background: statusColor }} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>Consumido</p>
+                            <p className="text-lg font-bold" style={{ color: '#00F5FF' }}>{(ov?.total_consumed ?? 0).toFixed(1)}h</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>Saldo</p>
+                            <p className="text-lg font-bold" style={{ color: (ov?.balance_hours ?? 0) < 0 ? '#ef4444' : '#22c55e' }}>
+                              {(ov?.balance_hours ?? 0).toFixed(1)}h
+                            </p>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-[10px] mb-1" style={{ color: 'var(--brand-subtle)' }}>
+                            <span>Consumo</span><span>{pct.toFixed(1)}%</span>
+                          </div>
+                          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: statusColor }} />
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                /* ── Linear / table view ── */
+                <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid var(--brand-border)' }}>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Cliente</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Vendido</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Consumido</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Saldo</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider w-40" style={{ color: 'var(--brand-subtle)' }}>% Consumo</th>
+                        <th className="text-center px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Saúde</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(healthFilter === 'all' ? multiData : multiData.filter(md => md.overview?.status === healthFilter)).map((md, i) => {
+                        const ov = md.overview
+                        const pct = ov?.consumption_pct ?? 0
+                        const sc = HC[ov?.status as keyof typeof HC] ?? HC.ok
+                        return (
+                          <tr key={md._cid}
+                            onClick={() => setCustomerIds([md._cid])}
+                            className="cursor-pointer transition-colors"
+                            style={{
+                              background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)',
+                              borderBottom: '1px solid rgba(255,255,255,0.05)',
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,245,255,0.04)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)')}
+                          >
+                            <td className="px-4 py-3 font-semibold text-white">{md.customer?.name}</td>
+                            <td className="px-4 py-3 text-right tabular-nums" style={{ color: 'var(--brand-muted)' }}>
+                              {fmt(ov?.total_sold ?? 0)}h
+                            </td>
+                            <td className="px-4 py-3 text-right tabular-nums font-bold" style={{ color: '#00F5FF' }}>
+                              {fmt(ov?.total_consumed ?? 0)}h
+                            </td>
+                            <td className="px-4 py-3 text-right tabular-nums font-bold" style={{ color: (ov?.balance_hours ?? 0) < 0 ? '#ef4444' : '#22c55e' }}>
+                              {(ov?.balance_hours ?? 0) < 0 ? '−' : ''}{fmt(Math.abs(ov?.balance_hours ?? 0))}h
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                                  <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: sc.bar }} />
+                                </div>
+                                <span className="text-xs tabular-nums w-10 text-right" style={{ color: 'var(--brand-muted)' }}>{pct.toFixed(1)}%</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
+                                {STATUS_LABEL[ov?.status ?? 'ok'] ?? '—'}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isMultiMode && customerId && (
             <>
               {/* ── 1. KPIs ── */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -781,6 +1288,358 @@ export default function PortalClientePage() {
               )}
 
             </>
+          )}
+
+          </> /* end portal tab */}
+
+          {/* ── Indicadores tab content ── */}
+          {activeTab === 'indicadores' && !isCliente && (
+            <div className="space-y-6">
+
+              {/* Contract type tabs */}
+              <div className="flex items-center gap-1 p-1.5 rounded-2xl overflow-x-auto" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                {(['', ...indContractTypes] as string[]).map(ct => {
+                  const active = indContractFilter === ct
+                  return (
+                    <button key={ct} onClick={() => setIndContractFilter(ct)}
+                      className="px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all"
+                      style={active ? { background: '#00F5FF', color: '#0A0A0B' } : { color: 'var(--brand-muted)', background: 'transparent' }}>
+                      {ct === '' ? 'Todos' : ct}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Filters row */}
+              <div className="flex flex-wrap items-center gap-2">
+
+                {/* Saúde */}
+                <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                  {([
+                    { key: 'all',    label: 'Todos',    color: '#00F5FF' },
+                    { key: 'green',  label: 'Saudável', color: '#22c55e' },
+                    { key: 'yellow', label: 'Atenção',  color: '#f59e0b' },
+                    { key: 'red',    label: 'Crítico',  color: '#ef4444' },
+                  ] as const).map(btn => {
+                    const active = indHealthFilter === btn.key
+                    return (
+                      <button key={btn.key} type="button" onClick={() => setIndHealthFilter(btn.key)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                        style={active
+                          ? { background: btn.color, color: btn.key === 'all' ? '#0A0A0B' : '#fff' }
+                          : { color: btn.color, background: 'transparent' }
+                        }>
+                        {btn.label}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Status */}
+                <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                  {([
+                    { key: 'active',         label: 'Ativo' },
+                    { key: 'awaiting_start', label: 'Aguardando' },
+                    { key: 'paused',         label: 'Pausado' },
+                    { key: 'finished',       label: 'Finalizado' },
+                    { key: '',               label: 'Todos' },
+                  ] as const).map(btn => {
+                    const active = indStatusFilter === btn.key
+                    return (
+                      <button key={btn.key} type="button" onClick={() => setIndStatusFilter(btn.key)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                        style={active
+                          ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
+                          : { color: 'var(--brand-muted)', background: 'transparent' }
+                        }>
+                        {btn.label}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* View toggle */}
+                <div className="flex items-center rounded-xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
+                  <button type="button" onClick={() => setIndViewMode('list')}
+                    className="p-2.5 transition-all"
+                    style={indViewMode === 'list'
+                      ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
+                      : { background: 'rgba(255,255,255,0.04)', color: 'var(--brand-subtle)' }
+                    }>
+                    <List size={14} />
+                  </button>
+                  <button type="button" onClick={() => setIndViewMode('card')}
+                    className="p-2.5 transition-all"
+                    style={indViewMode === 'card'
+                      ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
+                      : { background: 'rgba(255,255,255,0.04)', color: 'var(--brand-subtle)' }
+                    }>
+                    <LayoutGrid size={14} />
+                  </button>
+                </div>
+
+                {/* SearchSelects */}
+                {[
+                  { value: indCFilter,    onChange: setIndCFilter,    placeholder: 'Todos os clientes',   options: indClienteOptions },
+                  { value: indPFilter,    onChange: setIndPFilter,    placeholder: 'Todos os projetos',   options: indProjetoOptions },
+                  { value: indExecFilter, onChange: setIndExecFilter, placeholder: 'Todos os executivos', options: indExecOptions },
+                ].map(({ value, onChange, placeholder, options }) => (
+                  <IndSearchSelect key={placeholder} value={value} onChange={onChange} placeholder={placeholder} options={options} />
+                ))}
+                {indHasFilter && (
+                  <button onClick={() => { setIndCFilter(''); setIndPFilter(''); setIndContractFilter(''); setIndStatusFilter('active'); setIndExecFilter(''); setIndHealthFilter('all') }}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors hover:bg-white/[0.06]"
+                    style={{ color: 'var(--brand-muted)' }}>
+                    <X size={13} /> Limpar
+                  </button>
+                )}
+              </div>
+
+              {/* KPIs */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {indLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />) : (<>
+                  <div className="rounded-2xl p-5 border" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
+                    <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Saldo Total</p>
+                    <p className="text-2xl font-bold tabular-nums" style={{ color: indKpis.saldoTotal < 0 ? '#ef4444' : '#00F5FF' }}>
+                      {indKpis.saldoTotal < 0 ? '−' : ''}{fmt(Math.abs(indKpis.saldoTotal))}h
+                    </p>
+                    <p className="text-xs mt-1.5" style={{ color: 'var(--brand-subtle)' }}>{indFiltered.length} projeto(s) filtrado(s)</p>
+                  </div>
+                  <div className="rounded-2xl p-5 border" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
+                    <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Consumo Médio</p>
+                    <p className="text-2xl font-bold tabular-nums" style={{ color: HSI[healthColorInd(indKpis.consumoMedio)].text }}>{fmt(indKpis.consumoMedio)}%</p>
+                    <p className="text-xs mt-1.5" style={{ color: 'var(--brand-subtle)' }}>Média das horas consumidas</p>
+                  </div>
+                  <div className="rounded-2xl p-5 border" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
+                    <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Projetos em Risco</p>
+                    <p className="text-2xl font-bold tabular-nums" style={{ color: indKpis.emRisco > 0 ? '#ef4444' : '#22c55e' }}>{indKpis.emRisco}</p>
+                    <p className="text-xs mt-1.5" style={{ color: 'var(--brand-subtle)' }}>{indKpis.emRisco > 0 ? '≥ 90% consumido' : 'Nenhum em risco crítico'}</p>
+                  </div>
+                  <div className="rounded-2xl p-5 border" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
+                    <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Total de Projetos</p>
+                    <p className="text-2xl font-bold tabular-nums" style={{ color: '#00F5FF' }}>{indKpis.totalProjetos}</p>
+                    <p className="text-xs mt-1.5" style={{ color: 'var(--brand-subtle)' }}>Projetos ativos</p>
+                  </div>
+                </>)}
+              </div>
+
+              {/* Alertas */}
+              <div className="rounded-2xl border p-5" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
+                <h2 className="text-sm font-semibold mb-4" style={{ color: 'var(--brand-text)' }}>Alertas Operacionais</h2>
+                {indLoading ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14" />)}</div>
+                ) : indAlerts.length === 0 ? (
+                  <div className="flex items-center gap-2.5 py-4" style={{ color: '#22c55e' }}>
+                    <CheckCircle size={18} /><span className="text-sm font-medium">Nenhum alerta no momento</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                    {indAlerts.map((a: any, i: number) => {
+                      const borderColor = a.type === 'red' ? '#ef4444' : '#f59e0b'
+                      const bgIdle = a.type === 'red' ? 'rgba(239,68,68,0.05)' : 'rgba(245,158,11,0.05)'
+                      const bgHover = a.type === 'red' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)'
+                      const iconColor = a.type === 'red' ? '#fca5a5' : '#fcd34d'
+                      return (
+                        <button key={i} type="button"
+                          onClick={() => { if (a.href) router.push(a.href); else if (a.projectId) setIndPFilter(String(a.projectId)) }}
+                          className="flex items-start gap-3 rounded-xl p-3 pl-4 w-full text-left transition-all"
+                          style={{ borderLeft: `4px solid ${borderColor}`, background: bgIdle }}
+                          onMouseEnter={e => (e.currentTarget.style.background = bgHover)}
+                          onMouseLeave={e => (e.currentTarget.style.background = bgIdle)}>
+                          <span className="mt-0.5 shrink-0" style={{ color: iconColor }}>
+                            {a.icon === 'clock' ? <Clock size={16} /> : <AlertTriangle size={16} />}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate" style={{ color: 'var(--brand-text)' }}>{a.title}</p>
+                            <p className="text-xs mt-0.5" style={{ color: 'var(--brand-muted)' }}>{a.msg}</p>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Evolução Mensal */}
+              <div className="rounded-2xl border p-5" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
+                <h2 className="text-sm font-semibold mb-4" style={{ color: 'var(--brand-text)' }}>Evolução Mensal</h2>
+                {indChartLoading ? <Skeleton className="h-60" /> : !indMonthlyData || indMonthlyData.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-2">
+                    <TrendingUp size={32} style={{ color: 'var(--brand-subtle)' }} />
+                    <p className="text-sm font-medium" style={{ color: 'var(--brand-muted)' }}>Dados históricos em breve</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col lg:flex-row gap-6">
+                    <div className="flex-1 min-w-0">
+                      <ResponsiveContainer width="100%" height={240}>
+                        <LineChart data={indMonthlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#71717A' }} axisLine={false} tickLine={false} />
+                          <YAxis tick={{ fontSize: 11, fill: '#71717A' }} axisLine={false} tickLine={false} />
+                          <Tooltip content={<IndChartTooltip />} cursor={{ fill: 'transparent' }} />
+                          <Line type="monotone" dataKey="hours" name="Horas" stroke="#00F5FF" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#00F5FF' }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                    {indChartKpis && (
+                      <div className="flex lg:flex-col gap-3 lg:w-40 shrink-0">
+                        {[
+                          { label: 'Média mensal', value: `${fmt(indChartKpis.mediaHoras)}h`, color: '#00F5FF' },
+                          { label: 'Meses c/ dados', value: String(indChartKpis.mesesComDados), color: 'var(--brand-text)' },
+                          { label: 'Tendência', value: indChartKpis.tendencia, color: indChartKpis.tendencia.startsWith('+') ? '#22c55e' : indChartKpis.tendencia.startsWith('-') ? '#ef4444' : 'var(--brand-muted)' },
+                        ].map(kpi => (
+                          <div key={kpi.label} className="flex-1 lg:flex-none rounded-xl p-3 border" style={{ borderColor: 'var(--brand-border)', background: 'rgba(255,255,255,0.03)' }}>
+                            <p className="text-[10px] uppercase tracking-wider font-medium mb-1" style={{ color: 'var(--brand-subtle)' }}>{kpi.label}</p>
+                            <p className="text-lg font-bold tabular-nums" style={{ color: kpi.color }}>{kpi.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Projetos */}
+              <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
+                <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+                  <h2 className="text-sm font-semibold" style={{ color: 'var(--brand-text)' }}>Projetos</h2>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--brand-subtle)' }}>Ordenados por menor saldo</p>
+                </div>
+                {indLoading ? (
+                  <div className="p-5 space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
+                ) : indCritical.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2 py-12">
+                    <FolderOpen size={28} style={{ color: 'var(--brand-subtle)' }} />
+                    <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>Nenhum projeto encontrado</p>
+                  </div>
+                ) : indViewMode === 'list' ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--brand-border)' }}>
+                          {['Projeto', 'Cliente', 'Tipo', 'Saldo', '% Uso', 'Status'].map(col => (
+                            <th key={col} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {indCritical.map((p: any, i: number) => {
+                          const pct = p.balance_percentage ?? 0
+                          const bal = p.general_hours_balance ?? 0
+                          const isCritical = pct >= 90 || bal < 0
+                          const isWarning = pct >= 70 && !isCritical
+                          const hc = healthColorInd(pct)
+                          return (
+                            <tr key={p.id ?? i} style={{
+                              borderBottom: i < indCritical.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                              borderLeft: isCritical ? '3px solid #ef4444' : isWarning ? '3px solid #f59e0b' : '3px solid transparent',
+                              background: isCritical ? 'rgba(239,68,68,0.03)' : isWarning ? 'rgba(245,158,11,0.03)' : 'transparent',
+                            }}>
+                              <td className="px-4 py-3 font-medium max-w-[180px] truncate" style={{ color: 'var(--brand-text)' }}>
+                                {p.name ?? '—'}{p.code && <span className="ml-1.5 text-xs" style={{ color: 'var(--brand-subtle)' }}>{p.code}</span>}
+                              </td>
+                              <td className="px-4 py-3 max-w-[140px] truncate" style={{ color: 'var(--brand-muted)' }}>{p.customer?.name ?? '—'}</td>
+                              <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--brand-muted)' }}>{p.contract_type_display ?? '—'}</td>
+                              <td className="px-4 py-3 tabular-nums whitespace-nowrap font-medium">
+                                <span style={{ color: bal < 0 ? '#ef4444' : bal >= 20 ? '#86efac' : 'var(--brand-muted)' }}>
+                                  {bal < 0 ? '−' : ''}{fmt(Math.abs(bal))}h
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 tabular-nums whitespace-nowrap">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: HSI[hc].badge, color: HSI[hc].text }}>{fmt(pct)}%</span>
+                              </td>
+                              <td className="px-4 py-3">
+                                {p.status_display ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--brand-muted)' }}>{p.status_display}</span> : '—'}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {indCritical.map((p: any) => {
+                      const pct = p.balance_percentage ?? 0
+                      const bal = p.general_hours_balance ?? 0
+                      const hc = healthColorInd(pct)
+                      return (
+                        <div key={p.id} className="rounded-xl p-4 flex flex-col gap-3" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${HSI[hc].bar}30` }}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-white truncate">{p.name}</p>
+                              <p className="text-xs truncate mt-0.5" style={{ color: 'var(--brand-subtle)' }}>{p.customer?.name ?? '—'}</p>
+                            </div>
+                            <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: HSI[hc].badge, color: HSI[hc].text }}>{fmt(pct)}%</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <p style={{ color: 'var(--brand-subtle)' }}>Tipo</p>
+                              <p className="font-medium mt-0.5" style={{ color: 'var(--brand-muted)' }}>{p.contract_type_display ?? '—'}</p>
+                            </div>
+                            <div>
+                              <p style={{ color: 'var(--brand-subtle)' }}>Saldo</p>
+                              <p className="font-bold tabular-nums mt-0.5" style={{ color: bal < 0 ? '#ef4444' : '#86efac' }}>
+                                {bal < 0 ? '−' : ''}{fmt(Math.abs(bal))}h
+                              </p>
+                            </div>
+                          </div>
+                          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: HSI[hc].bar }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Performance da Equipe */}
+              <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
+                <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+                  <div className="flex items-center gap-2">
+                    <Users size={16} style={{ color: 'var(--brand-muted)' }} />
+                    <h2 className="text-sm font-semibold" style={{ color: 'var(--brand-text)' }}>Performance da Equipe</h2>
+                  </div>
+                </div>
+                {indTeamLoading ? (
+                  <div className="p-5 space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
+                ) : indConsultants.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2 py-10">
+                    <Users size={28} style={{ color: 'var(--brand-subtle)' }} />
+                    <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>Nenhum consultor encontrado</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--brand-border)' }}>
+                          {['Membro', 'Papel', 'Projetos', 'Status'].map(col => (
+                            <th key={col} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {indConsultants.map((c: any, i: number) => (
+                          <tr key={c.id} style={{ borderBottom: i < indConsultants.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                            <td className="px-4 py-3 font-medium" style={{ color: 'var(--brand-text)' }}>{c.name}</td>
+                            <td className="px-4 py-3"><span className="text-xs" style={{ color: 'var(--brand-subtle)' }}>{c.role}</span></td>
+                            <td className="px-4 py-3 tabular-nums" style={{ color: 'var(--brand-muted)' }}>{c.projects}</td>
+                            <td className="px-4 py-3">
+                              {c.projects > 0
+                                ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: 'rgba(34,197,94,0.12)', color: '#86efac' }}>Ativo</span>
+                                : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--brand-subtle)' }}>Sem projetos</span>
+                              }
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+            </div>
           )}
 
         </div>

@@ -18,6 +18,7 @@ import {
   CreditCard, FileText, Calendar, MoreVertical, CalendarDays, RefreshCw,
 } from 'lucide-react'
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
+import { ExpenseViewModal } from '@/components/ui/expense-view-modal'
 import { MonthYearPicker } from '@/components/ui/month-year-picker'
 import { useAuth } from '@/hooks/use-auth'
 
@@ -934,104 +935,15 @@ export default function ExpensesPage() {
       )}
 
       {/* Modal: Visualizar Despesa */}
-      {viewItem && (() => {
-        const sc = EXP_STATUS_CONF[viewItem.status] ?? { bg: 'rgba(113,113,122,0.12)', color: '#71717A', label: viewItem.status }
-        const canEdit = ['pending', 'rejected', 'adjustment_requested'].includes(viewItem.status)
-        return (
-          <ModalOverlay onClose={() => setViewItem(null)}>
-            <div className="max-h-[88vh] overflow-y-auto">
-              {/* Header */}
-              <div className="px-5 pt-5 pb-4 flex items-start gap-3">
-                <div className="p-2.5 rounded-xl shrink-0"
-                  style={{ background: 'rgba(249,115,22,0.1)', color: '#F97316' }}>
-                  <Receipt size={16} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-white">Detalhes da Despesa</h3>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>
-                    #{viewItem.id} · {formatDate(viewItem.expense_date)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="px-5 pb-5 space-y-4">
-                {/* Status + Categoria */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
-                    style={{ background: sc.bg, color: sc.color }}>
-                    {sc.label}
-                  </span>
-                  {viewItem.category?.name && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
-                      style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--brand-muted)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                      <Tag size={9} /> {viewItem.category.name}
-                    </span>
-                  )}
-                </div>
-
-                {/* Valor hero */}
-                <div className="rounded-xl px-4 py-4"
-                  style={{ background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.15)' }}>
-                  <p className="text-[10px] uppercase tracking-widest mb-1" style={{ color: 'var(--brand-subtle)' }}>Valor Total</p>
-                  <p className="text-2xl font-bold" style={{ color: '#F97316' }}>{formatCurrency(viewItem.amount)}</p>
-                </div>
-
-                {/* Info card */}
-                <div className="rounded-xl overflow-hidden"
-                  style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-                  <InfoRowModal icon={Calendar} label="Data" value={formatDate(viewItem.expense_date)} />
-                  {viewItem.user?.name && (
-                    <InfoRowModal icon={Building2} label="Colaborador" value={viewItem.user.name} />
-                  )}
-                  {viewItem.project?.customer?.name && (
-                    <InfoRowModal icon={Building2} label="Cliente" value={viewItem.project.customer.name} />
-                  )}
-                  <InfoRowModal icon={FolderOpen} label="Projeto" value={viewItem.project?.name} />
-                  <InfoRowModal icon={Tag} label="Tipo" value={EXP_TYPE_LABEL[viewItem.expense_type] ?? viewItem.expense_type} />
-                  {viewItem.payment_method && (
-                    <InfoRowModal icon={CreditCard} label="Pagamento" value={PAYMENT_LABEL_MAP[viewItem.payment_method] ?? viewItem.payment_method} />
-                  )}
-                  <InfoRowModal icon={Paperclip} label="Comprovante" last>
-                    {viewItem.receipt_url
-                      ? <ReceiptLink url={viewItem.receipt_url} />
-                      : <span className="text-xs" style={{ color: 'var(--brand-subtle)' }}>Sem comprovante</span>
-                    }
-                  </InfoRowModal>
-                </div>
-
-                {/* Descrição */}
-                {viewItem.description && (
-                  <div className="rounded-xl overflow-hidden"
-                    style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-                    <div className="flex items-center gap-2 px-4 py-2.5"
-                      style={{ borderBottom: '1px solid var(--brand-border)' }}>
-                      <FileText size={11} style={{ color: 'var(--brand-primary)' }} />
-                      <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: 'var(--brand-subtle)' }}>Descrição</span>
-                    </div>
-                    <p className="px-4 py-3 text-sm leading-relaxed" style={{ color: 'var(--brand-muted)' }}>
-                      {viewItem.description}
-                    </p>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex items-center justify-end gap-2 pt-1">
-                  {canEdit && (
-                    <UIButton variant="outline" onClick={() => { setViewItem(null); openEdit(viewItem) }}
-                      className="h-8 text-xs border-zinc-700 text-zinc-300 gap-1.5">
-                      <Pencil size={11} /> Editar
-                    </UIButton>
-                  )}
-                  <UIButton variant="outline" onClick={() => setViewItem(null)}
-                    className="h-8 text-xs border-zinc-700 text-zinc-300">
-                    Fechar
-                  </UIButton>
-                </div>
-              </div>
-            </div>
-          </ModalOverlay>
-        )
-      })()}
+      {viewItem && (
+        <ExpenseViewModal
+          expense={viewItem}
+          onClose={() => setViewItem(null)}
+          onEdit={['pending', 'rejected', 'adjustment_requested'].includes(viewItem.status)
+            ? () => { setViewItem(null); openEdit(viewItem) }
+            : undefined}
+        />
+      )}
 
       <ConfirmDeleteModal
         open={deleteConfirm.open}

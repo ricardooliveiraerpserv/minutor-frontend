@@ -84,13 +84,11 @@ type NavEntry = NavItem | NavGroup
 
 const NAV_COORDINATOR: NavEntry[] = [
   { type: 'item', label: 'Início',                   href: '/dashboard',        icon: Home },
-  { type: 'item', label: 'Meu Painel',               href: '/meu-painel',       icon: LayoutDashboard },
   { type: 'item', label: 'Apontamentos',             href: '/timesheets',       icon: Clock },
   { type: 'item', label: 'Despesas',                 href: '/expenses',         icon: Receipt },
-  { type: 'item', label: 'Gestão de Projetos',       href: '/gestao-projetos',  icon: Layers },
-  { type: 'item', label: 'Indicadores Projetos',     href: '/indicadores',      icon: TrendingUp },
-  { type: 'item', label: 'Visão Executiva',        href: '/portal-cliente',   icon: Building2 },
   { type: 'item', label: 'Aprovações',               href: '/approvals',        icon: CheckSquare },
+  { type: 'item', label: 'Gestão de Projetos',       href: '/gestao-projetos',  icon: Layers },
+  { type: 'item', label: 'Visão Executiva',          href: '/portal-cliente',   icon: Building2 },
 ]
 
 const NAV_CLIENTE: NavEntry[] = [
@@ -112,11 +110,9 @@ const NAV_CLIENTE: NavEntry[] = [
 
 const NAV: NavEntry[] = [
   { type: 'item', label: 'Início',                   href: '/dashboard',        icon: Home },
-  { type: 'item', label: 'Meu Painel',               href: '/meu-painel',       icon: LayoutDashboard },
   { type: 'item', label: 'Apontamentos',             href: '/timesheets',       icon: Clock },
   { type: 'item', label: 'Despesas',                 href: '/expenses',         icon: Receipt },
   { type: 'item', label: 'Gestão de Projetos',       href: '/gestao-projetos',  icon: Layers },
-  { type: 'item', label: 'Indicadores Projetos',     href: '/indicadores',      icon: TrendingUp },
   { type: 'item', label: 'Visão Executiva',        href: '/portal-cliente',   icon: Building2 },
   { type: 'item', label: 'Aprovações',               href: '/approvals',        icon: CheckSquare },
   {
@@ -265,23 +261,20 @@ function SidebarInner({ user }: { user: User }) {
       return nav
     }
     if (isConsultor) {
-      const allowed = new Set(['/dashboard', '/meu-painel'])
+      const allowed = new Set(['/dashboard'])
       if (ep.includes('gestao_projetos.view') || ep.includes('gestao_projetos.update')) allowed.add('/gestao-projetos')
       return NAV.filter(e => e.type === 'item' && allowed.has(e.href))
     }
     if (isParceiroAdmin) {
-      const base: NavEntry[] = [
-        { type: 'item', label: 'Meu Painel',   href: '/meu-painel', icon: LayoutDashboard },
-        { type: 'item', label: 'Apontamentos', href: '/timesheets',  icon: Clock },
-        { type: 'item', label: 'Despesas',     href: '/expenses',    icon: Receipt },
-      ]
       if (isParceiroGestor) {
         return [
           { type: 'item', label: 'Painel do Parceiro', href: '/partner-dashboard', icon: Handshake },
-          ...base,
         ] as NavEntry[]
       }
-      return base
+      // Parceiro simples: igual ao consultor
+      return [
+        { type: 'item', label: 'Início',     href: '/dashboard',  icon: Home },
+      ] as NavEntry[]
     }
     return NAV
   }, [isCoordenador, isConsultor, isCliente, isParceiroAdmin, isParceiroGestor, clienteContractCodes, ep])

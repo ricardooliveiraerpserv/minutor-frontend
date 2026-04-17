@@ -1688,7 +1688,7 @@ export default function MeuPainelPage() {
     { id: 'timesheets', label: 'Apontamentos', icon: Clock },
     { id: 'expenses',   label: 'Despesas',     icon: Receipt },
     { id: 'indicators', label: 'Indicadores',  icon: BarChart2 },
-    ...(!isFixo && (isHBConsultant || isHorista) ? [{ id: 'hora-banco' as TabType, label: 'Remuneração', icon: DollarSign }] : []),
+    ...(!isFixo && !isParceiroSimples && (isHBConsultant || isHorista) ? [{ id: 'hora-banco' as TabType, label: 'Remuneração', icon: DollarSign }] : []),
   ]
 
   // Se activeTab não existe na lista (ex: fixo que estava em hora-banco), volta ao overview
@@ -2335,6 +2335,7 @@ export default function MeuPainelPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
 
             {/* Valor Gerado */}
+            {!isParceiroSimples && (
             <div className="rounded-xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 p-5 col-span-2 lg:col-span-1">
               <div className="flex items-center gap-2 mb-3">
                 <div className="p-1.5 rounded-lg bg-cyan-500/20">
@@ -2353,8 +2354,10 @@ export default function MeuPainelPage() {
                   : 'Taxa não configurada no perfil'}
               </div>
             </div>
+            )}
 
             {/* Ticket Médio */}
+            {!isParceiroSimples && (
             <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
               <div className="flex items-center gap-2 mb-3">
                 <div className="p-1.5 rounded-lg bg-violet-500/20">
@@ -2367,6 +2370,7 @@ export default function MeuPainelPage() {
               </div>
               <div className="text-[11px] text-zinc-500 mt-1.5">por hora trabalhada</div>
             </div>
+            )}
 
             {/* Ocupação */}
             <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
@@ -2465,14 +2469,14 @@ export default function MeuPainelPage() {
                       <div className={`h-full rounded-full transition-all duration-500 ${targetPct >= 100 ? 'bg-gradient-to-r from-green-500 to-green-400' : 'bg-gradient-to-r from-cyan-500 to-cyan-400'}`}
                         style={{ width: `${targetPct}%` }} />
                     </div>
-                    {estimatedValue !== null && (
+                    {estimatedValue !== null && !isParceiroSimples && (
                       <div className="mt-3 pt-3 border-t border-zinc-800 flex items-center justify-between">
                         <span className="text-[11px] text-zinc-500">Valor pelo mês completo</span>
                         <span className="text-sm font-bold text-cyan-400">{formatBRL(billableHours * effectiveRate)}</span>
                       </div>
                     )}
                   </>
-                ) : estimatedValue !== null && isCurrentMonth && remainingWD > 0 ? (
+                ) : estimatedValue !== null && !isParceiroSimples && isCurrentMonth && remainingWD > 0 ? (
                   <div className="pt-3 border-t border-zinc-800 flex items-center justify-between">
                     <span className="text-[11px] text-zinc-500">
                       Se mantiver o ritmo de {avgHPerDay.toFixed(1)}h/dia nos {remainingWD} dias restantes
@@ -2549,7 +2553,7 @@ export default function MeuPainelPage() {
                       <th className="text-left px-5 py-3 text-zinc-500 font-medium">Projeto</th>
                       <th className="text-right px-5 py-3 text-zinc-500 font-medium">Horas</th>
                       <th className="text-right px-5 py-3 text-zinc-500 font-medium">%</th>
-                      {estimatedValue !== null && (
+                      {estimatedValue !== null && !isParceiroSimples && (
                         <th className="text-right px-5 py-3 text-zinc-500 font-medium">Valor</th>
                       )}
                     </tr>
@@ -2562,7 +2566,7 @@ export default function MeuPainelPage() {
                         <td className="px-5 py-3 text-right text-zinc-500">
                           {tsTotalMin > 0 ? ((p.minutes / tsTotalMin) * 100).toFixed(1) + '%' : '—'}
                         </td>
-                        {estimatedValue !== null && (
+                        {estimatedValue !== null && !isParceiroSimples && (
                           <td className="px-5 py-3 text-right text-cyan-400 font-medium">
                             {formatBRL((p.minutes / 60) * hourlyRate)}
                           </td>
@@ -2574,7 +2578,7 @@ export default function MeuPainelPage() {
                       <td className="px-5 py-3 text-zinc-300 font-semibold">Total</td>
                       <td className="px-5 py-3 text-right text-white font-mono font-bold">{minutesToHours(tsTotalMin)}</td>
                       <td className="px-5 py-3 text-right text-zinc-400">100%</td>
-                      {estimatedValue !== null && (
+                      {estimatedValue !== null && !isParceiroSimples && (
                         <td className="px-5 py-3 text-right text-cyan-300 font-bold">{formatBRL(estimatedValue)}</td>
                       )}
                     </tr>
@@ -2590,7 +2594,7 @@ export default function MeuPainelPage() {
 
           {/* ── Histórico: últimos 12 meses ───────────────────────────────────── */}
           {(() => {
-            const hasRate     = effectiveRate > 0
+            const hasRate     = effectiveRate > 0 && !isParceiroSimples
             const hasExpHist  = history.some(p => p.expenses > 0)
             const hasMonetary = hasRate || hasExpHist
 
@@ -2929,7 +2933,7 @@ export default function MeuPainelPage() {
                 </div>
 
                 <div className="flex items-center gap-4 text-[10px] px-1" style={{ color: 'var(--brand-subtle)' }}>
-                  <span>Valor fixo: {hourlyRate > 0 ? formatBRL(hourlyRate) : '—'}/mês</span>
+                  {!isParceiroSimples && <span>Valor fixo: {hourlyRate > 0 ? formatBRL(hourlyRate) : '—'}/mês</span>}
                   <span className="ml-auto">Total trabalhado: {fmtHours(workedHours)}</span>
                 </div>
               </>
@@ -2971,7 +2975,7 @@ export default function MeuPainelPage() {
                       <thead style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--brand-border)' }}>
                         <tr>
                           <th className="px-2 py-2.5 w-10" />
-                          {['Data', 'Projeto', 'Horas', 'Valor', 'Status'].map(h => (
+                          {['Data', 'Projeto', 'Horas', ...(isParceiroSimples ? [] : ['Valor']), 'Status'].map(h => (
                             <th key={h} className="px-4 py-2.5 text-center font-semibold uppercase tracking-wider text-[10px] first:text-left" style={{ color: 'var(--brand-subtle)' }}>{h}</th>
                           ))}
                         </tr>
@@ -2995,7 +2999,7 @@ export default function MeuPainelPage() {
                               <td className="px-4 py-2.5 font-medium" style={{ color: 'var(--brand-text)' }}>{fmt(ts.date)}</td>
                               <td className="px-4 py-2.5 text-center max-w-[180px] truncate" style={{ color: 'var(--brand-muted)' }}>{ts.project?.name ?? '—'}</td>
                               <td className="px-4 py-2.5 text-center font-mono" style={{ color: 'var(--brand-text)' }}>{fmtHours(hrs)}</td>
-                              <td className="px-4 py-2.5 text-center font-mono" style={{ color: val ? '#22c55e' : 'var(--brand-subtle)' }}>{val ? formatBRL(val) : '—'}</td>
+                              {!isParceiroSimples && <td className="px-4 py-2.5 text-center font-mono" style={{ color: val ? '#22c55e' : 'var(--brand-subtle)' }}>{val ? formatBRL(val) : '—'}</td>}
                               <td className="px-4 py-2.5 text-center">
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                                   ts.status === 'approved' ? 'bg-green-500/15 text-green-400' :
@@ -3012,8 +3016,8 @@ export default function MeuPainelPage() {
                 </div>
 
                 <div className="flex items-center gap-4 text-[10px] px-1" style={{ color: 'var(--brand-subtle)' }}>
-                  <span>Taxa: {hourlyRate > 0 ? formatBRL(hourlyRate) : '—'}/h</span>
-                  {guaranteedHours !== null && <span>Garantido: {fmtHours(Number(guaranteedHours))}/mês</span>}
+                  {!isParceiroSimples && <span>Taxa: {hourlyRate > 0 ? formatBRL(hourlyRate) : '—'}/h</span>}
+                  {!isParceiroSimples && guaranteedHours !== null && <span>Garantido: {fmtHours(Number(guaranteedHours))}/mês</span>}
                   <span className="ml-auto">Total faturável: {fmtHours(billableHours)}</span>
                 </div>
               </>

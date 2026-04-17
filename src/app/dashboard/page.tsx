@@ -133,8 +133,8 @@ export default function DashboardPage() {
   const [recentExp,  setRecentExp]  = useState<ExpItem[]>([])
   const [conLoading, setConLoading] = useState(false)
 
-  const isAdmin     = user?.type === 'admin' || user?.type === 'coordenador' || user?.type === 'parceiro_admin'
-  const isConsultor = user?.type === 'consultor'
+  const isAdmin     = user?.type === 'admin' || user?.type === 'coordenador'
+  const isConsultor = user?.type === 'consultor' || user?.type === 'parceiro_admin'
 
   // ── Load admin data ──
   useEffect(() => {
