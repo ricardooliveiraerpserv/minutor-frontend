@@ -278,6 +278,7 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, canEdit, canCha
             { label: 'Despesas',               icon: <BarChart2   size={12} />, onClick: () => onMenuAction('expenses',   project) },
             { label: 'Aportes',                icon: <TrendingUp  size={12} />, onClick: () => onMenuAction('aportes',    project) },
             { label: 'Selecionar Equipe',      icon: <Users          size={12} />, onClick: () => onMenuAction('team',     project) },
+            { label: 'Mensagens',              icon: <MessageCircle  size={12} />, onClick: () => onMenuAction('messages', project) },
           ]} />
         </td>
 

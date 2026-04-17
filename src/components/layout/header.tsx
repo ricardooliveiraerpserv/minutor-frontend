@@ -1,6 +1,6 @@
 'use client'
 
-import { Bell, LogOut, User } from 'lucide-react'
+import { Bell, LogOut, User, MessageCircle, X } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,27 +12,57 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from 'next/navigation'
 import { secureUrl, api } from '@/lib/api'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface HeaderProps {
   title?: string
   actions?: React.ReactNode
 }
 
+interface Notification {
+  project_id: number
+  project_name: string
+  project_code: string
+  unread_count: number
+}
+
 export function Header({ title, actions }: HeaderProps) {
   const { user, logout } = useAuth()
   const router = useRouter()
   const [unread, setUnread] = useState(0)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [bellOpen, setBellOpen] = useState(false)
+  const bellRef = useRef<HTMLDivElement>(null)
+
+  const fetchNotifications = () => {
+    if (!user || (user.type !== 'admin' && user.type !== 'coordenador')) return
+    api.get<Notification[]>('/messages/notifications')
+      .then(r => {
+        const list = Array.isArray(r) ? r : []
+        setNotifications(list)
+        setUnread(list.reduce((s, n) => s + n.unread_count, 0))
+      })
+      .catch(() => {})
+  }
 
   useEffect(() => {
     if (!user) return
-    const fetch = () => {
-      api.get<{ count: number }>('/messages/unread-count').then(r => setUnread(r.count ?? 0)).catch(() => {})
-    }
-    fetch()
-    const id = setInterval(fetch, 60_000)
+    fetchNotifications()
+    const id = setInterval(fetchNotifications, 60_000)
     return () => clearInterval(id)
   }, [user])
+
+  // Close bell panel on outside click
+  useEffect(() => {
+    if (!bellOpen) return
+    function handler(e: MouseEvent) {
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
+        setBellOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [bellOpen])
 
   const handleLogout = async () => {
     await logout()
@@ -46,6 +76,8 @@ export function Header({ title, actions }: HeaderProps) {
     .join('')
     .toUpperCase() ?? 'U'
 
+  const isAdminOrCoord = user?.type === 'admin' || user?.type === 'coordenador'
+
   return (
     <header className="flex items-center justify-between h-14 px-6 border-b shrink-0" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
       <div className="flex items-center gap-3">
@@ -57,17 +89,82 @@ export function Header({ title, actions }: HeaderProps) {
       <div className="flex items-center gap-2">
         {actions}
 
-        <button className="relative p-1.5 rounded-md text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-          <Bell size={16} />
-          {unread > 0 && (
-            <span
-              className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center pointer-events-none"
-              style={{ background: '#00F5FF', color: '#0A0A0B' }}
+        {/* Bell notification */}
+        {isAdminOrCoord && (
+          <div ref={bellRef} className="relative">
+            <button
+              onClick={() => { setBellOpen(v => !v); fetchNotifications() }}
+              className="relative p-1.5 rounded-md transition-colors hover:bg-zinc-800"
+              style={{ color: bellOpen ? '#00F5FF' : '#71717A' }}
             >
-              {unread > 9 ? '9+' : unread}
-            </span>
-          )}
-        </button>
+              <Bell size={16} />
+              {unread > 0 && (
+                <span
+                  className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center pointer-events-none"
+                  style={{ background: '#00F5FF', color: '#0A0A0B' }}
+                >
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
+            </button>
+
+            {bellOpen && (
+              <div
+                className="absolute right-0 top-full mt-2 w-80 rounded-xl shadow-2xl z-50 overflow-hidden"
+                style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+                  <div className="flex items-center gap-2">
+                    <MessageCircle size={14} style={{ color: '#00F5FF' }} />
+                    <span className="text-xs font-bold" style={{ color: '#FAFAFA' }}>Mensagens</span>
+                    {unread > 0 && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(0,245,255,0.12)', color: '#00F5FF' }}>
+                        {unread} não {unread === 1 ? 'lida' : 'lidas'}
+                      </span>
+                    )}
+                  </div>
+                  <button onClick={() => setBellOpen(false)} className="p-0.5 rounded hover:bg-white/5 transition-colors" style={{ color: 'var(--brand-muted)' }}>
+                    <X size={12} />
+                  </button>
+                </div>
+
+                {/* List */}
+                <div className="max-h-72 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 gap-1">
+                      <Bell size={20} style={{ color: 'var(--brand-muted)' }} />
+                      <p className="text-xs" style={{ color: 'var(--brand-subtle)' }}>Sem mensagens não lidas</p>
+                    </div>
+                  ) : (
+                    notifications.map(n => (
+                      <button
+                        key={n.project_id}
+                        onClick={() => {
+                          setBellOpen(false)
+                          router.push('/gestao-projetos')
+                        }}
+                        className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors border-b text-left"
+                        style={{ borderColor: 'var(--brand-border)' }}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold truncate" style={{ color: '#FAFAFA' }}>{n.project_name}</p>
+                          <p className="text-[10px] font-mono" style={{ color: 'var(--brand-muted)' }}>{n.project_code}</p>
+                        </div>
+                        <span
+                          className="ml-3 shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                          style={{ background: 'rgba(0,245,255,0.12)', color: '#00F5FF' }}
+                        >
+                          {n.unread_count}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors outline-none">
