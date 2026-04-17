@@ -76,8 +76,6 @@ export function Header({ title, actions }: HeaderProps) {
     .join('')
     .toUpperCase() ?? 'U'
 
-  const isAdminOrCoord = user?.type === 'admin' || user?.type === 'coordenador'
-
   return (
     <header className="flex items-center justify-between h-14 px-6 border-b shrink-0" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
       <div className="flex items-center gap-3">
@@ -89,8 +87,8 @@ export function Header({ title, actions }: HeaderProps) {
       <div className="flex items-center gap-2">
         {actions}
 
-        {/* Bell notification */}
-        {isAdminOrCoord && (
+        {/* Bell notification — visible for all logged-in users; content scoped server-side */}
+        {user && (
           <div ref={bellRef} className="relative">
             <button
               onClick={() => { setBellOpen(v => !v); fetchNotifications() }}
