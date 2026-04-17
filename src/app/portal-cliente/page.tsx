@@ -361,10 +361,8 @@ export default function PortalClientePage() {
   const indLoadedRef = useRef(false)
   const [indCFilter, setIndCFilter] = useState('')
   const [indPFilter, setIndPFilter] = useState('')
-  const [indContractFilter, setIndContractFilter] = useState('')
+
   const [indStatusFilter, setIndStatusFilter] = useState('')
-  const [indHealthFilter, setIndHealthFilter] = useState<'all' | 'green' | 'yellow' | 'red'>('all')
-  const [indViewMode, setIndViewMode] = useState<'list' | 'card'>('list')
   const [indExecFilter, setIndExecFilter] = useState('')
 
   // Para cliente: usa o customer_id do próprio usuário automaticamente
@@ -562,12 +560,6 @@ export default function PortalClientePage() {
   }, [activeTab])
 
   // ── Indicadores computed ──
-  const indContractTypes = useMemo(() => {
-    const set = new Set<string>()
-    for (const p of indProjects) if (p.contract_type_display) set.add(p.contract_type_display)
-    return Array.from(set).sort()
-  }, [indProjects])
-
   const indClienteOptions = useMemo(() => {
     const map = new Map<string, string>()
     for (const p of indProjects) if (p.customer?.id && p.customer?.name) map.set(String(p.customer.id), p.customer.name)
@@ -595,12 +587,10 @@ export default function PortalClientePage() {
   const indFiltered = useMemo(() => indProjects.filter(p => {
     if (indCFilter && String(p.customer?.id) !== indCFilter) return false
     if (indPFilter && String(p.id) !== indPFilter) return false
-    if (indContractFilter && p.contract_type_display !== indContractFilter) return false
     if (indStatusFilter && p.status !== indStatusFilter) return false
     if (indExecFilter && !(p.coordinators ?? []).some((c: any) => String(c.id) === indExecFilter)) return false
-    if (indHealthFilter !== 'all' && healthColorInd(p.balance_percentage) !== indHealthFilter) return false
     return true
-  }), [indProjects, indCFilter, indPFilter, indContractFilter, indStatusFilter, indExecFilter, indHealthFilter])
+  }), [indProjects, indCFilter, indPFilter, indStatusFilter, indExecFilter])
 
   const indKpis = useMemo(() => {
     const saldoTotal = indFiltered.reduce((acc, p) => acc + (p.general_hours_balance ?? 0), 0)
@@ -638,7 +628,6 @@ export default function PortalClientePage() {
     const filtered = indTeamProjects.filter(p => {
       if (indCFilter && String(p.customer?.id) !== indCFilter) return false
       if (indPFilter && String(p.id) !== indPFilter) return false
-      if (indContractFilter && p.contract_type_display !== indContractFilter) return false
       if (indStatusFilter && p.status !== indStatusFilter) return false
       if (indExecFilter && !(p.coordinators ?? []).some((c: any) => String(c.id) === indExecFilter)) return false
       return true
@@ -650,7 +639,7 @@ export default function PortalClientePage() {
       }
     }
     return Array.from(map.values()).sort((a, b) => b.projects - a.projects)
-  }, [indTeamProjects, indCFilter, indPFilter, indContractFilter, indStatusFilter, indExecFilter])
+  }, [indTeamProjects, indCFilter, indPFilter, indStatusFilter, indExecFilter])
 
   const indChartKpis = useMemo(() => {
     if (!indMonthlyData?.length) return null
@@ -666,7 +655,7 @@ export default function PortalClientePage() {
     return { mediaHoras, mesesComDados, tendencia }
   }, [indMonthlyData])
 
-  const indHasFilter = indCFilter !== '' || indPFilter !== '' || indContractFilter !== '' || indStatusFilter !== '' || indExecFilter !== '' || indHealthFilter !== 'all'
+  const indHasFilter = indCFilter !== '' || indPFilter !== '' || indStatusFilter !== '' || indExecFilter !== ''
 
   return (
     <AppLayout>
@@ -1290,44 +1279,8 @@ export default function PortalClientePage() {
           {activeTab === 'indicadores' && !isCliente && (
             <div className="space-y-6">
 
-              {/* Contract type tabs */}
-              <div className="flex items-center gap-1 p-1.5 rounded-2xl overflow-x-auto" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-                {(['', ...indContractTypes] as string[]).map(ct => {
-                  const active = indContractFilter === ct
-                  return (
-                    <button key={ct} onClick={() => setIndContractFilter(ct)}
-                      className="px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all"
-                      style={active ? { background: '#00F5FF', color: '#0A0A0B' } : { color: 'var(--brand-muted)', background: 'transparent' }}>
-                      {ct === '' ? 'Todos' : ct}
-                    </button>
-                  )
-                })}
-              </div>
-
               {/* Filters row */}
               <div className="flex flex-wrap items-center gap-2">
-
-                {/* Saúde */}
-                <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-                  {([
-                    { key: 'all',    label: 'Todos',    color: '#00F5FF' },
-                    { key: 'green',  label: 'Saudável', color: '#22c55e' },
-                    { key: 'yellow', label: 'Atenção',  color: '#f59e0b' },
-                    { key: 'red',    label: 'Crítico',  color: '#ef4444' },
-                  ] as const).map(btn => {
-                    const active = indHealthFilter === btn.key
-                    return (
-                      <button key={btn.key} type="button" onClick={() => setIndHealthFilter(btn.key)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                        style={active
-                          ? { background: btn.color, color: btn.key === 'all' ? '#0A0A0B' : '#fff' }
-                          : { color: btn.color, background: 'transparent' }
-                        }>
-                        {btn.label}
-                      </button>
-                    )
-                  })}
-                </div>
 
                 {/* Status */}
                 <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
@@ -1352,26 +1305,6 @@ export default function PortalClientePage() {
                   })}
                 </div>
 
-                {/* View toggle */}
-                <div className="flex items-center rounded-xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
-                  <button type="button" onClick={() => setIndViewMode('list')}
-                    className="p-2.5 transition-all"
-                    style={indViewMode === 'list'
-                      ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
-                      : { background: 'rgba(255,255,255,0.04)', color: 'var(--brand-subtle)' }
-                    }>
-                    <List size={14} />
-                  </button>
-                  <button type="button" onClick={() => setIndViewMode('card')}
-                    className="p-2.5 transition-all"
-                    style={indViewMode === 'card'
-                      ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
-                      : { background: 'rgba(255,255,255,0.04)', color: 'var(--brand-subtle)' }
-                    }>
-                    <LayoutGrid size={14} />
-                  </button>
-                </div>
-
                 {/* SearchSelects */}
                 {[
                   { value: indCFilter,    onChange: setIndCFilter,    placeholder: 'Todos os clientes',   options: indClienteOptions },
@@ -1381,7 +1314,7 @@ export default function PortalClientePage() {
                   <IndSearchSelect key={placeholder} value={value} onChange={onChange} placeholder={placeholder} options={options} />
                 ))}
                 {indHasFilter && (
-                  <button onClick={() => { setIndCFilter(''); setIndPFilter(''); setIndContractFilter(''); setIndStatusFilter(''); setIndExecFilter(''); setIndHealthFilter('all') }}
+                  <button onClick={() => { setIndCFilter(''); setIndPFilter(''); setIndStatusFilter(''); setIndExecFilter('') }}
                     className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors hover:bg-white/[0.06]"
                     style={{ color: 'var(--brand-muted)' }}>
                     <X size={13} /> Limpar
@@ -1511,7 +1444,7 @@ export default function PortalClientePage() {
                     <FolderOpen size={28} style={{ color: 'var(--brand-subtle)' }} />
                     <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>Nenhum projeto encontrado</p>
                   </div>
-                ) : indViewMode === 'list' ? (
+                ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
@@ -1555,40 +1488,6 @@ export default function PortalClientePage() {
                         })}
                       </tbody>
                     </table>
-                  </div>
-                ) : (
-                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {indSorted.map((p: any) => {
-                      const pct = p.balance_percentage ?? 0
-                      const bal = p.general_hours_balance ?? 0
-                      const hc = healthColorInd(pct)
-                      return (
-                        <div key={p.id} className="rounded-xl p-4 flex flex-col gap-3" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${HSI[hc].bar}30` }}>
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="text-sm font-bold text-white truncate">{p.name}</p>
-                              <p className="text-xs truncate mt-0.5" style={{ color: 'var(--brand-subtle)' }}>{p.customer?.name ?? '—'}</p>
-                            </div>
-                            <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: HSI[hc].badge, color: HSI[hc].text }}>{fmt(pct)}%</span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div>
-                              <p style={{ color: 'var(--brand-subtle)' }}>Tipo</p>
-                              <p className="font-medium mt-0.5" style={{ color: 'var(--brand-muted)' }}>{p.contract_type_display ?? '—'}</p>
-                            </div>
-                            <div>
-                              <p style={{ color: 'var(--brand-subtle)' }}>Saldo</p>
-                              <p className="font-bold tabular-nums mt-0.5" style={{ color: bal < 0 ? '#ef4444' : '#86efac' }}>
-                                {bal < 0 ? '−' : ''}{fmt(Math.abs(bal))}h
-                              </p>
-                            </div>
-                          </div>
-                          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: HSI[hc].bar }} />
-                          </div>
-                        </div>
-                      )
-                    })}
                   </div>
                 )}
               </div>
