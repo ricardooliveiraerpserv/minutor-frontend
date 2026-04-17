@@ -48,10 +48,10 @@ export function ProjectMessages({ projectId }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const bottomRef   = useRef<HTMLDivElement>(null)
 
-  // Fetch mentionable users once (admins + coordinators only)
+  // Fetch mentionable users: all admins + coordinators of this project
   useEffect(() => {
-    api.get<MentionUser[]>('/messages/mentionable-users').then(r => setMentionUsers(Array.isArray(r) ? r : [])).catch(() => {})
-  }, [])
+    api.get<MentionUser[]>(`/messages/mentionable-users?project_id=${projectId}`).then(r => setMentionUsers(Array.isArray(r) ? r : [])).catch(() => {})
+  }, [projectId])
 
   const load = useCallback(() => {
     setLoading(true)
