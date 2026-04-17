@@ -52,7 +52,7 @@ function GeneralTab() {
   useEffect(() => {
     Promise.all([
       api.get<{ data: SystemSettings }>('/system-settings'),
-      api.get<{ data: { id: number; name: string }[] }>('/customers?pageSize=100'),
+      api.get<{ data: { id: number; name: string }[] }>('/customers?pageSize=500'),
     ]).then(([s, c]) => {
       setSettings(s.data ?? s as unknown as SystemSettings)
       const cArr = Array.isArray((c as any)?.items) ? (c as any).items : Array.isArray((c as any)?.data) ? (c as any).data : []
@@ -65,7 +65,7 @@ function GeneralTab() {
   useEffect(() => {
     if (!settings.movidesk_default_customer_id) { setProjects([]); return }
     api.get<{ data: { id: number; name: string }[] }>(
-      `/projects?customer_id=${settings.movidesk_default_customer_id}&per_page=200`
+      `/projects?customer_id=${settings.movidesk_default_customer_id}&per_page=200&status=active`
     ).then(r => {
       const arr = Array.isArray((r as any)?.items) ? (r as any).items : Array.isArray((r as any)?.data) ? (r as any).data : []
       setProjects(arr)

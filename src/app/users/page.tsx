@@ -36,7 +36,7 @@ interface UserItem {
 }
 
 interface CustomerOption { id: number; name: string }
-interface PartnerOption  { id: number; name: string }
+interface PartnerOption  { id: number; name: string; pricing_type?: 'fixed' | 'variable'; hourly_rate?: string | null }
 
 // ─── Profile type logic ───────────────────────────────────────────────────────
 
@@ -245,7 +245,7 @@ export default function UsersPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id?: number }>({ open: false })
 
   useEffect(() => {
-    api.get<any>('/customers?pageSize=100').then(r =>
+    api.get<any>('/customers?pageSize=500').then(r =>
       setCustomers(Array.isArray(r?.items) ? r.items : [])
     ).catch(() => {})
     api.get<any>('/partners?pageSize=-1').then(r =>
@@ -379,6 +379,8 @@ export default function UsersPage() {
   const isParceiroAdm = form.profiles.includes('parceiro_adm')
   const hasRate       = isConsultor || isCoordenador || isParceiroAdm
   const needsPartner  = isParceiroAdm
+  const selectedPartner = partners.find(p => p.id === Number(form.partner_id))
+  const partnerIsFixed  = selectedPartner?.pricing_type === 'fixed'
 
   const canSave = !!form.name && !!form.email && form.profiles.length > 0
     && (!isCliente     || !!form.customer_id)
@@ -557,7 +559,14 @@ export default function UsersPage() {
                 )}
 
                 {/* ── Remuneração (Consultor / Coordenador / Parceiro) ── */}
-                {hasRate && (
+                {hasRate && isParceiroAdm && partnerIsFixed ? (
+                  <div className="text-[10px] text-zinc-500 bg-zinc-800/50 rounded-md px-3 py-2 border border-zinc-700/50">
+                    Valor hora definido pelo parceiro:{' '}
+                    <span className="text-cyan-400 font-medium">
+                      R$ {selectedPartner?.hourly_rate ? Number(selectedPartner.hourly_rate).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}/h
+                    </span>
+                  </div>
+                ) : hasRate && (
                   <div>
                     <Label className="text-xs text-zinc-400 mb-1 block">Remuneração</Label>
                     <div className="flex gap-2 items-center">

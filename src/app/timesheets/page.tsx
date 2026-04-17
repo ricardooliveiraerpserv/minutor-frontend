@@ -688,8 +688,10 @@ function toHHMM(mins: number): string {
 
 function TimesheetsPageContent() {
   const { user } = useAuth()
-  const isAdmin   = user?.type === 'admin' || user?.type === 'parceiro_admin'
-  const isCliente = user?.type === 'cliente'
+  const isAdmin        = user?.type === 'admin' || user?.type === 'parceiro_admin'
+  const isCoordenador  = user?.type === 'coordenador'
+  const canActAsUser   = isAdmin || isCoordenador
+  const isCliente      = user?.type === 'cliente'
   const searchParams = useSearchParams()
   const [projectId, setProjectId]     = useState(() => searchParams.get('project_id') ?? '')
   const [page, setPage]               = useState(1)
@@ -697,14 +699,16 @@ function TimesheetsPageContent() {
   const [origin, setOrigin]           = useState('')
   const [serviceTypeId, setServiceTypeId] = useState('')
   const [contractTypeId, setContractTypeId] = useState('')
-  const [customerId, setCustomerId]   = useState('')
+  const [customerId, setCustomerId]   = useState(() => searchParams.get('customer_id') ?? '')
   const [executiveId, setExecutiveId] = useState('')
   const [userId, setUserId]           = useState('')
-  const [startDate, setStartDate]     = useState('')
-  const [endDate, setEndDate]         = useState('')
+  const [startDate, setStartDate]     = useState(() => searchParams.get('start_date') ?? '')
+  const [endDate, setEndDate]         = useState(() => searchParams.get('end_date') ?? '')
   const [refMonth, setRefMonth]       = useState<number | null>(null)
   const [refYear,  setRefYear]        = useState<number | null>(null)
-  const [ticket, setTicket]           = useState('')
+  const [ticket, setTicket]           = useState(() => searchParams.get('ticket') ?? '')
+  const [requester, setRequester]     = useState(() => searchParams.get('requester') ?? '')
+  const [ticketService, setTicketService] = useState(() => searchParams.get('ticket_service') ?? '')
   const [exporting, setExporting]     = useState(false)
   const [sortField, setSortField]     = useState<SortField | null>('date')
   const [sortDir, setSortDir]         = useState<SortDir>('desc')
@@ -756,7 +760,7 @@ function TimesheetsPageContent() {
   useEffect(() => {
     if (!newForm.modal_customer_id) { setModalProjects([]); return }
     let cancelled = false
-    const qs = new URLSearchParams({ pageSize: '200', customer_id: newForm.modal_customer_id })
+    const qs = new URLSearchParams({ pageSize: '200', customer_id: newForm.modal_customer_id, status: 'active' })
     api.get<{ items: SelectOption[] }>(`/projects?${qs}`)
       .then(r => { if (!cancelled) setModalProjects(Array.isArray(r?.items) ? r.items : []) })
       .catch(() => {})
@@ -795,7 +799,7 @@ function TimesheetsPageContent() {
         ticket:      newForm.ticket || null,
         observation: newForm.observation || null,
       }
-      if (isAdmin && newForm.user_id) body.user_id = Number(newForm.user_id)
+      if (canActAsUser && newForm.user_id) body.user_id = Number(newForm.user_id)
       await api.post('/timesheets', body)
       toast.success('Apontamento criado com sucesso')
       setNewModalOpen(false)
@@ -854,14 +858,14 @@ function TimesheetsPageContent() {
     if (isCliente) {
       // Para cliente: carrega apenas os projetos do seu customer_id
       if (user?.customer_id) {
-        api.get<any>(`/projects?pageSize=200&customer_id=${user.customer_id}`)
+        api.get<any>(`/projects?pageSize=200&customer_id=${user.customer_id}&status=active`)
           .then(r => setClienteProjects(items(r))).catch(() => {})
       }
     } else {
       Promise.all([
-        api.get<any>('/customers?pageSize=100'),
+        api.get<any>('/customers?pageSize=500'),
         api.get<any>('/executives?pageSize=100'),
-        api.get<any>('/users?pageSize=200'),
+        api.get<any>('/users?pageSize=200&exclude_type=cliente'),
       ]).then(([c, ex, us]) => {
         setCustomers(items(c))
         setExecutives(items(ex))
@@ -884,23 +888,25 @@ function TimesheetsPageContent() {
     if (startDate)      p.set('start_date', startDate)
     if (endDate)        p.set('end_date', endDate)
     if (ticket)         p.set('ticket', ticket)
+    if (requester)      p.set('requester', requester)
+    if (ticketService)  p.set('ticket_service', ticketService)
     if (projectId)      p.set('project_id', projectId)
     if (sortField)      p.set('order', sortDir === 'desc' ? `-${sortField}` : sortField)
     return p.toString()
-  }, [page, status, origin, serviceTypeId, contractTypeId, customerId, executiveId, userId, projectId, startDate, endDate, ticket, sortField, sortDir, isCliente, user?.customer_id])
+  }, [page, status, origin, serviceTypeId, contractTypeId, customerId, executiveId, userId, projectId, startDate, endDate, ticket, requester, ticketService, sortField, sortDir, isCliente, user?.customer_id])
 
   const { data, loading, error, refetch } = useApiQuery<PaginatedResponse<Timesheet>>(
     `/timesheets?${params}`, [params]
   )
 
   const resetPage = useCallback(() => setPage(1), [])
-  const hasFilters = !!(status || origin || serviceTypeId || contractTypeId || customerId || executiveId || userId || projectId || startDate || endDate || ticket)
+  const hasFilters = !!(status || origin || serviceTypeId || contractTypeId || customerId || executiveId || userId || projectId || startDate || endDate || ticket || requester || ticketService)
 
   const clearFilters = useCallback(() => {
     setStatus(''); setOrigin(''); setServiceTypeId(''); setContractTypeId('')
     setCustomerId(''); setExecutiveId(''); setUserId(''); setProjectId('')
     setStartDate(''); setEndDate(''); setRefMonth(null); setRefYear(null)
-    setTicket(''); setPage(1)
+    setTicket(''); setRequester(''); setTicketService(''); setPage(1)
   }, [])
 
   const handleExport = async () => {
@@ -910,9 +916,15 @@ function TimesheetsPageContent() {
       if (status)         p.set('status', status)
       if (serviceTypeId)  p.set('service_type_id', serviceTypeId)
       if (contractTypeId) p.set('contract_type_id', contractTypeId)
+      if (customerId)     p.set('customer_id', customerId)
+      if (projectId)      p.set('project_id', projectId)
+      if (userId)         p.set('user_id', userId)
       if (startDate)      p.set('start_date', startDate)
       if (endDate)        p.set('end_date', endDate)
       if (ticket)         p.set('ticket', ticket)
+      if (requester)      p.set('requester', requester)
+      if (ticketService)  p.set('ticket_service', ticketService)
+      if (isCliente && user?.customer_id) p.set('customer_id', String(user.customer_id))
       const token = localStorage.getItem('minutor_token')
       const res = await fetch(`/api/v1/timesheets/export?${p}`, { headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) throw new Error()
@@ -935,11 +947,9 @@ function TimesheetsPageContent() {
           actions={
             <>
               <Button variant="ghost" size="sm" icon={RefreshCw} onClick={() => refetch()}>Atualizar</Button>
-              {!isCliente && (
-                <Button variant="secondary" size="sm" icon={FileSpreadsheet} onClick={handleExport} loading={exporting}>
-                  {exporting ? 'Exportando...' : 'Excel'}
-                </Button>
-              )}
+              <Button variant="secondary" size="sm" icon={FileSpreadsheet} onClick={handleExport} loading={exporting}>
+                {exporting ? 'Exportando...' : 'Excel'}
+              </Button>
               {!isCliente && (
                 <Button variant="primary" size="sm" icon={Plus} onClick={openNewModal}>Novo</Button>
               )}
@@ -1050,6 +1060,24 @@ function TimesheetsPageContent() {
                 </button>
               </div>
             )}
+            {requester && (
+              <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium"
+                style={{ background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.25)', color: '#8B5CF6' }}>
+                Solicitante: {requester}
+                <button onClick={() => { setRequester(''); resetPage() }} className="ml-1 hover:opacity-70 transition-opacity">
+                  <X size={10} />
+                </button>
+              </div>
+            )}
+            {ticketService && (
+              <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium"
+                style={{ background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)', color: '#10B981' }}>
+                Módulo: {ticketService}
+                <button onClick={() => { setTicketService(''); resetPage() }} className="ml-1 hover:opacity-70 transition-opacity">
+                  <X size={10} />
+                </button>
+              </div>
+            )}
             {hasFilters && (
               <button
                 onClick={clearFilters}
@@ -1132,6 +1160,7 @@ function TimesheetsPageContent() {
                 <Th sortable active={sortField === 'user.name'}     dir={sortDir} onClick={() => handleSort('user.name')}>Colaborador</Th>
                 <Th sortable active={sortField === 'project.name'}  dir={sortDir} onClick={() => handleSort('project.name')}>Projeto</Th>
                 <Th className="hidden lg:table-cell">Título</Th>
+                <Th className="hidden xl:table-cell">Descrição</Th>
                 <Th className="hidden xl:table-cell">Solicitante</Th>
                 <Th className="hidden xl:table-cell">Contrato</Th>
                 <Th>Status</Th>
@@ -1140,7 +1169,7 @@ function TimesheetsPageContent() {
             <Tbody>
               {data?.items.length === 0 ? (
                 <tr>
-                  <td colSpan={11}>
+                  <td colSpan={12}>
                     <EmptyState icon={Clock} title="Nenhum apontamento encontrado" description="Tente ajustar os filtros ou criar um novo apontamento." />
                   </td>
                 </tr>
@@ -1184,6 +1213,19 @@ function TimesheetsPageContent() {
                   </Td>
                   <Td muted className="hidden lg:table-cell truncate max-w-[160px]">
                     {ts.ticket_subject ?? '—'}
+                  </Td>
+                  <Td muted className="hidden xl:table-cell max-w-[180px]">
+                    {ts.observation ? (
+                      <div className="relative group w-full">
+                        <span className="block truncate cursor-default" style={{ color: 'var(--brand-muted)' }}>
+                          {ts.observation.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()}
+                        </span>
+                        <div className="pointer-events-none absolute z-50 left-0 top-full mt-1 hidden group-hover:block w-72 rounded-xl p-3 text-xs leading-relaxed shadow-2xl"
+                          style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.12)', color: '#E5E7EB' }}>
+                          {ts.observation.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()}
+                        </div>
+                      </div>
+                    ) : <span>—</span>}
                   </Td>
                   <Td muted className="hidden xl:table-cell truncate max-w-[140px]">
                     {ts.ticket_solicitante?.name ?? '—'}
@@ -1233,18 +1275,26 @@ function TimesheetsPageContent() {
             <h3 className="text-sm font-semibold text-white mb-4">Novo Apontamento</h3>
             <div className="space-y-3">
 
-              {/* Usuário (admin only) */}
-              {isAdmin && (
+              {/* Usuário (admin + coordenador) */}
+              {canActAsUser && (
                 <div>
-                  <Label className="text-xs text-zinc-400">Usuário</Label>
-                  <div className="mt-1">
-                    <SearchSelect
-                      value={newForm.user_id}
-                      onChange={v => setNewForm(f => ({ ...f, user_id: v }))}
-                      options={consultants}
-                      placeholder="Selecione o usuário..."
-                    />
+                  <div className="flex items-center justify-between mb-1">
+                    <Label className="text-xs text-zinc-400">Usuário</Label>
+                    <button
+                      type="button"
+                      onClick={() => setNewForm(f => ({ ...f, user_id: String(user?.id ?? '') }))}
+                      className="text-xs font-medium transition-colors"
+                      style={{ color: 'var(--brand-primary)' }}
+                    >
+                      → Colocar-me como responsável
+                    </button>
                   </div>
+                  <SearchSelect
+                    value={newForm.user_id}
+                    onChange={v => setNewForm(f => ({ ...f, user_id: v }))}
+                    options={consultants}
+                    placeholder="Selecione o usuário..."
+                  />
                 </div>
               )}
 

@@ -174,3 +174,50 @@ svg.recharts-surface > g > rect:first-child {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2a2a2e; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #3a3a3e; }
+
+/* ── Number input — remove spinners (setas) ──────────────────── */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+
+/* ── Status row styling ──────────────────────────────────────── */
+tr.row--cancelado {
+  background: rgba(239, 68, 68, 0.06) !important;
+  border-left: 3px solid #EF4444 !important;
+  opacity: 0.65;
+  filter: grayscale(20%);
+  transition: all 0.2s ease;
+}
+tr.row--encerrado {
+  background: rgba(148, 163, 184, 0.06) !important;
+  border-left: 3px solid #94A3B8 !important;
+  opacity: 0.75;
+  transition: all 0.2s ease;
+}
+tr.row--pausado {
+  background: rgba(245, 158, 11, 0.06) !important;
+  border-left: 3px solid #F59E0B !important;
+  transition: all 0.2s ease;
+}
+
+/* Filho: versão mais sutil — sem opacity agressiva, sem grayscale */
+tr.row--cancelado.row--child {
+  background: rgba(239, 68, 68, 0.03) !important;
+  opacity: 0.8;
+  filter: none;
+}
+tr.row--encerrado.row--child {
+  background: rgba(148, 163, 184, 0.03) !important;
+  opacity: 0.85;
+}
+tr.row--pausado.row--child {
+  background: rgba(245, 158, 11, 0.03) !important;
+}
+
+/* Hover: sempre restaura legibilidade */
+tr.row--cancelado:hover,
+tr.row--encerrado:hover,
+tr.row--pausado:hover {
+  opacity: 1 !important;
+  filter: none !important;
+}

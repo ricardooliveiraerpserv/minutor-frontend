@@ -58,7 +58,7 @@ export default function NewTimesheetPage() {
     const items = (r: any) => Array.isArray(r?.items) ? r.items : []
     Promise.all([
       isAdmin ? api.get<any>('/users?pageSize=200') : Promise.resolve(null),
-      api.get<any>('/customers?pageSize=100'),
+      api.get<any>('/customers?pageSize=500'),
     ]).then(([u, c]) => {
       if (u) setUsers(items(u))
       setCustomers(items(c))
@@ -68,7 +68,7 @@ export default function NewTimesheetPage() {
   useEffect(() => {
     if (!form.customer_id) { setProjects([]); return }
     let cancelled = false
-    const qs = new URLSearchParams({ pageSize: '200', customer_id: form.customer_id })
+    const qs = new URLSearchParams({ pageSize: '200', customer_id: form.customer_id, status: 'active' })
     api.get<PaginatedResponse<SelectOption>>(`/projects?${qs}`)
       .then(r => { if (!cancelled) setProjects(Array.isArray(r?.items) ? r.items : []) })
       .catch(() => {})

@@ -20,6 +20,8 @@ interface PartnerItem {
   email?: string
   phone?: string
   active: boolean
+  pricing_type: 'fixed' | 'variable'
+  hourly_rate?: string | null
 }
 
 function ModalOverlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
@@ -40,7 +42,7 @@ function TableSkeleton() {
     <>
       {[...Array(6)].map((_, i) => (
         <tr key={i} className="border-b border-zinc-800">
-          {[...Array(5)].map((_, j) => (
+          {[...Array(7)].map((_, j) => (
             <td key={j} className="px-3 py-2.5"><Skeleton className="h-4 w-full" /></td>
           ))}
         </tr>
@@ -49,7 +51,7 @@ function TableSkeleton() {
   )
 }
 
-const EMPTY_FORM = { name: '', document: '', email: '', phone: '', active: true }
+const EMPTY_FORM = { name: '', document: '', email: '', phone: '', active: true, pricing_type: 'fixed' as 'fixed' | 'variable', hourly_rate: '' }
 
 export default function PartnersPage() {
   const [items, setItems]   = useState<PartnerItem[]>([])
@@ -94,6 +96,8 @@ export default function PartnersPage() {
       email: item.email ?? '',
       phone: item.phone ?? '',
       active: item.active,
+      pricing_type: item.pricing_type ?? 'fixed',
+      hourly_rate: item.hourly_rate ?? '',
     })
     setModal({ open: true, item })
   }
@@ -102,11 +106,13 @@ export default function PartnersPage() {
     setSaving(true)
     try {
       const payload = {
-        name:     form.name,
-        document: form.document || null,
-        email:    form.email || null,
-        phone:    form.phone || null,
-        active:   form.active,
+        name:         form.name,
+        document:     form.document || null,
+        email:        form.email || null,
+        phone:        form.phone || null,
+        active:       form.active,
+        pricing_type: form.pricing_type,
+        hourly_rate:  form.pricing_type === 'fixed' ? (form.hourly_rate || null) : null,
       }
       if (modal.item) await api.put(`/partners/${modal.item.id}`, payload)
       else            await api.post('/partners', payload)
@@ -174,6 +180,7 @@ export default function PartnersPage() {
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden md:table-cell">Documento</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden md:table-cell">E-mail</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden sm:table-cell">Telefone</th>
+              <th className="text-left px-3 py-2.5 text-zinc-500 font-medium hidden lg:table-cell">Precificação</th>
               <th className="text-left px-3 py-2.5 text-zinc-500 font-medium">Status</th>
             </tr>
           </thead>
@@ -182,7 +189,7 @@ export default function PartnersPage() {
               <TableSkeleton />
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-12 text-center text-zinc-500">
+                <td colSpan={7} className="px-3 py-12 text-center text-zinc-500">
                   <div className="flex flex-col items-center gap-2">
                     <Handshake size={24} className="text-zinc-700" />
                     <span>Nenhum parceiro encontrado</span>
@@ -201,6 +208,15 @@ export default function PartnersPage() {
                 <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell">{item.document ?? '—'}</td>
                 <td className="px-3 py-2.5 text-zinc-400 hidden md:table-cell">{item.email ?? '—'}</td>
                 <td className="px-3 py-2.5 text-zinc-400 hidden sm:table-cell">{item.phone ?? '—'}</td>
+                <td className="px-3 py-2.5 hidden lg:table-cell">
+                  {item.pricing_type === 'fixed' ? (
+                    <span className="text-zinc-300 text-[10px]">
+                      Único {item.hourly_rate ? <span className="text-zinc-400">R$ {Number(item.hourly_rate).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/h</span> : ''}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-purple-400">Por consultor</span>
+                  )}
+                </td>
                 <td className="px-3 py-2.5">
                   <Badge variant="outline" className={`text-[10px] border ${item.active
                     ? 'bg-green-500/20 text-green-400 border-green-500/30'
@@ -259,6 +275,44 @@ export default function PartnersPage() {
                   placeholder="(00) 00000-0000"
                   className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
               </div>
+              <div>
+                <Label className="text-xs text-zinc-400 mb-1.5 block">Tipo de precificação *</Label>
+                <div className="flex gap-2">
+                  {(['fixed', 'variable'] as const).map(pt => (
+                    <button
+                      key={pt}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, pricing_type: pt, hourly_rate: pt === 'variable' ? '' : f.hourly_rate }))}
+                      className={`flex-1 py-1.5 rounded-md text-xs font-medium border transition-all ${
+                        form.pricing_type === pt
+                          ? 'border-blue-500 bg-blue-600/20 text-blue-300'
+                          : 'border-zinc-700 bg-zinc-800 text-zinc-400 hover:border-zinc-600'
+                      }`}
+                    >
+                      {pt === 'fixed' ? 'Valor único' : 'Valores por consultor'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {form.pricing_type === 'fixed' && (
+                <div>
+                  <Label className="text-xs text-zinc-400">Valor hora do parceiro (R$) *</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={form.hourly_rate}
+                    onChange={e => setForm(f => ({ ...f, hourly_rate: e.target.value }))}
+                    placeholder="0,00"
+                    className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs"
+                  />
+                </div>
+              )}
+              {form.pricing_type === 'variable' && (
+                <p className="text-[10px] text-zinc-500 bg-zinc-800/50 rounded-md px-3 py-2 border border-zinc-700/50">
+                  Cada consultor deste parceiro terá seu próprio valor hora definido no cadastro de usuário.
+                </p>
+              )}
               <div className="flex items-center gap-2">
                 <button onClick={() => setForm(f => ({ ...f, active: !f.active }))}
                   className={`w-8 h-4 rounded-full transition-colors relative ${form.active ? 'bg-blue-600' : 'bg-zinc-700'}`}>
@@ -270,7 +324,7 @@ export default function PartnersPage() {
             <div className="flex gap-2 mt-5 justify-end">
               <Button variant="outline" onClick={() => setModal({ open: false })}
                 className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
-              <Button onClick={save} disabled={saving || !form.name}
+              <Button onClick={save} disabled={saving || !form.name || (form.pricing_type === 'fixed' && !form.hourly_rate)}
                 className="h-8 text-xs bg-blue-600 hover:bg-blue-500 text-white">
                 {saving ? 'Salvando...' : 'Salvar'}
               </Button>

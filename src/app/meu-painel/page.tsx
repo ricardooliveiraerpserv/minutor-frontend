@@ -1185,7 +1185,7 @@ export default function MeuPainelPage() {
 
   // Load support data once
   useEffect(() => {
-    api.get<any>('/my-projects?pageSize=30').then(r =>
+    api.get<any>('/my-projects?pageSize=30&status=active').then(r =>
       setProjects(Array.isArray(r?.items) ? r.items : [])
     ).catch(() => {})
 
@@ -2886,6 +2886,7 @@ export default function MeuPainelPage() {
                     <table className="w-full text-xs" style={{ background: 'var(--brand-surface)' }}>
                       <thead style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--brand-border)' }}>
                         <tr>
+                          <th className="px-2 py-2.5 w-10" />
                           {['Data', 'Projeto', 'Horas', 'Status'].map(h => (
                             <th key={h} className="px-4 py-2.5 text-center font-semibold uppercase tracking-wider text-[10px] first:text-left" style={{ color: 'var(--brand-subtle)' }}>{h}</th>
                           ))}
@@ -2894,8 +2895,18 @@ export default function MeuPainelPage() {
                       <tbody>
                         {timesheets.map(ts => {
                           const hrs = ts.effort_minutes / 60
+                          const locked = isLocked(ts.status)
                           return (
                             <tr key={ts.id} className="border-b hover:bg-white/[0.02] transition-colors" style={{ borderColor: 'var(--brand-border)' }}>
+                              <td className="px-2 py-2.5 w-10">
+                                <RowMenu items={[
+                                  { label: 'Visualizar', icon: <Eye size={12} />, onClick: () => setTsViewItem(ts) },
+                                  ...(!locked && ['pending', 'rejected', 'adjustment_requested'].includes(ts.status) ? [
+                                    { label: 'Editar', icon: <Pencil size={12} />, onClick: () => openEditTs(ts) },
+                                    { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => deleteTs(ts.id), danger: true },
+                                  ] : []),
+                                ]} />
+                              </td>
                               <td className="px-4 py-2.5 font-medium" style={{ color: 'var(--brand-text)' }}>{fmt(ts.date)}</td>
                               <td className="px-4 py-2.5 text-center max-w-[180px] truncate" style={{ color: 'var(--brand-muted)' }}>{ts.project?.name ?? '—'}</td>
                               <td className="px-4 py-2.5 text-center font-mono" style={{ color: 'var(--brand-text)' }}>{fmtHours(hrs)}</td>
@@ -2954,6 +2965,7 @@ export default function MeuPainelPage() {
                     <table className="w-full text-xs" style={{ background: 'var(--brand-surface)' }}>
                       <thead style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--brand-border)' }}>
                         <tr>
+                          <th className="px-2 py-2.5 w-10" />
                           {['Data', 'Projeto', 'Horas', 'Valor', 'Status'].map(h => (
                             <th key={h} className="px-4 py-2.5 text-center font-semibold uppercase tracking-wider text-[10px] first:text-left" style={{ color: 'var(--brand-subtle)' }}>{h}</th>
                           ))}
@@ -2963,8 +2975,18 @@ export default function MeuPainelPage() {
                         {timesheets.map(ts => {
                           const hrs = ts.effort_minutes / 60
                           const val = effectiveRate > 0 ? hrs * effectiveRate : null
+                          const locked = isLocked(ts.status)
                           return (
                             <tr key={ts.id} className="border-b hover:bg-white/[0.02] transition-colors" style={{ borderColor: 'var(--brand-border)' }}>
+                              <td className="px-2 py-2.5 w-10">
+                                <RowMenu items={[
+                                  { label: 'Visualizar', icon: <Eye size={12} />, onClick: () => setTsViewItem(ts) },
+                                  ...(!locked && ['pending', 'rejected', 'adjustment_requested'].includes(ts.status) ? [
+                                    { label: 'Editar', icon: <Pencil size={12} />, onClick: () => openEditTs(ts) },
+                                    { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => deleteTs(ts.id), danger: true },
+                                  ] : []),
+                                ]} />
+                              </td>
                               <td className="px-4 py-2.5 font-medium" style={{ color: 'var(--brand-text)' }}>{fmt(ts.date)}</td>
                               <td className="px-4 py-2.5 text-center max-w-[180px] truncate" style={{ color: 'var(--brand-muted)' }}>{ts.project?.name ?? '—'}</td>
                               <td className="px-4 py-2.5 text-center font-mono" style={{ color: 'var(--brand-text)' }}>{fmtHours(hrs)}</td>

@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { formatBRL } from '@/lib/format'
 import { Project, PaginatedResponse, ProjectChangeLog, HourContribution } from '@/types'
 import { toast } from 'sonner'
-import { FolderOpen, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, Search, ChevronDown, Eye, Clock, Users, TrendingUp, Tag, History, HandCoins, Save, AlertCircle, DollarSign, BarChart2, UserCheck } from 'lucide-react'
+import { FolderOpen, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, Search, ChevronDown, Eye, Clock, Users, TrendingUp, Tag, History, HandCoins, Save, AlertCircle, DollarSign, BarChart2, UserCheck, Layers } from 'lucide-react'
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
 import { RowMenu } from '@/components/ui/row-menu'
 
@@ -103,7 +103,11 @@ const EMPTY_FORM: ProjectForm = {
   consultant_ids: [], coordinator_ids: [], consultant_group_ids: [],
 }
 
-// ─── Tree ────────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function cleanName(name: string) {
+  return (name || '').replace(/^\[.*?\]\s*/g, '').trim()
+}
 
 interface TreeRow extends Project {
   _level: number
@@ -113,23 +117,19 @@ interface TreeRow extends Project {
   _node_state: 'ACTIVE' | 'DISABLED' | null
 }
 
-function cleanName(name: string) {
-  return (name || '').replace(/^\[.*?\]\s*/g, '').trim()
-}
-
 function toTreeRow(p: Project, level = 0, parentId: number | null = null, nodeState: 'ACTIVE' | 'DISABLED' | null = null): TreeRow {
   return { ...p, _level: level, _hasChildren: (p.child_projects?.length ?? 0) > 0, _isExpanded: false, _parentId: parentId, _node_state: nodeState }
 }
 
 // % consumido = consumed / (sold + contributions) * 100
-function calcConsumedPct(row: TreeRow): number | null {
-  const sold = row.sold_hours ?? 0
-  const contrib = row.total_contributions_hours ?? row.hour_contribution ?? 0
+function calcConsumedPct(p: Project): number | null {
+  const sold = p.sold_hours ?? 0
+  const contrib = p.total_contributions_hours ?? p.hour_contribution ?? 0
   const totalSold = sold + contrib
   if (totalSold <= 0) return null
-  const consumed = row.consumed_hours != null
-    ? row.consumed_hours
-    : row.total_logged_minutes != null ? row.total_logged_minutes / 60 : null
+  const consumed = p.consumed_hours != null
+    ? p.consumed_hours
+    : p.total_logged_minutes != null ? p.total_logged_minutes / 60 : null
   if (consumed == null) return null
   return Math.round((consumed / totalSold) * 100)
 }
@@ -418,17 +418,18 @@ function ProjectsPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const isAdmin = user?.type === 'admin'
+  const isCoordenador = user?.type === 'coordenador'
   const ep = user?.extra_permissions ?? []
   const canCreate      = isAdmin || ep.includes('projects.create')
   const canEdit        = isAdmin || ep.includes('projects.update')
   const canDelete      = isAdmin || ep.includes('projects.delete')
   const canViewFinance = isAdmin || ep.includes('projects.view_financial')
+  const canChangeStatus = isAdmin || isCoordenador
 
   const [page, setPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState('')
   const [searchInput, setSearchInput] = useState('')  // valor exibido no input
   const [search, setSearch] = useState('')             // valor debounced enviado à API
-  const [multiContratual, setMultiContratual] = useState(false)
   // Filtros de lista
   const [filterCustomer, setFilterCustomer] = useState('')
   const [filterContractType, setFilterContractType] = useState('')
@@ -439,6 +440,9 @@ function ProjectsPageInner() {
   const [filterContractTypes, setFilterContractTypes] = useState<ContractType[]>([])
   const [filterApprovers, setFilterApprovers] = useState<SelectOption[]>([])
   const [filterExecutives, setFilterExecutives] = useState<SelectOption[]>([])
+
+  const [multiContratual, setMultiContratual] = useState(false)
+  const [rows, setRows] = useState<TreeRow[]>([])
 
   const [data, setData] = useState<PaginatedResponse<Project> | null>(null)
   const [loading, setLoading] = useState(true)
@@ -469,6 +473,38 @@ function ProjectsPageInner() {
   const [prefixInput, setPrefixInput] = useState('')
   const [prefixSaving, setPrefixSaving] = useState(false)
   const [deleting, setDeleting] = useState<number | null>(null)
+
+  // Modal de alteração de status
+  const [statusModal, setStatusModal] = useState<{ open: boolean; project: Project | null; newStatus: string }>({ open: false, project: null, newStatus: '' })
+  const [statusSaving, setStatusSaving] = useState(false)
+
+  const PROJECT_STATUSES_LIST = [
+    { value: 'awaiting_start', label: 'Aguardando Início' },
+    { value: 'started',        label: 'Em Andamento' },
+    { value: 'paused',         label: 'Pausado' },
+    { value: 'finished',       label: 'Encerrado' },
+    { value: 'cancelled',      label: 'Cancelado' },
+  ]
+
+  const handleChangeStatus = async () => {
+    if (!statusModal.project || !statusModal.newStatus) return
+    setStatusSaving(true)
+    const projectId = statusModal.project.id
+    const newStatus = statusModal.newStatus
+    try {
+      const res = await api.patch<{ status: string; status_display: string }>(`/projects/${projectId}/status`, { status: newStatus })
+      toast.success('Status atualizado com sucesso')
+      setStatusModal({ open: false, project: null, newStatus: '' })
+      // Atualiza estado local imediatamente — sem depender de reload
+      setData(prev => {
+        if (!prev) return prev
+        return { ...prev, items: prev.items.map(p => p.id === projectId ? { ...p, status: res.status, status_display: res.status_display } : p) }
+      })
+      setRows(prev => prev.map(r => r.id === projectId ? { ...r, status: res.status, status_display: res.status_display } : r))
+    } catch { toast.error('Erro ao atualizar status') }
+    finally { setStatusSaving(false) }
+  }
+
   const [deleteConfirm, setDeleteConfirm] = useState<{
     open: boolean
     type?: 'project' | 'contrib' | 'log'
@@ -535,8 +571,6 @@ function ProjectsPageInner() {
     return p.toString()
   }, [page, multiContratual, statusFilter, search, filterCustomer, filterContractType, filterApprover, filterExecutive])
 
-  const [rows, setRows] = useState<TreeRow[]>([])
-
   const load = useCallback(async (currentParams: string) => {
     const id = ++loadIdRef.current
     if (!hasLoadedRef.current) {
@@ -561,6 +595,25 @@ function ProjectsPageInner() {
     }
   }, [])
 
+  const toggleExpand = useCallback((row: TreeRow) => {
+    setRows(prev => {
+      const idx = prev.findIndex(r => r.id === row.id && r._level === 0)
+      if (idx === -1) return prev
+      if (row._isExpanded) {
+        const next = prev.filter(r => r._parentId !== row.id)
+        next[next.findIndex(r => r.id === row.id)] = { ...row, _isExpanded: false }
+        return [...next]
+      } else {
+        const children = (row.child_projects ?? []).map(child => {
+          const nodeState = (child as any).node_state ?? null
+          return toTreeRow(child, 1, row.id, nodeState)
+        })
+        const updated = { ...row, _isExpanded: true }
+        return [...prev.slice(0, idx), updated, ...children, ...prev.slice(idx + 1)]
+      }
+    })
+  }, [])
+
   // Debounce de 150ms: cancela chamadas redundantes quando múltiplos filtros mudam em sequência
   useEffect(() => {
     const t = setTimeout(() => { load(params) }, 150)
@@ -575,35 +628,6 @@ function ProjectsPageInner() {
     }, 400)
     return () => clearTimeout(t)
   }, [searchInput])
-
-  const toggleExpand = useCallback((row: TreeRow) => {
-    setRows(prev => {
-      const idx = prev.findIndex(r => r.id === row.id && r._level === 0)
-      if (idx === -1) return prev
-      if (row._isExpanded) {
-        // Recolher: remove filhos e marca como fechado
-        const next = prev.filter(r => r._parentId !== row.id)
-        next[next.findIndex(r => r.id === row.id)] = { ...row, _isExpanded: false }
-        return [...next]
-      } else {
-        // Expandir: insere filhos logo após o pai
-        const children = (row.child_projects ?? []).map(child => {
-          // node_state: se há filtro de status, filhos que não batem ficam DISABLED
-          const nodeState = statusFilter && statusFilter !== 'all'
-            ? (child.status === statusFilter ? 'ACTIVE' : 'DISABLED')
-            : null
-          return toTreeRow(child, 1, row.id, nodeState)
-        })
-        const updated = { ...row, _isExpanded: true }
-        return [
-          ...prev.slice(0, idx),
-          updated,
-          ...children,
-          ...prev.slice(idx + 1),
-        ]
-      }
-    })
-  }, [statusFilter])
 
   // Auto-abre modal de edição quando vem de outro módulo com ?editId=X
   useEffect(() => {
@@ -626,7 +650,7 @@ function ProjectsPageInner() {
   useEffect(() => {
     const items = (r: any) => Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
     Promise.allSettled([
-      api.get<any>('/customers?pageSize=200'),
+      api.get<any>('/customers?pageSize=500'),
       api.get<any>('/contract-types?pageSize=200&active=1'),
       api.get<any>('/users?pageSize=100&enabled=1'),
       api.get<any>('/executives?pageSize=100'),
@@ -641,7 +665,7 @@ function ProjectsPageInner() {
   const loadOptions = useCallback(async () => {
     try {
       const [c, ct, st, ps, u, appr, grps] = await Promise.all([
-        api.get<any>('/customers?pageSize=100'),
+        api.get<any>('/customers?pageSize=500'),
         api.get<any>('/contract-types?pageSize=50'),
         api.get<any>('/service-types?pageSize=50'),
         api.get<any>('/project-statuses'),
@@ -992,11 +1016,10 @@ function ProjectsPageInner() {
 
     setForm(f => {
       const next = { ...f, [field]: value }
-      // Campo a calcular: o que NÃO está nos 2 últimos editados
-      const toCalc: 'project_value' | 'hourly_rate' | 'sold_hours' =
-        edited.length >= 2
-          ? (allFields.find(x => !edited.includes(x)) ?? 'hourly_rate')
-          : 'hourly_rate'
+      // Só auto-calcula o 3º campo quando o usuário já editou 2 dos 3
+      if (edited.length < 2) return next
+
+      const toCalc = allFields.find(x => !edited.includes(x)) ?? 'project_value'
 
       const pv = Number(field === 'project_value' ? value : f.project_value) || 0
       const hr = Number(field === 'hourly_rate'   ? value : f.hourly_rate)   || 0
@@ -1094,18 +1117,16 @@ function ProjectsPageInner() {
           </div>
           {/* Linha 2: Multi-contratual + pills de tipo de contrato */}
           <div className="flex items-center gap-3 flex-wrap">
-            {/* Botão Multi-contratual em destaque */}
+            {/* Botão Multi-contratual */}
             <button
-              onClick={() => { setMultiContratual(v => !v); setFilterContractType(''); setPage(1) }}
-              className="px-4 py-1.5 rounded-xl text-xs font-bold transition-all"
+              onClick={() => { setMultiContratual(v => !v); setPage(1) }}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap"
               style={multiContratual
                 ? { background: 'var(--brand-primary)', color: '#0A0A0B', boxShadow: '0 0 12px rgba(0,245,255,0.35)' }
-                : { background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.25)' }
-              }
+                : { background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.25)' }}
             >
               ⬡ Multi-contratual
             </button>
-
           {/* Pills de tipo de contrato — clicar deseleciona Multi-contratual automaticamente */}
           <div
             className="flex items-center gap-1 p-1 rounded-xl w-fit flex-wrap"
@@ -1164,7 +1185,7 @@ function ProjectsPageInner() {
               </thead>
               <tbody>
                 {/* Skeleton apenas na primeira carga (sem dados ainda) */}
-                {loading && rows.length === 0 && Array.from({ length: 8 }).map((_, i) => (
+                {loading && (data?.items.length ?? 0) === 0 && Array.from({ length: 8 }).map((_, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid var(--brand-border)' }}>
                     {[...Array(9)].map((_, j) => (
                       <td key={j} className="px-4 py-4">
@@ -1174,7 +1195,7 @@ function ProjectsPageInner() {
                   </tr>
                 ))}
                 {/* Estado vazio: só mostra quando não está carregando e não tem dados */}
-                {!loading && !isFetching && rows.length === 0 && (
+                {!loading && !isFetching && (multiContratual ? rows.length === 0 : (data?.items.length ?? 0) === 0) && (
                   <tr>
                     <td colSpan={9} className="py-20 text-center">
                       <div className="flex flex-col items-center gap-3">
@@ -1187,11 +1208,9 @@ function ProjectsPageInner() {
                   </tr>
                 )}
                 {/* Dados — visíveis mesmo durante isFetching (keep-previous-data) */}
-                {rows.length > 0 && rows.map(p => {
-                  const isDisabled = p._node_state === 'DISABLED'
+                {(multiContratual ? rows : data?.items ?? []).map(p => {
                   const isOnDemand = p.contract_type_display?.toLowerCase().includes('on demand')
                   const isBankHoursMonthly = p.contract_type_display?.toLowerCase().includes('mensal') ?? false
-                  const isParent = p._hasChildren
                   const soldBase = p.sold_hours ?? 0
                   const soldDisplay = isBankHoursMonthly && (p.accumulated_sold_hours ?? 0) > 0
                     ? p.accumulated_sold_hours!
@@ -1201,20 +1220,14 @@ function ProjectsPageInner() {
                     : null
                   const sold = soldDisplay
                   const contrib = p.total_contributions_hours ?? p.hour_contribution ?? 0
-                  // Para projetos PAI mensais: consumido total = disponível - saldo (inclui filhos)
-                  // Para os demais: consumido direto (total_logged_minutes)
                   const consumedDirect = p.consumed_hours != null ? p.consumed_hours
                     : p.total_logged_minutes != null ? Math.round(p.total_logged_minutes / 60 * 10) / 10 : null
                   const totalAvailableForCalc = soldDisplay + contrib
-                  const consumedFromBalance = isBankHoursMonthly && isParent && p.general_hours_balance != null && totalAvailableForCalc > 0
+                  const consumedFromBalance = isBankHoursMonthly && p.general_hours_balance != null && totalAvailableForCalc > 0
                     ? Math.round((totalAvailableForCalc - p.general_hours_balance) * 10) / 10
                     : null
                   const consumed = consumedFromBalance ?? consumedDirect
-                  // Para PAI mensal: pct usando acumulado real (evita falso "Excedido")
-                  const consumedPct = isOnDemand ? 0
-                    : (isBankHoursMonthly && isParent && totalAvailableForCalc > 0 && consumed != null)
-                      ? Math.round((consumed / totalAvailableForCalc) * 100)
-                      : calcConsumedPct(p)
+                  const consumedPct = isOnDemand ? 0 : calcConsumedPct(p)
                   const barPct = consumedPct != null ? Math.min(100, Math.max(0, consumedPct)) : null
                   const balance = p.general_hours_balance
                   const s = p.status ?? ''
@@ -1223,88 +1236,93 @@ function ProjectsPageInner() {
                     : s === 'cancelled' ? 'cancelled'
                     : s === 'finished' ? 'finished' : 'default'
 
-                  const isChildRow  = p._level > 0
-                  const isActiveRow = isChildRow && !isDisabled
-                  const isParentRow = p._level === 0 && p._hasChildren
+                  // Tree visual
+                  const tr = multiContratual ? (p as TreeRow) : null
+                  const isChildRow  = tr ? tr._level > 0 : false
+                  const isActiveRow = isChildRow && tr?._node_state !== 'DISABLED'
+                  const isParentRow = tr ? tr._level === 0 && tr._hasChildren : false
+                  const isParentIndirect = isParentRow && (p as any).coordinator_is_direct === false
+                  const treeBg = isActiveRow ? 'rgba(0,245,255,0.06)' : 'transparent'
+                  const treeBorderLeft = isActiveRow ? '3px solid #00F5FF'
+                    : isParentRow ? '2px solid rgba(255,255,255,0.07)'
+                    : isChildRow ? '2px solid rgba(255,255,255,0.04)' : undefined
+                  const treeBoxShadow = isActiveRow ? 'inset 0 0 0 1px rgba(0,245,255,0.08)' : undefined
+                  const treeOpacity = (isChildRow && !isActiveRow) ? 0.4 : isParentIndirect ? 0.6 : 1
 
-                  const treeBg         = isActiveRow ? 'rgba(0,245,255,0.06)' : 'transparent'
-                  const treeBorder     = isActiveRow ? '3px solid #00F5FF'
-                    : isParentRow      ? '2px solid rgba(255,255,255,0.07)'
-                    : isChildRow       ? '2px solid rgba(255,255,255,0.04)' : undefined
-                  const treeBoxShadow  = isActiveRow ? 'inset 0 0 0 1px rgba(0,245,255,0.08)' : undefined
+                  const statusRowClass = s === 'cancelled' ? 'row--cancelado'
+                    : s === 'finished' ? 'row--encerrado'
+                    : s === 'paused' ? 'row--pausado'
+                    : ''
+                  const childRowClass = isChildRow ? 'row--child' : ''
 
                   return (
                     <tr
-                      key={`${p.id}-${p._level}-${p._parentId}`}
-                      className="transition-all"
+                      key={tr ? `${p.id}-${tr._level}-${tr._parentId}` : p.id}
+                      className={`transition-all ${statusRowClass} ${childRowClass}`.trim()}
                       style={{
                         borderBottom: '1px solid var(--brand-border)',
-                        opacity: isDisabled ? 0.4 : 1,
-                        background: treeBg,
-                        borderLeft: treeBorder,
+                        background: !statusRowClass ? treeBg : undefined,
+                        borderLeft: !statusRowClass ? treeBorderLeft : undefined,
                         boxShadow: treeBoxShadow,
+                        opacity: !statusRowClass ? treeOpacity : undefined,
                       }}
-                      onMouseEnter={e => !isDisabled && (e.currentTarget.style.background = isActiveRow ? 'rgba(0,245,255,0.09)' : 'rgba(255,255,255,0.02)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = treeBg)}
+                      onMouseEnter={e => {
+                        if (!statusRowClass) e.currentTarget.style.background = isActiveRow ? 'rgba(0,245,255,0.09)' : 'rgba(255,255,255,0.02)'
+                      }}
+                      onMouseLeave={e => {
+                        if (!statusRowClass) e.currentTarget.style.background = treeBg
+                      }}
                     >
                       {/* RowMenu */}
                       <td className="px-2 py-3 w-10">
                         <RowMenu items={[
                           { label: 'Visualizar', icon: <Eye size={12} />, onClick: () => openView(p) },
-                          ...(!isDisabled && canEdit ? [
+                          ...(canEdit ? [
                             { label: 'Editar', icon: <Pencil size={12} />, onClick: () => openEdit(p) },
                           ] : []),
-                          ...(!isDisabled && canDelete ? [
+                          ...(canChangeStatus ? [
+                            { label: 'Alterar Status', icon: <Layers size={12} />, onClick: () => setStatusModal({ open: true, project: p, newStatus: p.status ?? 'started' }) },
+                          ] : []),
+                          ...(canDelete ? [
                             { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => remove(p), danger: true, disabled: deleting === p.id },
                           ] : []),
                         ]} />
                       </td>
 
                       {/* Código */}
-                      <td className="px-4 py-3" style={{ paddingLeft: p._level > 0 ? `${16 + p._level * 24}px` : undefined }}>
+                      <td className="px-4 py-3">
                         <span className="font-mono text-xs px-2 py-0.5 rounded-md" style={{ background: 'var(--brand-border)', color: 'var(--brand-subtle)' }}>
                           {p.code}
                         </span>
                       </td>
 
-                      {/* Nome com controle de árvore */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          {/* Chevron ▶/▼ — pais com filhos */}
-                          {multiContratual && p._hasChildren && (
+                      {/* Nome */}
+                      <td className="px-4 py-3" style={{ paddingLeft: tr ? `${16 + tr._level * 24}px` : undefined }}>
+                        <div className="flex items-center gap-2">
+                          {multiContratual && tr?._hasChildren && (
                             <button
-                              onClick={() => toggleExpand(p)}
-                              className="w-5 h-5 flex items-center justify-center shrink-0 transition-colors rounded hover:bg-white/10"
-                              style={{ color: 'var(--brand-muted)' }}
+                              onClick={() => toggleExpand(tr!)}
+                              className="flex items-center justify-center w-5 h-5 rounded shrink-0 transition-colors"
+                              style={{ color: 'var(--brand-primary)', background: 'rgba(0,245,255,0.08)' }}
                             >
-                              {p._isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                              {tr._isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                             </button>
                           )}
-                          {/* Conector └─ nos filhos */}
                           {multiContratual && isChildRow && (
-                            <span className="shrink-0" style={{ color: isActiveRow ? 'rgba(0,245,255,0.4)' : 'rgba(255,255,255,0.1)', fontSize: 14 }}>└─</span>
+                            <span className="text-xs shrink-0" style={{ color: 'var(--brand-subtle)' }}>└─</span>
                           )}
-                          {/* Espaçador para pais sem filhos */}
-                          {multiContratual && !p._hasChildren && p._level === 0 && <span className="w-5 shrink-0" />}
-
+                          {multiContratual && !tr?._hasChildren && tr?._level === 0 && <span className="w-5 shrink-0" />}
                           <div className="flex flex-col gap-0.5 min-w-0">
-                            <div className="flex items-center gap-1">
-                              {/* Badge PAI — discreto */}
-                              {isParentRow && (
-                                <span className="text-[9px] font-bold px-1 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.06)', color: '#71717A' }}>PAI</span>
-                              )}
-                              {/* Badge ATIVO — protagonista */}
-                              {isActiveRow && (
-                                <span className="text-[9px] font-bold px-1 py-0.5 rounded" style={{ background: 'rgba(0,245,255,0.15)', color: '#00F5FF' }}>ATIVO</span>
-                              )}
-                            </div>
                             <span
                               className="font-medium text-sm leading-snug"
-                              style={{
-                                color: isActiveRow ? '#FFFFFF' : isParentRow ? '#A1A1AA' : 'var(--brand-text)',
-                                whiteSpace: 'normal', wordBreak: 'break-word',
-                              }}
+                              style={{ color: isActiveRow ? '#00F5FF' : isParentRow ? 'var(--brand-subtle)' : 'var(--brand-text)', whiteSpace: 'normal', wordBreak: 'break-word' }}
                             >{cleanName(p.name)}</span>
+                            {multiContratual && isParentRow && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded w-fit" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--brand-subtle)' }}>PAI</span>
+                            )}
+                            {multiContratual && isActiveRow && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded w-fit" style={{ background: 'rgba(0,245,255,0.12)', color: '#00F5FF' }}>ATIVO</span>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -1348,9 +1366,9 @@ function ProjectsPageInner() {
                       </td>
 
                       {/* Status */}
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <span
-                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap"
                           style={{
                             background: statusVariant === 'started' ? 'rgba(0,245,255,0.10)'
                               : statusVariant === 'paused' ? 'rgba(245,158,11,0.12)'
@@ -2318,6 +2336,44 @@ function ProjectsPageInner() {
           </div>
         </div>
       )}
+
+      {/* ── Modal: Alterar Status ── */}
+      {statusModal.open && statusModal.project && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="rounded-2xl w-full max-w-sm p-6" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold" style={{ color: 'var(--brand-text)' }}>Alterar Status</h3>
+              <button onClick={() => setStatusModal({ open: false, project: null, newStatus: '' })} style={{ color: 'var(--brand-subtle)' }}><X size={16} /></button>
+            </div>
+            <p className="text-xs mb-4" style={{ color: 'var(--brand-muted)' }}>
+              Projeto: <strong style={{ color: 'var(--brand-text)' }}>{statusModal.project.name}</strong>
+            </p>
+            <select
+              value={statusModal.newStatus}
+              onChange={e => setStatusModal(s => ({ ...s, newStatus: e.target.value }))}
+              className="w-full appearance-none px-3 py-2.5 rounded-xl text-sm outline-none mb-5"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}
+            >
+              {PROJECT_STATUSES_LIST.map(s => (
+                <option key={s.value} value={s.value} style={{ background: '#161618' }}>{s.label}</option>
+              ))}
+            </select>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setStatusModal({ open: false, project: null, newStatus: '' })}
+                className="px-4 py-2 rounded-xl text-sm font-medium"
+                style={{ color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}>
+                Cancelar
+              </button>
+              <button onClick={handleChangeStatus} disabled={statusSaving || statusModal.newStatus === statusModal.project.status}
+                className="px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
+                style={{ background: 'var(--brand-primary)', color: '#0A0A0B' }}>
+                {statusSaving ? 'Salvando...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </AppLayout>
   )
 }

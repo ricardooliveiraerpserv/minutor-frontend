@@ -401,9 +401,10 @@ function RowMenu({ items }: { items: RowMenuItem[] }) {
 
 export default function ExpensesPage() {
   const { user } = useAuth()
-  const isCoordenador = user?.type === 'coordenador'
-  const isAdmin = user?.type === 'admin' || user?.type === 'parceiro_admin'
-  const isCliente = user?.type === 'cliente'
+  const isCoordenador  = user?.type === 'coordenador'
+  const isAdmin        = user?.type === 'admin' || user?.type === 'parceiro_admin'
+  const canActAsUser   = isAdmin || isCoordenador
+  const isCliente      = user?.type === 'cliente'
 
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('')
@@ -492,13 +493,13 @@ export default function ExpensesPage() {
 
     if (isCliente && user?.customer_id) {
       Promise.allSettled([
-        api.get<any>(`/projects?pageSize=200&customer_id=${user.customer_id}`),
+        api.get<any>(`/projects?pageSize=200&customer_id=${user.customer_id}&status=active`),
       ]).then(([proj]) => {
         setClienteProjects(items(proj))
       })
     } else {
       Promise.allSettled([
-        api.get<any>('/customers?pageSize=100'),
+        api.get<any>('/customers?pageSize=500'),
         api.get<any>('/users?pageSize=100&role=Consultor'),
         api.get<any>('/users?pageSize=100&role=Coordenador'),
         api.get<any>('/executives?pageSize=100'),
@@ -515,19 +516,19 @@ export default function ExpensesPage() {
     try {
       const [c, u] = await Promise.all([
         api.get<{ items?: Category[]; data?: Category[] }>('/expense-categories?pageSize=100'),
-        isAdmin ? api.get<any>('/users?pageSize=200') : Promise.resolve(null),
+        canActAsUser ? api.get<any>('/users?pageSize=200&exclude_type=cliente') : Promise.resolve(null),
       ])
       setCategories(Array.isArray(c?.items) ? c.items : Array.isArray(c?.data) ? c.data : [])
       if (u) setModalUsers(Array.isArray(u?.items) ? u.items : [])
     } catch { /* silencioso */ }
-  }, [isAdmin])
+  }, [canActAsUser])
 
   // Reload modal projects when customer changes — só carrega se houver cliente selecionado
   useEffect(() => {
     if (!modal.open) return
     if (!form.customer_id) { setProjects([]); return }
     let cancelled = false
-    const qs = new URLSearchParams({ pageSize: '200', customer_id: form.customer_id })
+    const qs = new URLSearchParams({ pageSize: '200', customer_id: form.customer_id, status: 'active' })
     api.get<PaginatedResponse<SelectOption>>(`/projects?${qs}`)
       .then(p => { if (!cancelled) setProjects(Array.isArray(p?.items) ? p.items : []) })
       .catch(() => {})
@@ -572,7 +573,7 @@ export default function ExpensesPage() {
       fd.append('expense_type', form.expense_type)
       fd.append('payment_method', form.payment_method)
       fd.append('charge_client', form.charge_client ? '1' : '0')
-      if (isAdmin && form.user_id) fd.append('user_id', form.user_id)
+      if (canActAsUser && form.user_id) fd.append('user_id', form.user_id)
       if (receipt) fd.append('receipt', receipt)
       if (modal.item) fd.append('_method', 'PUT')
 
@@ -796,17 +797,25 @@ export default function ExpensesPage() {
           <div className="p-5">
             <h3 className="text-sm font-semibold text-white mb-4">{modal.item ? 'Editar Despesa' : 'Nova Despesa'}</h3>
             <div className="space-y-3">
-              {isAdmin && (
+              {canActAsUser && (
                 <div>
-                  <Label className="text-xs text-zinc-400">Usuário</Label>
-                  <div className="mt-1">
-                    <SearchSelect
-                      value={form.user_id}
-                      onChange={v => setForm(f => ({ ...f, user_id: v }))}
-                      options={modalUsers}
-                      placeholder="Selecione o usuário..."
-                    />
+                  <div className="flex items-center justify-between mb-1">
+                    <Label className="text-xs text-zinc-400">Usuário</Label>
+                    <button
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, user_id: String(user?.id ?? '') }))}
+                      className="text-xs font-medium transition-colors"
+                      style={{ color: 'var(--brand-primary)' }}
+                    >
+                      → Colocar-me como responsável
+                    </button>
                   </div>
+                  <SearchSelect
+                    value={form.user_id}
+                    onChange={v => setForm(f => ({ ...f, user_id: v }))}
+                    options={modalUsers}
+                    placeholder="Selecione o usuário..."
+                  />
                 </div>
               )}
               <div>

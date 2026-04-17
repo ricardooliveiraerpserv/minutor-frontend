@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
-import { Project, PaginatedResponse, HourContribution, ContractType } from '@/types'
+import { Project, PaginatedResponse, HourContribution } from '@/types'
 import { formatBRL } from '@/lib/format'
 import { toast } from 'sonner'
 import { Layers, Search, ChevronDown, ChevronRight, Users, TrendingUp, Clock, BarChart2, AlertTriangle, DollarSign, X, UserCheck, Pencil, Trash2, Plus, Edit2 } from 'lucide-react'
@@ -28,9 +28,7 @@ interface TreeRow extends ProjectWithTeam {
 }
 
 function toTreeRow(p: ProjectWithTeam, level = 0, parentId: number | null = null): TreeRow {
-  // Auto-expande o pai se algum filho estiver ativo (node_state !== 'DISABLED')
-  const hasActiveChild = level === 0 && (p.child_projects ?? []).some(c => c.node_state !== 'DISABLED')
-  return { ...p, _level: level, _hasChildren: (p.child_projects?.length ?? 0) > 0, _isExpanded: hasActiveChild, _parentId: parentId }
+  return { ...p, _level: level, _hasChildren: (p.child_projects?.length ?? 0) > 0, _isExpanded: false, _parentId: parentId }
 }
 
 interface CostSummary {
@@ -207,13 +205,15 @@ interface ProjectRowProps {
   expanded: boolean
   onToggle: () => void
   onMenuAction: (action: 'costs' | 'timesheets' | 'expenses' | 'team' | 'aportes', project: ProjectWithTeam) => void
+  canEdit?: boolean
+  canChangeStatus?: boolean
+  onEdit?: (project: ProjectWithTeam) => void
+  onChangeStatus?: (project: ProjectWithTeam) => void
   treeRow?: TreeRow
   onTreeToggle?: () => void
-  canEdit?: boolean
-  onEdit?: (project: ProjectWithTeam) => void
 }
 
-function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTreeToggle, canEdit, onEdit }: ProjectRowProps) {
+function ProjectRow({ project, expanded, onToggle, onMenuAction, canEdit, canChangeStatus, onEdit, onChangeStatus, treeRow, onTreeToggle }: ProjectRowProps) {
   const consumedHours = project.consumed_hours ?? (project.total_logged_minutes != null ? project.total_logged_minutes / 60 : 0)
   const pct   = project.sold_hours ? (consumedHours / project.sold_hours) * 100 : 0
   const color = healthColor(pct)
@@ -233,60 +233,50 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTree
 
   const teamCount = (project.consultants?.length ?? 0) + (project.coordinators?.length ?? 0)
 
+  // Tree visual
   const isChild           = treeRow ? treeRow._level > 0 : false
   const isParent          = treeRow ? treeRow._level === 0 && treeRow._hasChildren : false
-  const isInactive        = isChild && project.node_state === 'DISABLED'
-  const isActive          = isChild && project.node_state !== 'DISABLED'
+  const isInactive        = isChild && (project as any).node_state === 'DISABLED'
+  const isActive          = isChild && (project as any).node_state !== 'DISABLED'
   const isParentIndirect  = isParent && (project as any).coordinator_is_direct === false
+  const rowBg             = isActive ? 'rgba(0,245,255,0.06)' : 'transparent'
+  const rowBorderLeft     = isActive ? '3px solid #00F5FF'
+    : isParent ? '2px solid rgba(255,255,255,0.07)'
+    : isInactive ? '2px solid rgba(255,255,255,0.04)' : undefined
+  const rowBoxShadow      = isActive ? 'inset 0 0 0 1px rgba(0,245,255,0.08)' : undefined
+  const rowOpacity        = isInactive ? 0.4 : isParentIndirect ? 0.6 : 1
 
-  // ── Hierarquia visual ──────────────────────────────────────────────
-  // PAI DIRETO       → neutro, borda discreta, texto suave
-  // PAI INDIRETO     → idem + opacity reduzida (só container)
-  // FILHO ATIVO      → protagonista: fundo cyan, borda forte, glow, texto branco
-  // FILHO INATIVO    → apagado: transparente, opacity 0.4
-  const rowBg = isActive
-    ? 'rgba(0,245,255,0.06)'          // cyan glass
-    : 'transparent'
-
-  const rowBorderLeft = isActive
-    ? '3px solid #00F5FF'             // borda forte cyan
-    : isParent
-      ? '2px solid rgba(255,255,255,0.07)' // borda discreta no pai
-      : isInactive
-        ? '2px solid rgba(255,255,255,0.04)'
-        : undefined
-
-  const rowBoxShadow = isActive
-    ? 'inset 0 0 0 1px rgba(0,245,255,0.08)' // glow interno sutil
-    : undefined
-
-  const rowOpacity = isInactive ? 0.4 : isParentIndirect ? 0.6 : 1
+  const statusRowClass = project.status === 'cancelled' ? 'row--cancelado'
+    : project.status === 'finished' ? 'row--encerrado'
+    : project.status === 'paused' ? 'row--pausado'
+    : ''
+  const childRowClass = isChild ? 'row--child' : ''
 
   return (
     <>
       <tr
-        className="border-b transition-all cursor-pointer"
+        className={`border-b transition-all cursor-pointer ${statusRowClass} ${childRowClass}`.trim()}
         style={{
           borderColor: 'var(--brand-border)',
-          background: rowBg,
-          borderLeft: rowBorderLeft,
+          // Se filho ativo na tree, hierarquia visual prevalece sobre status
+          background: isActive ? rowBg : !statusRowClass ? rowBg : undefined,
+          borderLeft: isActive ? rowBorderLeft : !statusRowClass ? rowBorderLeft : undefined,
           boxShadow: rowBoxShadow,
-          opacity: rowOpacity,
+          opacity: !statusRowClass ? rowOpacity : undefined,
         }}
         onClick={treeRow ? (treeRow._hasChildren ? onTreeToggle : undefined) : onToggle}
       >
-        {/* Menu de ações — oculto para filhos inativos e pais indiretos */}
+        {/* Menu de ações */}
         <td className="py-2 pl-2 pr-1 w-8" onClick={e => e.stopPropagation()}>
-          {!isInactive && !isParentIndirect && (
-            <RowMenu items={[
-              ...(canEdit ? [{ label: 'Editar', icon: <Edit2 size={12} />, onClick: () => onEdit?.(project) }] : []),
-              { label: 'Custo',                  icon: <DollarSign  size={12} />, onClick: () => onMenuAction('costs',      project) },
-              { label: 'Apontamentos',           icon: <Clock       size={12} />, onClick: () => onMenuAction('timesheets', project) },
-              { label: 'Despesas',               icon: <BarChart2   size={12} />, onClick: () => onMenuAction('expenses',   project) },
-              { label: 'Aportes',                icon: <TrendingUp  size={12} />, onClick: () => onMenuAction('aportes',    project) },
-              { label: 'Selecionar Equipe',      icon: <Users       size={12} />, onClick: () => onMenuAction('team',       project) },
-            ]} />
-          )}
+          <RowMenu items={[
+            ...(canEdit ? [{ label: 'Editar', icon: <Edit2 size={12} />, onClick: () => onEdit?.(project) }] : []),
+            ...(canChangeStatus ? [{ label: 'Alterar Status', icon: <Layers size={12} />, onClick: () => onChangeStatus?.(project) }] : []),
+            { label: 'Custo',                  icon: <DollarSign  size={12} />, onClick: () => onMenuAction('costs',      project) },
+            { label: 'Apontamentos',           icon: <Clock       size={12} />, onClick: () => onMenuAction('timesheets', project) },
+            { label: 'Despesas',               icon: <BarChart2   size={12} />, onClick: () => onMenuAction('expenses',   project) },
+            { label: 'Aportes',                icon: <TrendingUp  size={12} />, onClick: () => onMenuAction('aportes',    project) },
+            { label: 'Selecionar Equipe',      icon: <Users       size={12} />, onClick: () => onMenuAction('team',       project) },
+          ]} />
         </td>
 
         {/* Indicador de saúde (borda esquerda) */}
@@ -297,70 +287,36 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTree
         {/* Projeto */}
         <td className="py-3 pr-4" style={{ paddingLeft: treeRow ? 8 + treeRow._level * 24 : 8 }}>
           <div className="flex items-center gap-2">
-            {treeRow ? (
-              treeRow._hasChildren ? (
-                // Pai com filhos: chevron ▶/▼
-                <button
-                  onClick={e => { e.stopPropagation(); onTreeToggle?.() }}
-                  className="w-5 h-5 flex items-center justify-center shrink-0 transition-colors rounded hover:bg-white/10"
-                  style={{ color: 'var(--brand-muted)' }}
-                >
-                  {treeRow._isExpanded
-                    ? <ChevronDown size={14} />
-                    : <ChevronRight size={14} />
-                  }
-                </button>
-              ) : isChild ? (
-                // Filho: conector └─ (cyan se ativo, cinza se inativo)
-                <span className="shrink-0 flex items-center" style={{ width: 20, color: isActive ? 'rgba(0,245,255,0.4)' : 'rgba(255,255,255,0.1)', fontSize: 14, lineHeight: 1 }}>└─</span>
-              ) : (
-                <span className="w-5 shrink-0" />
-              )
-            ) : (
-              teamCount > 0
+            {treeRow
+              ? treeRow._hasChildren
+                ? (treeRow._isExpanded
+                    ? <ChevronDown size={14} style={{ color: 'var(--brand-primary)' }} />
+                    : <ChevronRight size={14} style={{ color: 'var(--brand-subtle)' }} />)
+                : isChild
+                  ? <span className="text-xs shrink-0" style={{ color: 'var(--brand-subtle)' }}>└─</span>
+                  : <span className="w-3.5" />
+              : teamCount > 0
                 ? (expanded
                     ? <ChevronDown size={14} style={{ color: 'var(--brand-subtle)' }} />
                     : <ChevronRight size={14} style={{ color: 'var(--brand-subtle)' }} />)
                 : <span className="w-3.5" />
-            )}
+            }
             <div>
               <div className="flex items-center gap-1.5">
                 <p
                   className="text-sm font-semibold"
-                  style={{
-                    color: isActive ? '#FFFFFF'
-                      : isParent ? '#A1A1AA'        // pai: cinza — estrutura, não foco
-                      : 'var(--brand-muted)',        // filho inativo: apagado
-                  }}
+                  style={{ color: isActive ? '#00F5FF' : isParent ? 'var(--brand-subtle)' : 'var(--brand-muted)' }}
                 >
                   {project.name}
                 </p>
-
-                {/* Badge PAI */}
-                {isParent && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold"
-                    style={{ background: 'rgba(255,255,255,0.06)', color: '#71717A' }}>
-                    PAI
-                  </span>
+                {treeRow && isParent && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--brand-subtle)' }}>PAI</span>
                 )}
-
-                {/* Badge via filho */}
-                {isParentIndirect && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px]"
-                    style={{ color: '#52525B', fontSize: 9 }}>
-                    via filho
-                  </span>
-                )}
-
-                {/* Badge ATIVO — protagonista */}
-                {isActive && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold"
-                    style={{ background: 'rgba(0,245,255,0.15)', color: '#00F5FF', letterSpacing: '0.03em' }}>
-                    ATIVO
-                  </span>
+                {treeRow && isActive && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(0,245,255,0.12)', color: '#00F5FF' }}>ATIVO</span>
                 )}
               </div>
-              <p className="text-xs font-mono" style={{ color: isActive ? 'rgba(0,245,255,0.5)' : 'var(--brand-subtle)' }}>
+              <p className="text-xs font-mono" style={{ color: 'var(--brand-subtle)' }}>
                 {project.code}
               </p>
             </div>
@@ -409,18 +365,31 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, treeRow, onTree
         </td>
 
         {/* Status */}
-        <td className="py-3">
+        <td className="py-3 whitespace-nowrap">
           <span
-            className="text-xs font-medium px-2 py-1 rounded-lg"
-            style={{ background: hs.badge, color: hs.text }}
+            className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+            style={{
+              background: project.status === 'started' ? 'rgba(0,245,255,0.10)'
+                : project.status === 'paused' ? 'rgba(245,158,11,0.12)'
+                : project.status === 'cancelled' ? 'rgba(239,68,68,0.12)'
+                : project.status === 'finished' ? 'rgba(161,161,170,0.12)'
+                : project.status === 'awaiting_start' ? 'rgba(139,92,246,0.12)'
+                : 'rgba(161,161,170,0.12)',
+              color: project.status === 'started' ? '#00F5FF'
+                : project.status === 'paused' ? '#F59E0B'
+                : project.status === 'cancelled' ? '#EF4444'
+                : project.status === 'finished' ? '#71717A'
+                : project.status === 'awaiting_start' ? '#8B5CF6'
+                : '#A1A1AA',
+            }}
           >
             {project.status_display ?? statusLabel[project.status] ?? project.status}
           </span>
         </td>
       </tr>
 
-      {/* Expansão: equipe (apenas no modo flat, não em filhos) */}
-      {!treeRow && expanded && teamCount > 0 && (
+      {/* Expansão: equipe */}
+      {expanded && teamCount > 0 && (
         <tr style={{ background: 'rgba(0,0,0,0.2)' }}>
           <td /><td />
           <td colSpan={7} className="py-3 px-4">
@@ -469,8 +438,10 @@ export default function GestaoProjetosPage() {
   const router = useRouter()
   const { user } = useAuth()
   const isAdmin = user?.type === 'admin'
+  const isCoordenador = user?.type === 'coordenador'
   const ep = user?.extra_permissions ?? []
   const canEdit = isAdmin || ep.includes('gestao_projetos.update')
+  const canChangeStatus = isAdmin || isCoordenador
 
   const [projects, setProjects]   = useState<ProjectWithTeam[]>([])
   const [loading, setLoading]     = useState(true)
@@ -479,10 +450,9 @@ export default function GestaoProjetosPage() {
   const [clienteFilter, setCliente] = useState('')
   const [saudeFilter, setSaude]   = useState('')
   const [expanded, setExpanded]   = useState<Set<number>>(new Set())
-  const [multiContratual, setMultiContratual] = useState(false)
-  const [rows, setRows]           = useState<TreeRow[]>([])
   const [filterContractType, setFilterContractType] = useState('')
-  const [filterContractTypes, setFilterContractTypes] = useState<ContractType[]>([])
+  const [multiContratual, setMultiContratual] = useState(false)
+  const [rows, setRows] = useState<TreeRow[]>([])
 
   // Modal de custos
   const [costProject, setCostProject]   = useState<ProjectWithTeam | null>(null)
@@ -499,6 +469,34 @@ export default function GestaoProjetosPage() {
   const [consultantGroups, setConsultantGroups] = useState<{ id: number; name: string }[]>([])
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<number>>(new Set())
 
+  // Modal de alteração de status
+  const [statusModal, setStatusModal] = useState<{ open: boolean; project: ProjectWithTeam | null; newStatus: string }>({ open: false, project: null, newStatus: '' })
+  const [statusSaving, setStatusSaving] = useState(false)
+
+  const PROJECT_STATUSES = [
+    { value: 'awaiting_start', label: 'Aguardando Início' },
+    { value: 'started',        label: 'Em Andamento' },
+    { value: 'paused',         label: 'Pausado' },
+    { value: 'finished',       label: 'Encerrado' },
+    { value: 'cancelled',      label: 'Cancelado' },
+  ]
+
+  const handleChangeStatus = async () => {
+    if (!statusModal.project || !statusModal.newStatus) return
+    setStatusSaving(true)
+    const projectId = statusModal.project.id
+    const newStatus = statusModal.newStatus
+    try {
+      const res = await api.patch<{ status: string; status_display: string }>(`/projects/${projectId}/status`, { status: newStatus })
+      toast.success('Status atualizado com sucesso')
+      setStatusModal({ open: false, project: null, newStatus: '' })
+      // Atualiza estado local imediatamente — sem depender de reload
+      setProjects(prev => prev.map(p => p.id === projectId ? { ...p, status: res.status, status_display: res.status_display } : p))
+      setRows(prev => prev.map(r => r.id === projectId ? { ...r, status: res.status, status_display: res.status_display } : r))
+    } catch { toast.error('Erro ao atualizar status') }
+    finally { setStatusSaving(false) }
+  }
+
   // Modal de aportes
   const [aportesProject, setAportesProject]   = useState<ProjectWithTeam | null>(null)
   const [contributions, setContributions]     = useState<HourContribution[]>([])
@@ -507,16 +505,6 @@ export default function GestaoProjetosPage() {
   const [contribForm, setContribForm]         = useState({ contributed_hours: '', hourly_rate: '', contributed_at: '', description: '' })
   const [contribSaving, setContribSaving]     = useState(false)
   const [contribDeleteConfirm, setContribDeleteConfirm] = useState<HourContribution | null>(null)
-
-  // Carrega tipos de contrato para as pills
-  useEffect(() => {
-    api.get<any>('/contract-types?pageSize=200&active=1')
-      .then(res => {
-        const items = Array.isArray(res?.items) ? res.items : Array.isArray(res?.data) ? res.data : []
-        setFilterContractTypes(items)
-      })
-      .catch(() => {})
-  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -527,18 +515,7 @@ export default function GestaoProjetosPage() {
       .then(res => {
         const items = res.items ?? []
         setProjects(items)
-        if (multiContratual) {
-          // Constrói a lista já com filhos expandidos para pais que auto-expandem
-          const built: TreeRow[] = []
-          for (const p of items) {
-            const parent = toTreeRow(p)
-            built.push(parent)
-            if (parent._isExpanded && parent._hasChildren) {
-              built.push(...(p.child_projects ?? []).map(c => toTreeRow(c, 1, p.id)))
-            }
-          }
-          setRows(built)
-        }
+        if (multiContratual) setRows(items.map(p => toTreeRow(p)))
       })
       .catch(() => toast.error('Erro ao carregar projetos'))
       .finally(() => setLoading(false))
@@ -553,8 +530,21 @@ export default function GestaoProjetosPage() {
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [projects])
 
+  const availableContractTypes = useMemo(() => {
+    const seen = new Set<string>()
+    const result: { id: string; name: string }[] = []
+    for (const p of projects) {
+      if (p.contract_type_display && !seen.has(p.contract_type_display)) {
+        seen.add(p.contract_type_display)
+        result.push({ id: p.contract_type_display, name: p.contract_type_display })
+      }
+    }
+    return result.sort((a, b) => a.name.localeCompare(b.name))
+  }, [projects])
+
   const filtered = useMemo(() => {
     return projects.filter(p => {
+      if (filterContractType && p.contract_type_display !== filterContractType) return false
       if (statusFilter && p.status !== statusFilter) return false
       if (clienteFilter && String(p.customer_id) !== clienteFilter) return false
       if (saudeFilter) {
@@ -573,9 +563,8 @@ export default function GestaoProjetosPage() {
       }
       return true
     })
-  }, [projects, search, statusFilter, clienteFilter, saudeFilter])
+  }, [projects, search, statusFilter, clienteFilter, saudeFilter, filterContractType])
 
-  // ── Tree expand/collapse ──
   const toggleTree = (row: TreeRow) => {
     setRows(prev => {
       const idx = prev.findIndex(r => r.id === row.id && r._level === 0)
@@ -593,7 +582,6 @@ export default function GestaoProjetosPage() {
     })
   }
 
-  // ── Linhas filtradas em modo multi ──
   const filteredRows = useMemo(() => {
     if (!multiContratual) return [] as TreeRow[]
     const parentRows = rows.filter(r => r._level === 0)
@@ -849,17 +837,14 @@ export default function GestaoProjetosPage() {
         <div className="flex items-center gap-3 flex-wrap">
           {/* Botão Multi-contratual */}
           <button
-            onClick={() => { setMultiContratual(v => !v); setFilterContractType('') }}
-            className="px-4 py-1.5 rounded-xl text-xs font-bold transition-all"
+            onClick={() => { setMultiContratual(v => !v) }}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap"
             style={multiContratual
               ? { background: 'var(--brand-primary)', color: '#0A0A0B', boxShadow: '0 0 12px rgba(0,245,255,0.35)' }
-              : { background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.25)' }
-            }
+              : { background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.25)' }}
           >
             ⬡ Multi-contratual
           </button>
-
-          {/* Pills de tipo de contrato */}
           <div
             className="flex items-center gap-1 p-1 rounded-xl w-fit flex-wrap"
             style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}
@@ -873,7 +858,7 @@ export default function GestaoProjetosPage() {
             >
               Todos
             </button>
-            {filterContractTypes.map(ct => (
+            {availableContractTypes.map(ct => (
               <button
                 key={ct.id}
                 onClick={() => { setFilterContractType(String(ct.id)); setMultiContratual(false) }}
@@ -889,55 +874,52 @@ export default function GestaoProjetosPage() {
         </div>
 
         {/* ── Tabela ── */}
-        {(() => {
-          const displayList = multiContratual ? filteredRows : filtered
-          return loading ? (
-            <Skeleton />
-          ) : displayList.length === 0 ? (
-            <div className="text-center py-20" style={{ color: 'var(--brand-subtle)' }}>
-              <Layers size={40} className="mx-auto mb-3 opacity-30" />
-              <p className="text-sm">Nenhum projeto encontrado</p>
-            </div>
-          ) : (
-            <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
-              <table className="w-full text-left">
-                <thead>
-                  <tr style={{ background: 'var(--brand-surface)', borderBottom: '1px solid var(--brand-border)' }}>
-                    <th className="w-8 pl-2" />
-                    <th className="w-1" />
-                    <th className="py-3 pr-4 pl-2 text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Projeto</th>
-                    <th className="py-3 pr-4 text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Cliente</th>
-                    <th className="py-3 px-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>HS Vendidas</th>
-                    <th className="py-3 px-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>HS Consumidas</th>
-                    <th className="py-3 px-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>Saldo</th>
-                    <th className="py-3 px-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)', minWidth: 140 }}>% Uso</th>
-                    <th className="py-3 text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Status</th>
-                  </tr>
-                </thead>
-                <tbody style={{ background: 'var(--brand-bg)' }}>
-                  {displayList.map(project => {
-                    const tr = multiContratual ? (project as TreeRow) : undefined
-                    return (
-                      <ProjectRow
-                        key={multiContratual
-                          ? `${project.id}-${(project as TreeRow)._level}-${(project as TreeRow)._parentId}`
-                          : project.id}
-                        project={project}
-                        expanded={expanded.has(project.id)}
-                        onToggle={() => toggleExpand(project.id)}
-                        onMenuAction={handleMenuAction}
-                        treeRow={tr}
-                        onTreeToggle={tr ? () => toggleTree(tr) : undefined}
-                        canEdit={canEdit}
-                        onEdit={p => router.push(`/projects?editId=${p.id}`)}
-                      />
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )
-        })()}
+        {loading ? (
+          <Skeleton />
+        ) : (multiContratual ? filteredRows : filtered).length === 0 ? (
+          <div className="text-center py-20" style={{ color: 'var(--brand-subtle)' }}>
+            <Layers size={40} className="mx-auto mb-3 opacity-30" />
+            <p className="text-sm">Nenhum projeto encontrado</p>
+          </div>
+        ) : (
+          <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
+            <table className="w-full text-left">
+              <thead>
+                <tr style={{ background: 'var(--brand-surface)', borderBottom: '1px solid var(--brand-border)' }}>
+                  <th className="w-8 pl-2" />
+                  <th className="w-1" />
+                  <th className="py-3 pr-4 pl-2 text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Projeto</th>
+                  <th className="py-3 pr-4 text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Cliente</th>
+                  <th className="py-3 px-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>HS Vendidas</th>
+                  <th className="py-3 px-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>HS Consumidas</th>
+                  <th className="py-3 px-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>Saldo</th>
+                  <th className="py-3 px-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)', minWidth: 140 }}>% Uso</th>
+                  <th className="py-3 text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody style={{ background: 'var(--brand-bg)' }}>
+                {(multiContratual ? filteredRows : filtered).map(project => {
+                  const tr = multiContratual ? (project as TreeRow) : undefined
+                  return (
+                    <ProjectRow
+                      key={tr ? `${project.id}-${tr._level}-${tr._parentId}` : project.id}
+                      project={project}
+                      expanded={expanded.has(project.id)}
+                      onToggle={() => toggleExpand(project.id)}
+                      onMenuAction={handleMenuAction}
+                      canEdit={canEdit}
+                      canChangeStatus={canChangeStatus}
+                      onEdit={p => router.push(`/projects?editId=${p.id}`)}
+                      onChangeStatus={p => setStatusModal({ open: true, project: p, newStatus: p.status ?? '' })}
+                      treeRow={tr}
+                      onTreeToggle={tr ? () => toggleTree(tr) : undefined}
+                    />
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* ── Legenda ── */}
         {!loading && (multiContratual ? filteredRows : filtered).length > 0 && (
@@ -1267,6 +1249,43 @@ export default function GestaoProjetosPage() {
             <div className="flex gap-2 justify-center">
               <button onClick={() => setContribDeleteConfirm(null)} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-white/5 transition-colors" style={{ color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}>Cancelar</button>
               <button onClick={() => doDeleteContrib(contribDeleteConfirm)} className="px-4 py-2 rounded-xl text-sm font-bold bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors">Excluir</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Alterar Status ── */}
+      {statusModal.open && statusModal.project && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="rounded-2xl w-full max-w-sm p-6" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold" style={{ color: 'var(--brand-text)' }}>Alterar Status</h3>
+              <button onClick={() => setStatusModal({ open: false, project: null, newStatus: '' })} style={{ color: 'var(--brand-subtle)' }}><X size={16} /></button>
+            </div>
+            <p className="text-xs mb-4" style={{ color: 'var(--brand-muted)' }}>
+              Projeto: <strong style={{ color: 'var(--brand-text)' }}>{statusModal.project.name}</strong>
+            </p>
+            <select
+              value={statusModal.newStatus}
+              onChange={e => setStatusModal(s => ({ ...s, newStatus: e.target.value }))}
+              className="w-full appearance-none px-3 py-2.5 rounded-xl text-sm outline-none mb-5"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}
+            >
+              {PROJECT_STATUSES.map(s => (
+                <option key={s.value} value={s.value} style={{ background: '#161618' }}>{s.label}</option>
+              ))}
+            </select>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setStatusModal({ open: false, project: null, newStatus: '' })}
+                className="px-4 py-2 rounded-xl text-sm font-medium"
+                style={{ color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}>
+                Cancelar
+              </button>
+              <button onClick={handleChangeStatus} disabled={statusSaving || statusModal.newStatus === statusModal.project.status}
+                className="px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
+                style={{ background: 'var(--brand-primary)', color: '#0A0A0B' }}>
+                {statusSaving ? 'Salvando...' : 'Confirmar'}
+              </button>
             </div>
           </div>
         </div>

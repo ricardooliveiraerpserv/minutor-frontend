@@ -487,6 +487,9 @@ export default function ApprovalsPage() {
   const [rejectReason, setRejectReason] = useState('')
   const [adjModal,     setAdjModal]     = useState<{ open: boolean; id: number | null; type: 'timesheet' | 'expense' }>({ open: false, id: null, type: 'expense' })
   const [adjReason,    setAdjReason]    = useState('')
+  const [bulkAdjOpen,  setBulkAdjOpen]  = useState(false)
+  const [bulkAdjReason, setBulkAdjReason] = useState('')
+  const [bulkAdjLoading, setBulkAdjLoading] = useState(false)
   const [adjLoading,   setAdjLoading]   = useState(false)
 
   // View / approve-expense modals
@@ -508,7 +511,7 @@ export default function ApprovalsPage() {
       setExecutives(l.map((u: any) => ({ id: u.id, name: u.name })))
     }).catch(() => {})
     // /projects omitido — endpoint lento; filtro de projeto não está disponível temporariamente
-    api.get<any>('/customers?pageSize=100').then(r => {
+    api.get<any>('/customers?pageSize=500').then(r => {
       const l = Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
       setCustomers(l.map((c: any) => ({ id: c.id, name: c.name })))
     }).catch(() => {})
@@ -641,9 +644,26 @@ export default function ApprovalsPage() {
     finally { setApproving(false) }
   }
 
+  // Bulk request adjustment
+  const bulkAdjTs = async () => {
+    if (!selected.length || !bulkAdjReason.trim()) return
+    setBulkAdjLoading(true)
+    try {
+      await Promise.all(selected.map(id =>
+        api.post(`/timesheets/${id}/request-adjustment`, { reason: bulkAdjReason.trim() })
+      ))
+      toast.success(`Ajuste solicitado para ${selected.length} apontamento(s)`)
+      setBulkAdjOpen(false); setBulkAdjReason('')
+      setSelected([])
+      loadTs()
+    } catch { toast.error('Erro ao solicitar ajuste em lote') }
+    finally { setBulkAdjLoading(false) }
+  }
+
   // Reject
   const handleReject = async () => {
     if (!rejectModal.ids.length) return
+    if (!rejectReason.trim()) { toast.error('Informe o motivo da rejeição'); return }
     setApproving(true)
     try {
       if (tab === 'timesheets') {
@@ -790,6 +810,10 @@ export default function ApprovalsPage() {
           <button onClick={bulkApproveTs} disabled={approving}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-green-600 hover:bg-green-500 text-white disabled:opacity-50 transition-colors">
             <Check size={12} />{approving ? 'Aprovando...' : 'Aprovar todos'}
+          </button>
+          <button onClick={() => { setBulkAdjOpen(true); setBulkAdjReason('') }} disabled={approving}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-50 transition-colors">
+            <RotateCcw size={12} /> Solicitar Ajuste
           </button>
           <button onClick={() => { setRejectModal({ open: true, ids: selected }); setRejectReason('') }} disabled={approving}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-red-600 hover:bg-red-500 text-white disabled:opacity-50 transition-colors">
@@ -968,6 +992,34 @@ export default function ApprovalsPage() {
         />
       )}
 
+      {/* ── Modal: solicitar ajuste em lote ── */}
+      {bulkAdjOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-sm p-5 shadow-xl">
+            <h3 className="text-sm font-semibold text-white mb-1">Solicitar Ajuste</h3>
+            <p className="text-xs text-zinc-400 mb-3">{selected.length} apontamento(s) selecionado(s). Descreva o que os colaboradores devem corrigir.</p>
+            <Label className="text-xs text-zinc-400">Motivo do ajuste *</Label>
+            <textarea
+              autoFocus
+              value={bulkAdjReason}
+              onChange={e => setBulkAdjReason(e.target.value)}
+              placeholder="Ex: Descrição incompleta, horas incorretas..."
+              rows={3}
+              className="mt-1 w-full bg-zinc-800 border border-zinc-700 text-white text-xs rounded-lg px-3 py-2 outline-none focus:border-blue-500 resize-none placeholder:text-zinc-600"
+            />
+            <div className="flex gap-2 mt-4 justify-end">
+              <Button variant="outline" onClick={() => { setBulkAdjOpen(false); setBulkAdjReason('') }}
+                className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
+              <Button onClick={bulkAdjTs} disabled={bulkAdjLoading || !bulkAdjReason.trim()}
+                className="h-8 text-xs bg-amber-600 hover:bg-amber-500 text-white">
+                <RotateCcw size={12} className="mr-1" />
+                {bulkAdjLoading ? 'Enviando...' : 'Solicitar ajuste'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Modal: solicitar ajuste ── */}
       {adjModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -1003,16 +1055,16 @@ export default function ApprovalsPage() {
             <h3 className="text-sm font-semibold text-white mb-1">
               {rejectModal.ids.length === 1 ? 'Rejeitar item' : `Rejeitar ${rejectModal.ids.length} itens`}
             </h3>
-            <p className="text-xs text-zinc-400 mb-3">Informe o motivo da rejeição (opcional).</p>
-            <Label className="text-xs text-zinc-400">Motivo</Label>
+            <p className="text-xs text-zinc-400 mb-3">Informe o motivo da rejeição <span className="text-red-400 font-semibold">(obrigatório)</span>.</p>
+            <Label className="text-xs text-zinc-400">Motivo <span className="text-red-400">*</span></Label>
             <Input value={rejectReason} onChange={e => setRejectReason(e.target.value)}
               placeholder="Ex: Fora do prazo, informação incorreta..."
               className="mt-1 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
             <div className="flex gap-2 mt-4 justify-end">
-              <Button variant="outline" onClick={() => setRejectModal({ open: false, ids: [] })}
+              <Button variant="outline" onClick={() => { setRejectModal({ open: false, ids: [] }); setRejectReason('') }}
                 className="h-8 text-xs border-zinc-700 text-zinc-300">Cancelar</Button>
-              <Button onClick={handleReject} disabled={approving}
-                className="h-8 text-xs bg-red-600 hover:bg-red-500 text-white">
+              <Button onClick={handleReject} disabled={approving || !rejectReason.trim()}
+                className="h-8 text-xs bg-red-600 hover:bg-red-500 text-white disabled:opacity-50">
                 {approving ? 'Rejeitando...' : 'Confirmar rejeição'}
               </Button>
             </div>
