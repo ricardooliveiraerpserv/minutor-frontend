@@ -761,11 +761,12 @@ function TimesheetsPageContent() {
     if (!newForm.modal_customer_id) { setModalProjects([]); return }
     let cancelled = false
     const qs = new URLSearchParams({ pageSize: '200', customer_id: newForm.modal_customer_id, status: 'active' })
+    if (!isAdmin) qs.set('consultant_only', 'true')
     api.get<{ items: SelectOption[] }>(`/projects?${qs}`)
       .then(r => { if (!cancelled) setModalProjects(Array.isArray(r?.items) ? r.items : []) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [newForm.modal_customer_id])
+  }, [newForm.modal_customer_id, isAdmin])
 
   const openNewModal = () => {
     setNewUseTotal(false)
@@ -862,8 +863,11 @@ function TimesheetsPageContent() {
           .then(r => setClienteProjects(items(r))).catch(() => {})
       }
     } else {
+      const customerEndpoint = isAdmin
+        ? '/customers?pageSize=500'
+        : '/customers/user-linked?pageSize=500'
       Promise.all([
-        api.get<any>('/customers?pageSize=500'),
+        api.get<any>(customerEndpoint),
         api.get<any>('/executives?pageSize=100'),
         api.get<any>('/users?pageSize=200&exclude_type=cliente'),
       ]).then(([c, ex, us]) => {
@@ -872,7 +876,7 @@ function TimesheetsPageContent() {
         setConsultants(items(us))
       }).catch(() => {})
     }
-  }, [isCliente, user?.customer_id])
+  }, [isCliente, isAdmin, user?.customer_id])
 
   const params = useMemo(() => {
     const p = new URLSearchParams({ page: String(page), per_page: '20' })

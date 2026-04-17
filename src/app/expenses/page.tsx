@@ -498,8 +498,11 @@ export default function ExpensesPage() {
         setClienteProjects(items(proj))
       })
     } else {
+      const customerEndpoint = isAdmin
+        ? '/customers?pageSize=500'
+        : '/customers/user-linked?pageSize=500'
       Promise.allSettled([
-        api.get<any>('/customers?pageSize=500'),
+        api.get<any>(customerEndpoint),
         api.get<any>('/users?pageSize=100&role=Consultor'),
         api.get<any>('/users?pageSize=100&role=Coordenador'),
         api.get<any>('/executives?pageSize=100'),
@@ -510,7 +513,7 @@ export default function ExpensesPage() {
         setExecutives(items(ex))
       })
     }
-  }, [isCliente, user?.customer_id])
+  }, [isCliente, isAdmin, user?.customer_id])
 
   const loadOptions = useCallback(async () => {
     try {
@@ -529,6 +532,7 @@ export default function ExpensesPage() {
     if (!form.customer_id) { setProjects([]); return }
     let cancelled = false
     const qs = new URLSearchParams({ pageSize: '200', customer_id: form.customer_id, status: 'active' })
+    if (!isAdmin) qs.set('consultant_only', 'true')
     api.get<PaginatedResponse<SelectOption>>(`/projects?${qs}`)
       .then(p => { if (!cancelled) setProjects(Array.isArray(p?.items) ? p.items : []) })
       .catch(() => {})
