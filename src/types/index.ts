@@ -4,6 +4,7 @@ export interface User {
   email: string
   profile_photo_url?: string | null
   type?: string | null
+  coordinator_type?: 'projetos' | 'sustentacao' | null
   customer_id?: number | null
   partner_id?: number | null
   is_executive?: boolean | null

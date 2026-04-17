@@ -253,6 +253,7 @@ const EMPTY_FORM = {
   hourly_rate: '', rate_type: 'hourly' as 'hourly' | 'monthly',
   daily_hours: '8', profiles: [] as ProfileType[],
   consultant_type: '' as ConsultantType | '',
+  coordinator_type: '' as 'projetos' | 'sustentacao' | '',
   bank_hours_start_date: '',
   guaranteed_hours: '',
   is_partner_adm: false,
@@ -362,6 +363,7 @@ export function UserManagementTab() {
       rate_type: (item.rate_type as 'hourly' | 'monthly') ?? 'hourly',
       daily_hours: item.daily_hours != null ? String(item.daily_hours) : '8',
       profiles, consultant_type: consultant_type as ConsultantType | '',
+      coordinator_type: (item.coordinator_type as 'projetos' | 'sustentacao' | undefined) ?? '',
       bank_hours_start_date: item.bank_hours_start_date ?? '',
       guaranteed_hours: item.guaranteed_hours != null ? String(item.guaranteed_hours) : '',
       is_partner_adm: item.is_executive ?? false,
@@ -388,6 +390,7 @@ export function UserManagementTab() {
       if (form.hourly_rate) payload.hourly_rate = parseFloat(form.hourly_rate)
       if (form.daily_hours) payload.daily_hours = parseFloat(form.daily_hours)
       if (form.profiles.includes('consultor') && form.consultant_type) payload.consultant_type = form.consultant_type
+      if (form.profiles.includes('coordenador')) payload.coordinator_type = form.coordinator_type || null
       payload.bank_hours_start_date = (form.profiles.includes('consultor') || form.profiles.includes('parceiro_adm')) && form.bank_hours_start_date
         ? form.bank_hours_start_date
         : null
@@ -437,13 +440,15 @@ export function UserManagementTab() {
 
   const isCliente     = form.profiles.includes('cliente')
   const isConsultor   = form.profiles.includes('consultor')
+  const isCoordenador = form.profiles.includes('coordenador')
   const isParceiroAdm = form.profiles.includes('parceiro_adm')
-  const hasRate       = isConsultor || form.profiles.includes('coordenador') || isParceiroAdm
+  const hasRate       = isConsultor || isCoordenador || isParceiroAdm
   const selectedPartner = partners.find(p => p.id === Number(form.partner_id))
   const partnerIsFixed  = selectedPartner?.pricing_type === 'fixed'
   const canSave = !!form.name && !!form.email && form.profiles.length > 0
     && (!isCliente     || !!form.customer_id)
     && (!isConsultor   || !!form.consultant_type)
+    && (!isCoordenador || !!form.coordinator_type)
     && (!isParceiroAdm || !!form.partner_id)
 
   // Seleciona perfil exclusivo (type é um único valor)
@@ -453,9 +458,10 @@ export function UserManagementTab() {
       return {
         ...f,
         profiles,
-        consultant_type: profiles.includes('consultor') ? f.consultant_type : '',
-        customer_id:     profiles.includes('cliente')      ? f.customer_id : '',
-        partner_id:      profiles.includes('parceiro_adm') ? f.partner_id  : '',
+        consultant_type:  profiles.includes('consultor')    ? f.consultant_type  : '',
+        coordinator_type: profiles.includes('coordenador')  ? f.coordinator_type : '',
+        customer_id:      profiles.includes('cliente')      ? f.customer_id : '',
+        partner_id:       profiles.includes('parceiro_adm') ? f.partner_id  : '',
       }
     })
   }
@@ -732,6 +738,24 @@ export function UserManagementTab() {
                 {isConsultor && (
                   <ConsultantTypeCard value={form.consultant_type}
                     onChange={opt => setForm(f => ({ ...f, consultant_type: opt, rate_type: opt === 'horista' ? 'hourly' : 'monthly' }))} />
+                )}
+                {isCoordenador && (
+                  <div>
+                    <Label className="text-xs text-zinc-400 mb-1 block">Área do Coordenador *</Label>
+                    <div className="flex rounded-lg border border-zinc-700 overflow-hidden text-xs">
+                      {([['projetos', 'Projetos'], ['sustentacao', 'Sustentação']] as const).map(([val, label]) => (
+                        <button key={val} type="button"
+                          onClick={() => setForm(f => ({ ...f, coordinator_type: val }))}
+                          className={`flex-1 px-3 py-2 font-medium transition-colors ${
+                            form.coordinator_type === val
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+                          }`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 {isConsultor && form.consultant_type === 'horista' && (
                   <div>

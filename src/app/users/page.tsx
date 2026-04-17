@@ -199,6 +199,7 @@ const EMPTY_FORM = {
   daily_hours: '8',
   profiles: [] as ProfileType[],
   consultant_type: '' as ConsultantType | '',
+  coordinator_type: '' as 'projetos' | 'sustentacao' | '',
   is_partner_consultor: false,
   is_partner_adm: false,
   customer_id: '' as number | '',
@@ -291,6 +292,7 @@ export default function UsersPage() {
       daily_hours:         item.daily_hours != null ? String(item.daily_hours) : '8',
       profiles,
       consultant_type:      consultant_type as ConsultantType | '',
+      coordinator_type:     (item.coordinator_type as 'projetos' | 'sustentacao' | undefined) ?? '',
       is_partner_consultor: false,
       is_partner_adm:       item.is_executive ?? false,
       customer_id:          item.customer_id ?? '',
@@ -319,6 +321,7 @@ export default function UsersPage() {
       if (form.hourly_rate) payload.hourly_rate = parseFloat(form.hourly_rate)
       if (form.daily_hours) payload.daily_hours = parseFloat(form.daily_hours)
       if (form.profiles.includes('consultor') && form.consultant_type) payload.consultant_type = form.consultant_type
+      if (form.profiles.includes('coordenador')) payload.coordinator_type = form.coordinator_type || null
       if (!modal.item && form.password) payload.password = form.password
 
       if (modal.item) await api.put(`/users/${modal.item.id}`, payload)
@@ -385,6 +388,7 @@ export default function UsersPage() {
   const canSave = !!form.name && !!form.email && form.profiles.length > 0
     && (!isCliente     || !!form.customer_id)
     && (!isConsultor   || !!form.consultant_type)
+    && (!isCoordenador || !!form.coordinator_type)
     && (!needsPartner  || !!form.partner_id)
 
   // Toggle de perfil — adiciona se não tem, remove se já tem
@@ -394,9 +398,10 @@ export default function UsersPage() {
       return {
         ...f,
         profiles,
-        consultant_type: profiles.includes('consultor') ? f.consultant_type : '',
-        customer_id:     profiles.includes('cliente')      ? f.customer_id : '',
-        partner_id:      profiles.includes('parceiro_adm') ? f.partner_id  : '',
+        consultant_type:  profiles.includes('consultor')    ? f.consultant_type  : '',
+        coordinator_type: profiles.includes('coordenador')  ? f.coordinator_type : '',
+        customer_id:      profiles.includes('cliente')      ? f.customer_id : '',
+        partner_id:       profiles.includes('parceiro_adm') ? f.partner_id  : '',
       }
     })
   }
@@ -636,6 +641,26 @@ export default function UsersPage() {
                   />
                 )}
 
+
+                {/* ── Coordenador: tipo (Projetos ou Sustentação) ── */}
+                {isCoordenador && (
+                  <div>
+                    <Label className="text-xs text-zinc-400 mb-1 block">Área do Coordenador *</Label>
+                    <div className="flex rounded-lg border border-zinc-700 overflow-hidden text-xs">
+                      {([['projetos', 'Projetos'], ['sustentacao', 'Sustentação']] as const).map(([val, label]) => (
+                        <button key={val} type="button"
+                          onClick={() => setForm(f => ({ ...f, coordinator_type: val }))}
+                          className={`flex-1 px-3 py-2 font-medium transition-colors ${
+                            form.coordinator_type === val
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+                          }`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* ── Parceiro: seleciona empresa + define se é ADM ── */}
                 {isParceiroAdm && (

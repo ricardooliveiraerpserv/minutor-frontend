@@ -83,12 +83,11 @@ type NavGroup = {
 type NavEntry = NavItem | NavGroup
 
 const NAV_COORDINATOR: NavEntry[] = [
-  { type: 'item', label: 'Início',             href: '/dashboard',       icon: Home },
-  { type: 'item', label: 'Gestão de Projetos', href: '/gestao-projetos', icon: Layers },
-  { type: 'item', label: 'Visão Executiva',    href: '/portal-cliente',  icon: Building2 },
-  { type: 'item', label: 'Apontamentos',       href: '/timesheets',      icon: Clock },
-  { type: 'item', label: 'Despesas',           href: '/expenses',        icon: Receipt },
-  { type: 'item', label: 'Aprovações',         href: '/approvals',       icon: CheckSquare },
+  { type: 'item', label: 'Início',          href: '/dashboard',      icon: Home },
+  { type: 'item', label: 'Visão Executiva', href: '/portal-cliente', icon: Building2 },
+  { type: 'item', label: 'Apontamentos',    href: '/timesheets',     icon: Clock },
+  { type: 'item', label: 'Despesas',        href: '/expenses',       icon: Receipt },
+  { type: 'item', label: 'Aprovações',      href: '/approvals',      icon: CheckSquare },
 ]
 
 const NAV_CLIENTE: NavEntry[] = [
@@ -201,6 +200,11 @@ function SidebarInner({ user }: { user: User }) {
       const ep = user?.extra_permissions ?? []
       const has = (p: string) => ep.includes(p)
       const nav: NavEntry[] = [...NAV_COORDINATOR]
+
+      // Gestão de Projetos — somente para coordenadores do tipo "projetos"
+      if (user?.coordinator_type === 'projetos') {
+        nav.splice(1, 0, { type: 'item', label: 'Gestão de Projetos', href: '/gestao-projetos', icon: Layers })
+      }
 
       // Projetos e Usuários — opcionais via extra_permissions
       const hasProjectsAction = ['projects.create','projects.update','projects.delete','projects.view_financial'].some(p => ep.includes(p))
