@@ -179,21 +179,17 @@ function DebugClientesTab({ rows, onSync }: { rows: DebugClienteRow[]; onSync: (
   const [search, setSearch]           = useState('')
   const [matchFilter, setMatchFilter] = useState<'all' | 'cnpj' | 'nome' | 'nao'>('all')
   const [cnpjFilter, setCnpjFilter]   = useState<'all' | 'com' | 'sem'>('all')
-  const [hideDept, setHideDept]       = useState(true)
-  const [syncing, setSyncing]         = useState(false)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'ativo' | 'inativo'>('all')
+  const [syncing, setSyncing]           = useState(false)
 
   const handleSync = async () => {
     setSyncing(true)
     try { await onSync() } finally { setSyncing(false) }
   }
 
-  // "provável departamento" = sem CNPJ no Movidesk E sem match no Minutor
-  const isDept = (row: DebugClienteRow) => !row.cnpj_movidesk && row.match === 'nao'
-
-  const deptCount = rows.filter(isDept).length
-
   const filtered = rows.filter(row => {
-    if (hideDept && isDept(row)) return false
+    if (statusFilter === 'ativo'   && !row.is_active) return false
+    if (statusFilter === 'inativo' &&  row.is_active) return false
     if (matchFilter !== 'all' && row.match !== matchFilter) return false
     if (cnpjFilter === 'com' && !row.cnpj_movidesk) return false
     if (cnpjFilter === 'sem' && row.cnpj_movidesk) return false
@@ -216,6 +212,17 @@ function DebugClientesTab({ rows, onSync }: { rows: DebugClienteRow[]; onSync: (
     { key: 'cnpj', label: `✓ CNPJ (${matchCounts.cnpj})`,     color: '#22c55e' },
     { key: 'nome', label: `~ Nome (${matchCounts.nome})`,      color: '#eab308' },
     { key: 'nao',  label: `✗ Não vinc. (${matchCounts.nao})`,  color: '#ef4444' },
+  ]
+
+  const statusCounts = {
+    all:     rows.length,
+    ativo:   rows.filter(r => r.is_active === true).length,
+    inativo: rows.filter(r => r.is_active === false).length,
+  }
+  const STATUS_OPTIONS: { key: 'all' | 'ativo' | 'inativo'; label: string; color: string }[] = [
+    { key: 'all',     label: `Todos (${statusCounts.all})`,          color: '#71717a' },
+    { key: 'ativo',   label: `Ativo (${statusCounts.ativo})`,        color: '#22c55e' },
+    { key: 'inativo', label: `Inativo (${statusCounts.inativo})`,    color: '#ef4444' },
   ]
 
   return (
@@ -243,11 +250,15 @@ function DebugClientesTab({ rows, onSync }: { rows: DebugClienteRow[]; onSync: (
           style={{ border: '1px solid var(--brand-border)', color: 'var(--brand-text)', width: 200 }}
         />
 
-        <button onClick={() => setHideDept(v => !v)}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
-          style={{ border: '1px solid var(--brand-border)', background: hideDept ? 'rgba(0,245,255,0.08)' : 'transparent', color: hideDept ? '#00F5FF' : '#71717a' }}>
-          {hideDept ? `Departamentos ocultos (${deptCount})` : `Mostrar departamentos (${deptCount})`}
-        </button>
+        <div className="flex rounded-lg border border-zinc-700 overflow-hidden text-xs">
+          {STATUS_OPTIONS.map(opt => (
+            <button key={opt.key} onClick={() => setStatusFilter(opt.key)}
+              className="px-3 py-1.5 font-medium transition-colors"
+              style={{ background: statusFilter === opt.key ? 'rgba(255,255,255,0.06)' : 'transparent', color: statusFilter === opt.key ? opt.color : '#71717a' }}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
 
         <div className="flex rounded-lg border border-zinc-700 overflow-hidden text-xs">
           {MATCH_OPTIONS.map(opt => (
