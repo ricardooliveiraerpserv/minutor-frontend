@@ -141,6 +141,7 @@ const STATUS_LABEL: Record<string, string> = {
 const TABS = [
   { id: 'kpis',         label: 'Visão Executiva',   icon: Activity },
   { id: 'queue',        label: 'Fila Operacional',  icon: List },
+  { id: 'indicadores',  label: 'Indicadores',       icon: BarChart2 },
   { id: 'sla',          label: 'SLA',               icon: Shield },
   { id: 'productivity', label: 'Produtividade',     icon: Users },
   { id: 'financial',    label: 'Financeiro',        icon: DollarSign },
@@ -679,8 +680,10 @@ export default function SustentacaoPage() {
   const [evolution, setEvolution]     = useState<EvolutionData | null>(null)
   const [debugClientes, setDebugClientes]         = useState<{ rows: DebugClienteRow[] } | null>(null)
   const [debugResponsaveis, setDebugResponsaveis] = useState<{ rows: DebugResponsavelRow[] } | null>(null)
-  const [loadError, setLoadError]       = useState<string | null>(null)
-  const [contextStats, setContextStats] = useState<ContextStats | null>(null)
+  const [loadError, setLoadError]         = useState<string | null>(null)
+  const [contextStats, setContextStats]   = useState<ContextStats | null>(null)
+  const [indicadores, setIndicadores]     = useState<ContextStats | null>(null)
+  const [indicadorOpen, setIndicadorOpen] = useState<string | null>(null)
 
   const params = `from=${from}&to=${to}`
 
@@ -712,6 +715,9 @@ export default function SustentacaoPage() {
       } else if (t === 'evolution' && !evolution) {
         const r = await api.get<EvolutionData>(`/sustentacao/evolution`)
         setEvolution(r)
+      } else if (t === 'indicadores' && !indicadores) {
+        const r = await api.get<ContextStats>(`/sustentacao/context-stats?${params}`)
+        setIndicadores(r)
       } else if (t === 'debug') {
         if (!debugClientes) {
           const r = await api.get<{ rows: DebugClienteRow[] }>(`/sustentacao/debug-clientes`)
@@ -874,6 +880,95 @@ export default function SustentacaoPage() {
           </div>
         )}
 
+        {/* INDICADORES */}
+        {tab === 'indicadores' && indicadores && (() => {
+          const cards = [
+            { id: 'consultores', label: 'Tickets por Consultor', value: indicadores.by_consultant.length, sub: `${indicadores.tickets_open} abertos`, color: CYAN, icon: '👤' },
+            { id: 'clientes',    label: 'Tickets por Cliente',   value: indicadores.by_client.length,     sub: `${indicadores.tickets_open} abertos`, color: BLUE, icon: '🏢' },
+            { id: 'sla',         label: 'SLA Violado',           value: indicadores.sla_breached,         sub: `${indicadores.sla_rate ?? '—'}% no prazo`, color: indicadores.sla_breached > 0 ? RED : GREEN, icon: '🛡️' },
+            { id: 'risco',       label: 'Em Risco (4h)',         value: indicadores.sla_at_risk,          sub: 'prazo nas próximas 4h', color: indicadores.sla_at_risk > 0 ? ORANGE : GREEN, icon: '⚠️' },
+            { id: 'over4h',      label: 'Abertos +4h',          value: indicadores.over_4h,              sub: 'sem resolução', color: indicadores.over_4h > 0 ? ORANGE : GREEN, icon: '⏱️' },
+            { id: 'resolvidos',  label: 'Resolvidos no Período', value: indicadores.tickets_resolved,     sub: `tempo médio ${fmt(indicadores.avg_solution_min ?? null)}`, color: GREEN, icon: '✅' },
+          ]
+          return (
+            <div className="space-y-6">
+              {/* Cards clicáveis */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {cards.map(c => (
+                  <button key={c.id} onClick={() => setIndicadorOpen(indicadorOpen === c.id ? null : c.id)}
+                    className="rounded-xl border p-4 text-left transition-all hover:border-cyan-500/40"
+                    style={{ borderColor: indicadorOpen === c.id ? c.color : 'var(--brand-border)', background: indicadorOpen === c.id ? `${c.color}11` : 'var(--brand-surface)' }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-lg">{c.icon}</span>
+                      {indicadorOpen === c.id && <Check size={12} style={{ color: c.color }} />}
+                    </div>
+                    <p className="text-2xl font-bold mb-1" style={{ color: c.color }}>{c.value}</p>
+                    <p className="text-[11px] text-zinc-300 font-medium leading-tight">{c.label}</p>
+                    <p className="text-[10px] text-zinc-500 mt-0.5">{c.sub}</p>
+                  </button>
+                ))}
+              </div>
+
+              {/* Painel de detalhes expansível */}
+              {indicadorOpen && (
+                <div className="rounded-xl border p-4" style={{ borderColor: 'var(--brand-border)', background: 'var(--brand-surface)' }}>
+                  {(indicadorOpen === 'consultores' || indicadorOpen === 'sla') && (
+                    <div>
+                      <p className="text-xs font-semibold text-zinc-300 mb-3">Tickets por Consultor</p>
+                      <table className="w-full text-xs">
+                        <thead><tr className="border-b" style={{ borderColor: 'var(--brand-border)' }}>
+                          <th className="text-left py-2 text-zinc-500 font-medium">Consultor</th>
+                          <th className="text-center py-2 text-zinc-500 font-medium">Abertos</th>
+                          <th className="text-center py-2 text-zinc-500 font-medium">Em Atend.</th>
+                          <th className="text-center py-2 text-zinc-500 font-medium">SLA Viol.</th>
+                          <th className="text-center py-2 text-zinc-500 font-medium">SLA %</th>
+                        </tr></thead>
+                        <tbody>
+                          {indicadores.by_consultant.map(c => (
+                            <tr key={c.name} className="border-b hover:bg-zinc-800/40" style={{ borderColor: 'var(--brand-border)' }}>
+                              <td className="py-2 text-white font-medium">{c.name}</td>
+                              <td className="py-2 text-center text-zinc-300">{c.total_open}</td>
+                              <td className="py-2 text-center" style={{ color: CYAN }}>{c.in_attendance}</td>
+                              <td className="py-2 text-center" style={{ color: c.sla_breached > 0 ? RED : '#71717a' }}>{c.sla_breached}</td>
+                              <td className="py-2 text-center font-bold" style={{ color: c.sla_ok_pct >= 90 ? GREEN : c.sla_ok_pct >= 70 ? YELLOW : RED }}>{c.sla_ok_pct}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {(indicadorOpen === 'clientes') && (
+                    <div>
+                      <p className="text-xs font-semibold text-zinc-300 mb-3">Tickets por Cliente</p>
+                      <table className="w-full text-xs">
+                        <thead><tr className="border-b" style={{ borderColor: 'var(--brand-border)' }}>
+                          <th className="text-left py-2 text-zinc-500 font-medium">Cliente</th>
+                          <th className="text-center py-2 text-zinc-500 font-medium">Abertos</th>
+                          <th className="text-center py-2 text-zinc-500 font-medium">Em Atend.</th>
+                          <th className="text-center py-2 text-zinc-500 font-medium">SLA Viol.</th>
+                        </tr></thead>
+                        <tbody>
+                          {indicadores.by_client.map(c => (
+                            <tr key={c.name} className="border-b hover:bg-zinc-800/40" style={{ borderColor: 'var(--brand-border)' }}>
+                              <td className="py-2 text-white font-medium">{c.name}</td>
+                              <td className="py-2 text-center text-zinc-300">{c.total_open}</td>
+                              <td className="py-2 text-center" style={{ color: CYAN }}>{c.in_attendance}</td>
+                              <td className="py-2 text-center" style={{ color: c.sla_breached > 0 ? RED : '#71717a' }}>{c.sla_breached}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {(indicadorOpen === 'risco' || indicadorOpen === 'over4h' || indicadorOpen === 'resolvidos') && (
+                    <p className="text-xs text-zinc-400">Para ver os tickets detalhados, use a aba <strong>Fila Operacional</strong> com os filtros aplicados.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })()}
+
         {/* FILA OPERACIONAL */}
         {tab === 'queue' && queue && (
           <div className="space-y-3">
@@ -886,7 +981,12 @@ export default function SustentacaoPage() {
                     ? 'Visão por Responsável + Cliente'
                     : contextStats.filter.responsavel.length > 0 ? 'Visão por Responsável' : 'Visão por Cliente'}
                 </p>
-                <span className="text-[10px] text-zinc-500">período: {contextStats.filter.responsavel.length} resp. · {contextStats.filter.cliente.length} cliente(s)</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] text-zinc-500">{contextStats.filter.responsavel.length} resp. · {contextStats.filter.cliente.length} cliente(s)</span>
+                  <button onClick={() => setContextStats(null)} className="text-zinc-500 hover:text-zinc-300 transition-colors p-0.5 rounded">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                  </button>
+                </div>
               </div>
               <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-3">
                 {/* Abertos */}
