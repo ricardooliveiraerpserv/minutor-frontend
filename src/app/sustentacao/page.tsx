@@ -40,6 +40,8 @@ interface QueueTicket {
   created_date: string | null
   user: { id: number; name: string } | null
   customer: { id: number; name: string } | null
+  solicitante: { organization?: string; [k: string]: unknown } | null
+  responsavel: { name?: string; [k: string]: unknown } | null
 }
 
 interface SlaData {
@@ -750,8 +752,8 @@ export default function SustentacaoPage() {
                       </span>
                     </td>
                     <td className="px-3 py-2 text-zinc-300">{STATUS_LABEL[t.base_status] ?? t.base_status}</td>
-                    <td className="px-3 py-2 text-zinc-300">{t.customer?.name ?? '—'}</td>
-                    <td className="px-3 py-2 text-zinc-300">{t.user?.name ?? '—'}</td>
+                    <td className="px-3 py-2 text-zinc-300">{t.solicitante?.organization ?? t.customer?.name ?? '—'}</td>
+                    <td className="px-3 py-2 text-zinc-300">{t.responsavel?.name ?? t.user?.name ?? '—'}</td>
                     <td className="px-3 py-2 text-zinc-400">{t.owner_team ?? '—'}</td>
                     <td className="px-3 py-2">
                       <span style={{ color: isOverdue(t.sla_solution_date) ? RED : '#fafafa' }}>
@@ -783,10 +785,10 @@ export default function SustentacaoPage() {
                       <div className="flex gap-3">
                         <span className="font-mono text-zinc-500">#{t.ticket_id}</span>
                         <span className="text-white">{t.titulo ?? '—'}</span>
-                        <span className="text-zinc-400">{t.customer?.name}</span>
+                        <span className="text-zinc-400">{t.solicitante?.organization ?? t.customer?.name ?? '—'}</span>
                       </div>
                       <div className="flex gap-4 text-right">
-                        <span className="text-zinc-400">{t.user?.name ?? '—'}</span>
+                        <span className="text-zinc-400">{t.responsavel?.name ?? t.user?.name ?? '—'}</span>
                         <span style={{ color: RED }}>{fmtDate(t.sla_solution_date)}</span>
                       </div>
                     </div>
