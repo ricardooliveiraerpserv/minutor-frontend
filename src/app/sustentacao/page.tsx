@@ -40,7 +40,7 @@ interface QueueTicket {
   created_date: string | null
   user: { id: number; name: string } | null
   customer: { id: number; name: string } | null
-  solicitante: { organization?: string; [k: string]: unknown } | null
+  solicitante: { organization?: string; name?: string; email?: string; [k: string]: unknown } | null
   responsavel: { name?: string; [k: string]: unknown } | null
 }
 
@@ -138,6 +138,15 @@ function fmt(min: number | null | undefined): string {
   const h = Math.floor(min / 60)
   const m = min % 60
   return h > 0 ? `${h}h${m > 0 ? ` ${m}m` : ''}` : `${m}m`
+}
+
+function clienteMovidesk(t: QueueTicket): string {
+  const s = t.solicitante
+  if (!s) return t.customer?.name ?? '—'
+  if (s.organization) return s.organization
+  // só mostra name se for cliente externo (email não-@erpserv)
+  if (s.name && !String(s.email ?? '').includes('@erpserv')) return s.name
+  return t.customer?.name ?? '—'
 }
 
 function fmtDate(dt: string | null | undefined): string {
@@ -752,7 +761,7 @@ export default function SustentacaoPage() {
                       </span>
                     </td>
                     <td className="px-3 py-2 text-zinc-300">{STATUS_LABEL[t.base_status] ?? t.base_status}</td>
-                    <td className="px-3 py-2 text-zinc-300">{t.solicitante?.organization ?? t.customer?.name ?? '—'}</td>
+                    <td className="px-3 py-2 text-zinc-300">{clienteMovidesk(t)}</td>
                     <td className="px-3 py-2 text-zinc-300">{t.responsavel?.name ?? t.user?.name ?? '—'}</td>
                     <td className="px-3 py-2 text-zinc-400">{t.owner_team ?? '—'}</td>
                     <td className="px-3 py-2">
@@ -785,7 +794,7 @@ export default function SustentacaoPage() {
                       <div className="flex gap-3">
                         <span className="font-mono text-zinc-500">#{t.ticket_id}</span>
                         <span className="text-white">{t.titulo ?? '—'}</span>
-                        <span className="text-zinc-400">{t.solicitante?.organization ?? t.customer?.name ?? '—'}</span>
+                        <span className="text-zinc-400">{clienteMovidesk(t)}</span>
                       </div>
                       <div className="flex gap-4 text-right">
                         <span className="text-zinc-400">{t.responsavel?.name ?? t.user?.name ?? '—'}</span>
