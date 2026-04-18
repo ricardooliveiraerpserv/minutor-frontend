@@ -354,12 +354,13 @@ function DebugResponsaveisTab({ rows, onSync }: { rows: DebugResponsavelRow[]; o
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-zinc-300">Responsáveis por Ticket: Movidesk × Minutor</h2>
         <div className="flex items-center gap-3">
-          {!hasStatus && <span className="text-xs text-yellow-500">Status indisponível — clique em Integrar para buscar</span>}
+          {!hasStatus && !syncing && <span className="text-xs text-yellow-500">Status indisponível — clique em Integrar para buscar</span>}
+          {syncing && <span className="text-xs text-cyan-400">⏳ Rodando em background... recarrega automaticamente em 3 min</span>}
           <span className="text-xs text-zinc-600">{filtered.length} de {rows.length} responsáveis</span>
           <button onClick={handleSync} disabled={syncing}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
             style={{ background: 'rgba(0,245,255,0.10)', border: '1px solid rgba(0,245,255,0.25)', color: '#00F5FF' }}>
-            {syncing ? '⏳ Integrando...' : '⚡ Integrar agora'}
+            {syncing ? '⏳ Aguardando...' : '⚡ Integrar agora'}
           </button>
         </div>
       </div>
@@ -970,8 +971,11 @@ export default function SustentacaoPage() {
         {tab === 'debug-resp' && !loading && debugResponsaveis && (
           <DebugResponsaveisTab rows={debugResponsaveis.rows} onSync={async () => {
             await api.post('/sustentacao/sync-agents', {})
-            const r = await api.get<{ rows: DebugResponsavelRow[] }>('/sustentacao/debug-responsaveis')
-            setDebugResponsaveis(r)
+            // Comando roda em background (~3 min). Recarrega após 3 min.
+            setTimeout(async () => {
+              const r = await api.get<{ rows: DebugResponsavelRow[] }>('/sustentacao/debug-responsaveis')
+              setDebugResponsaveis(r)
+            }, 3 * 60 * 1000)
           }} />
         )}
       </div>
