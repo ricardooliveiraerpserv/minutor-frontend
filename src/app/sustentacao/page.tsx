@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { AppLayout } from '@/components/layout/app-layout'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { MonthYearPicker } from '@/components/ui/month-year-picker'
@@ -641,6 +641,52 @@ function MultiSelect({ label, options, selected, onChange, placeholder = 'Buscar
   )
 }
 
+function DrillTicketTable({ tickets }: { tickets: QueueTicket[] }) {
+  return (
+    <table className="w-full text-xs">
+      <thead>
+        <tr className="border-b" style={{ borderColor: 'var(--brand-border)', background: 'rgba(255,255,255,0.03)' }}>
+          {['#', 'Título', 'Urgência', 'Status', 'Cliente', 'Responsável', 'SLA Solução'].map(h => (
+            <th key={h} className="px-4 py-2 text-left font-medium text-zinc-500">{h}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {tickets.map((t, i) => (
+          <tr key={t.id} className="border-b hover:bg-zinc-800/40 transition-colors"
+            style={{ borderColor: 'var(--brand-border)', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
+            <td className="px-4 py-2 font-mono">
+              <a href={`https://erpserv.movidesk.com/Ticket/Edit/${t.ticket_id}`} target="_blank" rel="noopener noreferrer"
+                className="text-cyan-400 hover:text-cyan-300 hover:underline">{t.ticket_id}</a>
+            </td>
+            <td className="px-4 py-2 text-white max-w-[240px] truncate">
+              <a href={`https://erpserv.movidesk.com/Ticket/Edit/${t.ticket_id}`} target="_blank" rel="noopener noreferrer"
+                className="hover:text-cyan-300 hover:underline">{t.titulo ?? '—'}</a>
+            </td>
+            <td className="px-4 py-2">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                style={{ background: `${urgencyColor(t.urgencia)}22`, color: urgencyColor(t.urgencia) }}>
+                {t.urgencia ?? '—'}
+              </span>
+            </td>
+            <td className="px-4 py-2">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-zinc-300">{t.status ?? STATUS_LABEL[t.base_status] ?? t.base_status}</span>
+                {t.status && <span className="text-[10px] text-zinc-500">{STATUS_LABEL[t.base_status] ?? t.base_status}</span>}
+              </div>
+            </td>
+            <td className="px-4 py-2 text-zinc-300 max-w-[140px] truncate">{clienteMovidesk(t)}</td>
+            <td className="px-4 py-2 text-zinc-300">{t.responsavel?.name ?? t.user?.name ?? '—'}</td>
+            <td className="px-4 py-2">
+              <span style={{ color: isOverdue(t.sla_solution_date) ? RED : '#fafafa' }}>{fmtDate(t.sla_solution_date)}</span>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SustentacaoPage() {
@@ -939,126 +985,87 @@ export default function SustentacaoPage() {
 
               {/* Painel de detalhes expansível */}
               {indicadorOpen && (
-                <div className="rounded-xl border p-4" style={{ borderColor: 'var(--brand-border)', background: 'var(--brand-surface)' }}>
+                <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--brand-border)', background: 'var(--brand-surface)' }}>
                   {(indicadorOpen === 'consultores' || indicadorOpen === 'sla') && (
-                    <div>
-                      <p className="text-xs font-semibold text-zinc-300 mb-3">Tickets por Consultor</p>
-                      <table className="w-full text-xs">
-                        <thead><tr className="border-b" style={{ borderColor: 'var(--brand-border)' }}>
-                          <th className="text-left py-2 text-zinc-500 font-medium">Consultor</th>
-                          <th className="text-center py-2 text-zinc-500 font-medium">Abertos</th>
-                          <th className="text-center py-2 text-zinc-500 font-medium">Em Atend.</th>
-                          <th className="text-center py-2 text-zinc-500 font-medium">SLA Viol.</th>
-                          <th className="text-center py-2 text-zinc-500 font-medium">SLA %</th>
-                        </tr></thead>
-                        <tbody>
-                          {indicadores.by_consultant.map(c => (
-                            <tr key={c.name} className="border-b hover:bg-zinc-800/40 cursor-pointer transition-colors"
+                    <table className="w-full text-xs">
+                      <thead><tr className="border-b" style={{ borderColor: 'var(--brand-border)', background: 'rgba(255,255,255,0.02)' }}>
+                        <th className="text-left px-4 py-2.5 text-zinc-500 font-medium">Consultor</th>
+                        <th className="text-center px-4 py-2.5 text-zinc-500 font-medium">Abertos</th>
+                        <th className="text-center px-4 py-2.5 text-zinc-500 font-medium">Em Atend.</th>
+                        <th className="text-center px-4 py-2.5 text-zinc-500 font-medium">SLA Viol.</th>
+                        <th className="text-center px-4 py-2.5 text-zinc-500 font-medium">SLA %</th>
+                      </tr></thead>
+                      <tbody>
+                        {indicadores.by_consultant.map(c => (
+                          <React.Fragment key={c.email}>
+                            <tr className="border-b hover:bg-zinc-800/40 cursor-pointer transition-colors"
                               style={{ borderColor: 'var(--brand-border)', background: drillDown?.key === c.email && drillDown?.type === 'consultor' ? 'rgba(0,245,255,0.06)' : undefined }}
                               onClick={() => fetchDrillDown('consultor', c.email, c.name)}>
-                              <td className="py-2 text-white font-medium">{c.name}</td>
-                              <td className="py-2 text-center text-zinc-300">{c.total_open}</td>
-                              <td className="py-2 text-center" style={{ color: CYAN }}>{c.in_attendance}</td>
-                              <td className="py-2 text-center" style={{ color: c.sla_breached > 0 ? RED : '#71717a' }}>{c.sla_breached}</td>
-                              <td className="py-2 text-center font-bold" style={{ color: c.sla_ok_pct >= 90 ? GREEN : c.sla_ok_pct >= 70 ? YELLOW : RED }}>{c.sla_ok_pct}%</td>
+                              <td className="px-4 py-2.5 text-white font-medium flex items-center gap-2">
+                                <span style={{ color: drillDown?.key === c.email ? CYAN : undefined }}>{drillDown?.key === c.email ? '▾' : '▸'}</span>
+                                {c.name}
+                              </td>
+                              <td className="px-4 py-2.5 text-center text-zinc-300">{c.total_open}</td>
+                              <td className="px-4 py-2.5 text-center" style={{ color: CYAN }}>{c.in_attendance}</td>
+                              <td className="px-4 py-2.5 text-center" style={{ color: c.sla_breached > 0 ? RED : '#71717a' }}>{c.sla_breached}</td>
+                              <td className="px-4 py-2.5 text-center font-bold" style={{ color: c.sla_ok_pct >= 90 ? GREEN : c.sla_ok_pct >= 70 ? YELLOW : RED }}>{c.sla_ok_pct}%</td>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                            {drillDown?.key === c.email && drillDown?.type === 'consultor' && (
+                              <tr style={{ borderBottom: `1px solid var(--brand-border)` }}>
+                                <td colSpan={5} style={{ padding: 0, background: 'rgba(0,245,255,0.02)' }}>
+                                  {drillLoading
+                                    ? <p className="text-xs text-zinc-500 px-6 py-3">Carregando...</p>
+                                    : !drillTickets || drillTickets.length === 0
+                                    ? <p className="text-xs text-zinc-500 px-6 py-3">Nenhum ticket aberto.</p>
+                                    : <DrillTicketTable tickets={drillTickets} />}
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
                   )}
                   {(indicadorOpen === 'clientes') && (
-                    <div>
-                      <p className="text-xs font-semibold text-zinc-300 mb-3">Tickets por Cliente</p>
-                      <table className="w-full text-xs">
-                        <thead><tr className="border-b" style={{ borderColor: 'var(--brand-border)' }}>
-                          <th className="text-left py-2 text-zinc-500 font-medium">Cliente</th>
-                          <th className="text-center py-2 text-zinc-500 font-medium">Abertos</th>
-                          <th className="text-center py-2 text-zinc-500 font-medium">Em Atend.</th>
-                          <th className="text-center py-2 text-zinc-500 font-medium">SLA Viol.</th>
-                        </tr></thead>
-                        <tbody>
-                          {indicadores.by_client.map(c => (
-                            <tr key={c.name} className="border-b hover:bg-zinc-800/40 cursor-pointer transition-colors"
+                    <table className="w-full text-xs">
+                      <thead><tr className="border-b" style={{ borderColor: 'var(--brand-border)', background: 'rgba(255,255,255,0.02)' }}>
+                        <th className="text-left px-4 py-2.5 text-zinc-500 font-medium">Cliente</th>
+                        <th className="text-center px-4 py-2.5 text-zinc-500 font-medium">Abertos</th>
+                        <th className="text-center px-4 py-2.5 text-zinc-500 font-medium">Em Atend.</th>
+                        <th className="text-center px-4 py-2.5 text-zinc-500 font-medium">SLA Viol.</th>
+                      </tr></thead>
+                      <tbody>
+                        {indicadores.by_client.map(c => (
+                          <React.Fragment key={c.name}>
+                            <tr className="border-b hover:bg-zinc-800/40 cursor-pointer transition-colors"
                               style={{ borderColor: 'var(--brand-border)', background: drillDown?.key === c.name && drillDown?.type === 'cliente' ? 'rgba(0,245,255,0.06)' : undefined }}
                               onClick={() => fetchDrillDown('cliente', c.name, c.name)}>
-                              <td className="py-2 text-white font-medium">{c.name}</td>
-                              <td className="py-2 text-center text-zinc-300">{c.total_open}</td>
-                              <td className="py-2 text-center" style={{ color: CYAN }}>{c.in_attendance}</td>
-                              <td className="py-2 text-center" style={{ color: c.sla_breached > 0 ? RED : '#71717a' }}>{c.sla_breached}</td>
+                              <td className="px-4 py-2.5 text-white font-medium flex items-center gap-2">
+                                <span style={{ color: drillDown?.key === c.name ? CYAN : undefined }}>{drillDown?.key === c.name ? '▾' : '▸'}</span>
+                                {c.name}
+                              </td>
+                              <td className="px-4 py-2.5 text-center text-zinc-300">{c.total_open}</td>
+                              <td className="px-4 py-2.5 text-center" style={{ color: CYAN }}>{c.in_attendance}</td>
+                              <td className="px-4 py-2.5 text-center" style={{ color: c.sla_breached > 0 ? RED : '#71717a' }}>{c.sla_breached}</td>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                            {drillDown?.key === c.name && drillDown?.type === 'cliente' && (
+                              <tr style={{ borderBottom: `1px solid var(--brand-border)` }}>
+                                <td colSpan={4} style={{ padding: 0, background: 'rgba(0,245,255,0.02)' }}>
+                                  {drillLoading
+                                    ? <p className="text-xs text-zinc-500 px-6 py-3">Carregando...</p>
+                                    : !drillTickets || drillTickets.length === 0
+                                    ? <p className="text-xs text-zinc-500 px-6 py-3">Nenhum ticket aberto.</p>
+                                    : <DrillTicketTable tickets={drillTickets} />}
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
                   )}
                   {(indicadorOpen === 'risco' || indicadorOpen === 'over4h' || indicadorOpen === 'resolvidos') && (
-                    <p className="text-xs text-zinc-400">Para ver os tickets detalhados, use a aba <strong>Fila Operacional</strong> com os filtros aplicados.</p>
-                  )}
-                </div>
-              )}
-
-              {/* Painel de tickets do drill-down */}
-              {drillDown && (
-                <div className="rounded-xl border" style={{ borderColor: 'rgba(0,245,255,0.2)', background: 'var(--brand-surface)' }}>
-                  <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--brand-border)' }}>
-                    <p className="text-xs font-semibold text-cyan-400">
-                      Tickets de {drillDown.label}
-                      {drillTickets && !drillLoading && <span className="ml-2 text-zinc-500 font-normal">({drillTickets.length} abertos)</span>}
-                    </p>
-                    <button onClick={() => { setDrillDown(null); setDrillTickets(null) }}
-                      className="text-zinc-500 hover:text-zinc-300 transition-colors p-0.5 rounded">
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                    </button>
-                  </div>
-                  {drillLoading && <p className="text-xs text-zinc-500 px-4 py-3">Carregando...</p>}
-                  {!drillLoading && drillTickets && drillTickets.length === 0 && (
-                    <p className="text-xs text-zinc-500 px-4 py-3">Nenhum ticket aberto encontrado.</p>
-                  )}
-                  {!drillLoading && drillTickets && drillTickets.length > 0 && (
-                    <div className="overflow-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b" style={{ borderColor: 'var(--brand-border)', background: 'rgba(255,255,255,0.02)' }}>
-                            {['#', 'Título', 'Urgência', 'Status', 'Cliente', 'Responsável', 'SLA Solução'].map(h => (
-                              <th key={h} className="px-3 py-2 text-left font-medium text-zinc-500">{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {drillTickets.map((t, i) => (
-                            <tr key={t.id} className="border-b hover:bg-zinc-800/40 transition-colors"
-                              style={{ borderColor: 'var(--brand-border)', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
-                              <td className="px-3 py-2 font-mono">
-                                <a href={`https://erpserv.movidesk.com/Ticket/Edit/${t.ticket_id}`} target="_blank" rel="noopener noreferrer"
-                                  className="text-cyan-400 hover:text-cyan-300 hover:underline">{t.ticket_id}</a>
-                              </td>
-                              <td className="px-3 py-2 text-white max-w-[220px] truncate">
-                                <a href={`https://erpserv.movidesk.com/Ticket/Edit/${t.ticket_id}`} target="_blank" rel="noopener noreferrer"
-                                  className="hover:text-cyan-300 hover:underline">{t.titulo ?? '—'}</a>
-                              </td>
-                              <td className="px-3 py-2">
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold"
-                                  style={{ background: `${urgencyColor(t.urgencia)}22`, color: urgencyColor(t.urgencia) }}>
-                                  {t.urgencia ?? '—'}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2">
-                                <div className="flex flex-col gap-0.5">
-                                  <span className="text-zinc-300">{t.status ?? STATUS_LABEL[t.base_status] ?? t.base_status}</span>
-                                  {t.status && <span className="text-[10px] text-zinc-500">{STATUS_LABEL[t.base_status] ?? t.base_status}</span>}
-                                </div>
-                              </td>
-                              <td className="px-3 py-2 text-zinc-300 max-w-[140px] truncate">{clienteMovidesk(t)}</td>
-                              <td className="px-3 py-2 text-zinc-300">{t.responsavel?.name ?? t.user?.name ?? '—'}</td>
-                              <td className="px-3 py-2">
-                                <span style={{ color: isOverdue(t.sla_solution_date) ? RED : '#fafafa' }}>{fmtDate(t.sla_solution_date)}</span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <p className="text-xs text-zinc-400 px-4 py-3">Para ver os tickets detalhados, use a aba <strong>Fila Operacional</strong> com os filtros aplicados.</p>
                   )}
                 </div>
               )}
