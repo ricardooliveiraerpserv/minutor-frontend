@@ -429,6 +429,7 @@ export default function ExpensesPage() {
   const [dateTo,         setDateTo]         = useState('')
   const [refMonth,       setRefMonth]       = useState<number | null>(null)
   const [refYear,        setRefYear]        = useState<number | null>(null)
+  const [filterMode,     setFilterMode]     = useState<'month' | 'period'>('month')
   const [customerId,     setCustomerId]     = useState('')
   const [projectId,      setProjectId]      = useState('')
   const [userId,         setUserId]         = useState('')
@@ -643,24 +644,36 @@ export default function ExpensesPage() {
             </div>
           )}
           <div className="flex items-center gap-2">
-            <MonthYearPicker
-              month={refMonth}
-              year={refYear}
-              onChange={(m, y) => {
-                if (m === 0) { setRefMonth(null); setRefYear(null); setDateFrom(''); setDateTo('') }
-                else {
-                  const mm = String(m).padStart(2, '0')
-                  const last = new Date(y, m, 0).getDate()
-                  setRefMonth(m); setRefYear(y)
-                  setDateFrom(`${y}-${mm}-01`); setDateTo(`${y}-${mm}-${String(last).padStart(2, '0')}`)
-                }
-                setPage(1)
-              }}
-            />
-            <DateRangePicker
-              from={dateFrom} to={dateTo}
-              onChange={(f, t) => { setDateFrom(f); setDateTo(t); setRefMonth(null); setRefYear(null); setPage(1) }}
-            />
+            <div className="flex rounded-lg border border-zinc-700 overflow-hidden text-xs">
+              {(['month', 'period'] as const).map((mode) => (
+                <button key={mode} onClick={() => setFilterMode(mode)}
+                  className="px-3 py-1.5 font-medium transition-colors"
+                  style={{ background: filterMode === mode ? 'rgba(0,245,255,0.12)' : 'transparent', color: filterMode === mode ? '#00F5FF' : '#71717a' }}>
+                  {mode === 'month' ? 'Mês/Ano' : 'Período'}
+                </button>
+              ))}
+            </div>
+            {filterMode === 'month' ? (
+              <MonthYearPicker
+                month={refMonth}
+                year={refYear}
+                onChange={(m, y) => {
+                  if (m === 0) { setRefMonth(null); setRefYear(null); setDateFrom(''); setDateTo('') }
+                  else {
+                    const mm = String(m).padStart(2, '0')
+                    const last = new Date(y, m, 0).getDate()
+                    setRefMonth(m); setRefYear(y)
+                    setDateFrom(`${y}-${mm}-01`); setDateTo(`${y}-${mm}-${String(last).padStart(2, '0')}`)
+                  }
+                  setPage(1)
+                }}
+              />
+            ) : (
+              <DateRangePicker
+                from={dateFrom} to={dateTo}
+                onChange={(f, t) => { setDateFrom(f); setDateTo(t); setRefMonth(null); setRefYear(null); setPage(1) }}
+              />
+            )}
             {(customerId || projectId || userId || coordinatorId || executiveId || contractTypeId || dateFrom || dateTo) && (
               <button onClick={() => { setCustomerId(''); setProjectId(''); setUserId(''); setCoordinatorId(''); setExecutiveId(''); setContractTypeId(''); setDateFrom(''); setDateTo(''); setRefMonth(null); setRefYear(null); setPage(1) }}
                 className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs transition-all hover:bg-white/5"

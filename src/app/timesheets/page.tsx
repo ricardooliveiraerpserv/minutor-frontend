@@ -18,6 +18,7 @@ import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
 import { TimesheetViewModal } from '@/components/ui/timesheet-view-modal'
 import { TimesheetFormModal } from '@/components/ui/timesheet-form-modal'
 import { MonthYearPicker } from '@/components/ui/month-year-picker'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/use-auth'
 import { ApiError } from '@/lib/api'
@@ -501,6 +502,7 @@ function TimesheetsPageContent() {
   const [endDate, setEndDate]         = useState(() => searchParams.get('end_date') ?? '')
   const [refMonth, setRefMonth]       = useState<number | null>(null)
   const [refYear,  setRefYear]        = useState<number | null>(null)
+  const [filterMode, setFilterMode]   = useState<'month' | 'period'>('month')
   const [ticket, setTicket]           = useState(() => searchParams.get('ticket') ?? '')
   const [requester, setRequester]     = useState(() => searchParams.get('requester') ?? '')
   const [ticketService, setTicketService] = useState(() => searchParams.get('ticket_service') ?? '')
@@ -741,25 +743,37 @@ function TimesheetsPageContent() {
 
           {/* Linha 2: datas + limpar */}
           <div className="flex items-center gap-2 flex-wrap">
-            <MonthYearPicker
-              month={refMonth}
-              year={refYear}
-              onChange={(m, y) => {
-                if (m === 0) { setRefMonth(null); setRefYear(null); setStartDate(''); setEndDate('') }
-                else {
-                  const mm = String(m).padStart(2, '0')
-                  const last = new Date(y, m, 0).getDate()
-                  setRefMonth(m); setRefYear(y)
-                  setStartDate(`${y}-${mm}-01`); setEndDate(`${y}-${mm}-${String(last).padStart(2, '0')}`)
-                }
-                resetPage()
-              }}
-            />
-            <DateRangePicker
-              from={startDate}
-              to={endDate}
-              onChange={(f, t) => { setStartDate(f); setEndDate(t); setRefMonth(null); setRefYear(null); resetPage() }}
-            />
+            <div className="flex rounded-lg border border-zinc-700 overflow-hidden text-xs">
+              {(['month', 'period'] as const).map((mode) => (
+                <button key={mode} onClick={() => setFilterMode(mode)}
+                  className="px-3 py-1.5 font-medium transition-colors"
+                  style={{ background: filterMode === mode ? 'rgba(0,245,255,0.12)' : 'transparent', color: filterMode === mode ? '#00F5FF' : '#71717a' }}>
+                  {mode === 'month' ? 'Mês/Ano' : 'Período'}
+                </button>
+              ))}
+            </div>
+            {filterMode === 'month' ? (
+              <MonthYearPicker
+                month={refMonth}
+                year={refYear}
+                onChange={(m, y) => {
+                  if (m === 0) { setRefMonth(null); setRefYear(null); setStartDate(''); setEndDate('') }
+                  else {
+                    const mm = String(m).padStart(2, '0')
+                    const last = new Date(y, m, 0).getDate()
+                    setRefMonth(m); setRefYear(y)
+                    setStartDate(`${y}-${mm}-01`); setEndDate(`${y}-${mm}-${String(last).padStart(2, '0')}`)
+                  }
+                  resetPage()
+                }}
+              />
+            ) : (
+              <DateRangePicker
+                from={startDate}
+                to={endDate}
+                onChange={(f, t) => { setStartDate(f); setEndDate(t); setRefMonth(null); setRefYear(null); resetPage() }}
+              />
+            )}
             {projectId && (
               <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium"
                 style={{ background: 'rgba(0,245,255,0.08)', border: '1px solid rgba(0,245,255,0.2)', color: 'var(--brand-primary)' }}>

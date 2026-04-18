@@ -453,6 +453,7 @@ export default function ApprovalsPage() {
   const [dateTo,        setDateTo]        = useState('')
   const [refMonth,      setRefMonth]      = useState<number | null>(null)
   const [refYear,       setRefYear]       = useState<number | null>(null)
+  const [filterMode,    setFilterMode]    = useState<'month' | 'period'>('month')
   const [userId,        setUserId]        = useState('')
   const [coordinatorId, setCoordinatorId] = useState('')
   const [executiveId,   setExecutiveId]   = useState('')
@@ -736,29 +737,37 @@ export default function ApprovalsPage() {
         {showFilters && (
           <div className="border-t border-zinc-800 px-4 py-3">
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-              <div>
-                <Label className="text-[11px] text-zinc-500 mb-1 block">Mês/Ano</Label>
-                <MonthYearPicker
-                  month={refMonth}
-                  year={refYear}
-                  onChange={(m, y) => {
-                    if (m === 0) { setRefMonth(null); setRefYear(null); setDateFrom(''); setDateTo('') }
-                    else {
-                      const mm = String(m).padStart(2, '0')
-                      const last = new Date(y, m, 0).getDate()
-                      setRefMonth(m); setRefYear(y)
-                      setDateFrom(`${y}-${mm}-01`); setDateTo(`${y}-${mm}-${String(last).padStart(2, '0')}`)
-                    }
-                  }}
-                />
-              </div>
-              <div>
-                <Label className="text-[11px] text-zinc-500 mb-1 block">Período</Label>
-                <DateRangePicker
-                  from={dateFrom}
-                  to={dateTo}
-                  onChange={(f, t) => { setDateFrom(f); setDateTo(t); setRefMonth(null); setRefYear(null) }}
-                />
+              <div className="flex items-end gap-2 col-span-2">
+                <div className="flex rounded-lg border border-zinc-700 overflow-hidden text-xs self-end mb-0.5">
+                  {(['month', 'period'] as const).map((mode) => (
+                    <button key={mode} onClick={() => setFilterMode(mode)}
+                      className="px-3 py-1.5 font-medium transition-colors"
+                      style={{ background: filterMode === mode ? 'rgba(0,245,255,0.12)' : 'transparent', color: filterMode === mode ? '#00F5FF' : '#71717a' }}>
+                      {mode === 'month' ? 'Mês/Ano' : 'Período'}
+                    </button>
+                  ))}
+                </div>
+                {filterMode === 'month' ? (
+                  <MonthYearPicker
+                    month={refMonth}
+                    year={refYear}
+                    onChange={(m, y) => {
+                      if (m === 0) { setRefMonth(null); setRefYear(null); setDateFrom(''); setDateTo('') }
+                      else {
+                        const mm = String(m).padStart(2, '0')
+                        const last = new Date(y, m, 0).getDate()
+                        setRefMonth(m); setRefYear(y)
+                        setDateFrom(`${y}-${mm}-01`); setDateTo(`${y}-${mm}-${String(last).padStart(2, '0')}`)
+                      }
+                    }}
+                  />
+                ) : (
+                  <DateRangePicker
+                    from={dateFrom}
+                    to={dateTo}
+                    onChange={(f, t) => { setDateFrom(f); setDateTo(t); setRefMonth(null); setRefYear(null) }}
+                  />
+                )}
               </div>
               <SearchableSelect
                 label="Colaborador"

@@ -98,6 +98,7 @@ export default function OnDemandPage() {
   const [dateTo,   setDateTo]   = useState(isoLastDay)
   const [refMonth, setRefMonth] = useState<number | null>(now.getMonth() + 1)
   const [refYear,  setRefYear]  = useState<number | null>(now.getFullYear())
+  const [filterMode, setFilterMode] = useState<'month' | 'period'>('month')
 
   const [summary,       setSummary]       = useState<SummaryData | null>(null)
   const [loadingSummary, setLoadingSummary] = useState(false)
@@ -207,17 +208,36 @@ export default function OnDemandPage() {
             placeholder="Selecione um projeto"
             wide
           />
-          {/* Mês/Ano de referência */}
+          {/* Filtro de data */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Mês/Ano</label>
-            <MonthYearPicker
-              month={refMonth}
-              year={refYear}
-              onChange={(m, y) => {
-                if (m === 0) { setRefMonth(null); setRefYear(null) }
-                else { setRefMonth(m); setRefYear(y); setDateFrom(''); setDateTo('') }
-              }}
-            />
+            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Data</label>
+            <div className="flex items-center gap-2">
+              <div className="flex rounded-lg border border-zinc-700 overflow-hidden text-xs">
+                {(['month', 'period'] as const).map((mode) => (
+                  <button key={mode} onClick={() => setFilterMode(mode)}
+                    className="px-3 py-1.5 font-medium transition-colors"
+                    style={{ background: filterMode === mode ? 'rgba(0,245,255,0.12)' : 'transparent', color: filterMode === mode ? '#00F5FF' : '#71717a' }}>
+                    {mode === 'month' ? 'Mês/Ano' : 'Período'}
+                  </button>
+                ))}
+              </div>
+              {filterMode === 'month' ? (
+                <MonthYearPicker
+                  month={refMonth}
+                  year={refYear}
+                  onChange={(m, y) => {
+                    if (m === 0) { setRefMonth(null); setRefYear(null) }
+                    else { setRefMonth(m); setRefYear(y); setDateFrom(''); setDateTo('') }
+                  }}
+                />
+              ) : (
+                <DateRangePicker
+                  from={dateFrom}
+                  to={dateTo}
+                  onChange={(f, t) => { setDateFrom(f); setDateTo(t); setRefMonth(null); setRefYear(null) }}
+                />
+              )}
+            </div>
           </div>
         </div>
 
