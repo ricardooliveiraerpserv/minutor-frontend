@@ -568,8 +568,11 @@ export default function SustentacaoPage() {
     ? new Date(refYear, refMonth, 0).toISOString().split('T')[0]
     : dateTo
 
-  const [queueFilterResp,    setQueueFilterResp]    = useState('')
-  const [queueFilterCliente, setQueueFilterCliente] = useState('')
+  const [queueFilterResp,      setQueueFilterResp]      = useState('')
+  const [queueFilterCliente,   setQueueFilterCliente]   = useState('')
+  const [queueFilterUrgencia,  setQueueFilterUrgencia]  = useState('')
+  const [queueFilterStatus,    setQueueFilterStatus]    = useState('')
+  const [queueSearch,          setQueueSearch]          = useState('')
 
   const [kpis, setKpis]               = useState<KPIs | null>(null)
   const [queue, setQueue]             = useState<{ data: QueueTicket[]; total: number } | null>(null)
@@ -593,7 +596,7 @@ export default function SustentacaoPage() {
         const r = await api.get<KPIs>(`/sustentacao/kpis?${params}`)
         setKpis(r)
       } else if (t === 'queue') {
-        await fetchQueue(queueFilterResp, queueFilterCliente)
+        await fetchQueue(queueFilterResp, queueFilterCliente, queueFilterUrgencia, queueFilterStatus, queueSearch)
       } else if (t === 'sla' && !slaData) {
         const r = await api.get<SlaData>(`/sustentacao/sla?${params}`)
         setSlaData(r)
@@ -630,12 +633,17 @@ export default function SustentacaoPage() {
     }
   }, [params, kpis, slaData, productivity, financial, clients, distribution, evolution, debugClientes, debugResponsaveis])
 
-  const fetchQueue = useCallback(async (resp: string, cliente: string) => {
+  const fetchQueue = useCallback(async (
+    resp: string, cliente: string, urgencia: string, status: string, search: string
+  ) => {
     setLoading(true)
     try {
       const qp = new URLSearchParams({ per_page: '100' })
-      if (resp)    qp.set('responsavel', resp)
-      if (cliente) qp.set('cliente', cliente)
+      if (resp)     qp.set('responsavel', resp)
+      if (cliente)  qp.set('cliente', cliente)
+      if (urgencia) qp.set('urgencia', urgencia)
+      if (status)   qp.set('status', status)
+      if (search)   qp.set('search', search)
       const r = await api.get<any>(`/sustentacao/queue?${qp}`)
       setQueue({ data: r.data ?? [], total: r.total ?? 0 })
     } finally {
@@ -645,10 +653,9 @@ export default function SustentacaoPage() {
 
   useEffect(() => { load(tab) }, [tab])
 
-  // Recarrega a fila quando os filtros mudam (passa valores atuais diretamente)
   useEffect(() => {
-    if (tab === 'queue') fetchQueue(queueFilterResp, queueFilterCliente)
-  }, [queueFilterResp, queueFilterCliente])
+    if (tab === 'queue') fetchQueue(queueFilterResp, queueFilterCliente, queueFilterUrgencia, queueFilterStatus, queueSearch)
+  }, [queueFilterResp, queueFilterCliente, queueFilterUrgencia, queueFilterStatus, queueSearch])
 
   const invalidateAll = () => {
     setKpis(null); setSlaData(null); setProductivity(null)
@@ -757,13 +764,44 @@ export default function SustentacaoPage() {
         {/* FILA OPERACIONAL */}
         {tab === 'queue' && queue && (
           <div className="space-y-3">
-          {/* Filtros */}
-          <div className="flex gap-3 flex-wrap">
+          {/* Barra de filtros */}
+          <div className="flex gap-2 flex-wrap items-end">
+            {/* Busca livre */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-zinc-500 font-medium uppercase tracking-wide">Buscar</label>
+              <input type="text" placeholder="# ou título..." value={queueSearch}
+                onChange={e => setQueueSearch(e.target.value)}
+                className="text-xs rounded-lg px-2.5 py-1.5 border outline-none"
+                style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: '#e4e4e7', width: 160 }} />
+            </div>
+            {/* Urgência */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-zinc-500 font-medium uppercase tracking-wide">Urgência</label>
+              <select value={queueFilterUrgencia} onChange={e => setQueueFilterUrgencia(e.target.value)}
+                className="text-xs rounded-lg px-2.5 py-1.5 border outline-none"
+                style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: '#e4e4e7', minWidth: 120 }}>
+                <option value="">Todas</option>
+                {['Urgente', 'Alta', 'Normal', 'Baixa'].map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+            {/* Status */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-zinc-500 font-medium uppercase tracking-wide">Status</label>
+              <select value={queueFilterStatus} onChange={e => setQueueFilterStatus(e.target.value)}
+                className="text-xs rounded-lg px-2.5 py-1.5 border outline-none"
+                style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: '#e4e4e7', minWidth: 140 }}>
+                <option value="">Todos</option>
+                <option value="New">Novo</option>
+                <option value="InAttendance">Em Atendimento</option>
+                <option value="Stopped">Parado</option>
+              </select>
+            </div>
+            {/* Responsável */}
             <div className="flex flex-col gap-1">
               <label className="text-[10px] text-zinc-500 font-medium uppercase tracking-wide">Responsável</label>
               <select value={queueFilterResp} onChange={e => setQueueFilterResp(e.target.value)}
                 className="text-xs rounded-lg px-2.5 py-1.5 border outline-none"
-                style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: '#e4e4e7', minWidth: 180 }}>
+                style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: '#e4e4e7', minWidth: 170 }}>
                 <option value="">Todos</option>
                 {Array.from(
                   new Map(
@@ -775,29 +813,27 @@ export default function SustentacaoPage() {
                   .map(([name, email]) => <option key={email} value={email}>{name}</option>)}
               </select>
             </div>
+            {/* Cliente */}
             <div className="flex flex-col gap-1">
               <label className="text-[10px] text-zinc-500 font-medium uppercase tracking-wide">Cliente</label>
               <select value={queueFilterCliente} onChange={e => setQueueFilterCliente(e.target.value)}
                 className="text-xs rounded-lg px-2.5 py-1.5 border outline-none"
-                style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: '#e4e4e7', minWidth: 180 }}>
+                style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: '#e4e4e7', minWidth: 170 }}>
                 <option value="">Todos</option>
                 {[...new Set(
                   queue.data.map(t => (t.org_name ?? clienteMovidesk(t)) as string).filter(s => !!s)
                 )].sort().map(name => <option key={name} value={name}>{name}</option>)}
               </select>
             </div>
-            {(queueFilterResp || queueFilterCliente) && (
-              <div className="flex items-end">
-                <button onClick={() => { setQueueFilterResp(''); setQueueFilterCliente('') }}
-                  className="text-xs px-3 py-1.5 rounded-lg border transition-colors hover:bg-zinc-800"
-                  style={{ borderColor: 'var(--brand-border)', color: '#71717a' }}>
-                  Limpar filtros
-                </button>
-              </div>
+            {/* Limpar / contador */}
+            {(queueSearch || queueFilterUrgencia || queueFilterStatus || queueFilterResp || queueFilterCliente) && (
+              <button onClick={() => { setQueueSearch(''); setQueueFilterUrgencia(''); setQueueFilterStatus(''); setQueueFilterResp(''); setQueueFilterCliente('') }}
+                className="text-xs px-3 py-1.5 rounded-lg border transition-colors hover:bg-zinc-800 self-end"
+                style={{ borderColor: 'var(--brand-border)', color: '#71717a' }}>
+                Limpar
+              </button>
             )}
-            <div className="flex items-end ml-auto">
-              <span className="text-xs text-zinc-500">{queue.total} tickets</span>
-            </div>
+            <span className="text-xs text-zinc-500 ml-auto self-end pb-1.5">{queue.total} tickets</span>
           </div>
           <div className="overflow-auto rounded-xl border" style={{ borderColor: 'var(--brand-border)' }}>
             <table className="w-full text-xs">
