@@ -819,7 +819,18 @@ export default function ContratosPage() {
                       <div>
                         <label className={labelCls}>Horas Contratadas *</label>
                         <input type="number" min="0" value={form.horas_contratadas}
-                          onChange={e => setForm(f => ({ ...f, horas_contratadas: e.target.value }))}
+                          onChange={e => {
+                            const h = Number(e.target.value)
+                            setForm(f => {
+                              const vp = Number(f.valor_projeto)
+                              const vh = Number(f.valor_hora)
+                              let newVh = f.valor_hora
+                              let newVp = f.valor_projeto
+                              if (h > 0 && vp > 0) newVh = String((vp / h).toFixed(2))
+                              else if (h > 0 && vh > 0) newVp = String((vh * h).toFixed(2))
+                              return { ...f, horas_contratadas: e.target.value, valor_hora: newVh, valor_projeto: newVp }
+                            })
+                          }}
                           className={inputCls} style={inputStyle} />
                       </div>
                     )}
@@ -840,7 +851,12 @@ export default function ContratosPage() {
                           <label className={labelCls}>Valor do Projeto (R$)</label>
                           <input type="number" min="0" step="0.01" placeholder="0,00"
                             value={form.valor_projeto}
-                            onChange={e => setForm(f => ({ ...f, valor_projeto: e.target.value }))}
+                            onChange={e => {
+                              const vp = e.target.value
+                              const h = Number(form.horas_contratadas)
+                              const vh = vp && h > 0 ? String((Number(vp) / h).toFixed(2)) : form.valor_hora
+                              setForm(f => ({ ...f, valor_projeto: vp, valor_hora: vh }))
+                            }}
                             className={inputCls} style={inputStyle} />
                         </div>
                       )}
@@ -848,7 +864,12 @@ export default function ContratosPage() {
                         <label className={labelCls}>Valor da Hora (R$)</label>
                         <input type="number" min="0" step="0.01" placeholder="0,00"
                           value={form.valor_hora}
-                          onChange={e => setForm(f => ({ ...f, valor_hora: e.target.value }))}
+                          onChange={e => {
+                            const vh = e.target.value
+                            const h = Number(form.horas_contratadas)
+                            const vp = vh && h > 0 ? String((Number(vh) * h).toFixed(2)) : form.valor_projeto
+                            setForm(f => ({ ...f, valor_hora: vh, valor_projeto: isOnDemand ? f.valor_projeto : vp }))
+                          }}
                           className={inputCls} style={inputStyle} />
                       </div>
                       {!isOnDemand && (
