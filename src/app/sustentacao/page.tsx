@@ -249,7 +249,13 @@ function DebugClientesTab({ rows }: { rows: DebugClienteRow[] }) {
               return (
                 <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--brand-border)' : undefined, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
                   <td className="px-3 py-2 text-zinc-200">{row.org ?? '—'}</td>
-                  <td className="px-3 py-2 font-mono text-zinc-400">{row.cnpj_movidesk ?? <span className="text-red-400 italic">vazio</span>}</td>
+                  <td className="px-3 py-2 font-mono text-zinc-400">
+                    {row.cnpj_movidesk
+                      ? row.cnpj_movidesk
+                      : row.match === 'nao'
+                        ? <span className="text-zinc-500 italic text-[10px]">sem CNPJ — dept?</span>
+                        : <span className="text-red-400 italic">vazio</span>}
+                  </td>
                   <td className="px-3 py-2 text-right text-zinc-300">{row.tickets}</td>
                   <td className="px-3 py-2 text-right" style={{ color: row.vinculados === row.tickets ? '#22c55e' : row.vinculados > 0 ? '#eab308' : '#ef4444' }}>{row.vinculados}</td>
                   <td className="px-3 py-2 text-zinc-200">{row.minutor_name ?? <span className="text-zinc-600 italic">—</span>}</td>
