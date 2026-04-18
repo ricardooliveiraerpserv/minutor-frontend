@@ -105,6 +105,8 @@ const ATTACHMENT_TYPE_LABEL: Record<string, string> = {
 
 type FormState = {
   customer_id: string
+  project_name: string
+  parent_project_id: string
   code_seq: string
   code_year: string
   categoria: 'projeto' | 'sustentacao'
@@ -129,6 +131,8 @@ type FormState = {
 
 const EMPTY_FORM: FormState = {
   customer_id: '',
+  project_name: '',
+  parent_project_id: '',
   code_seq: '',
   code_year: CURRENT_YEAR_2D,
   categoria: 'projeto',
@@ -203,6 +207,9 @@ export default function ContratosPage() {
   // Contatos do cadastro do cliente selecionado
   const [customerContacts, setCustomerContacts] = useState<CustomerContact[]>([])
 
+  // Projetos pai disponíveis para o cliente selecionado
+  const [parentProjects, setParentProjects] = useState<SelectOption[]>([])
+
   // Attachments in modal
   const [pendingFiles, setPendingFiles] = useState<{ file: File; type: 'proposta' | 'contrato' | 'logo' }[]>([])
   const [uploading, setUploading] = useState(false)
@@ -261,12 +268,15 @@ export default function ContratosPage() {
     api.get<any>('/contract-types?pageSize=100').then(r => setContractTypes(r?.items ?? r?.data ?? r ?? [])).catch(() => {})
   }, [])
 
-  // Carrega contatos do cliente selecionado
+  // Carrega contatos e projetos pai do cliente selecionado
   useEffect(() => {
-    if (!form.customer_id) { setCustomerContacts([]); return }
+    if (!form.customer_id) { setCustomerContacts([]); setParentProjects([]); return }
     api.get<CustomerContact[]>(`/customer-contacts?customer_id=${form.customer_id}`)
       .then(r => setCustomerContacts(Array.isArray(r) ? r : []))
       .catch(() => setCustomerContacts([]))
+    api.get<any>(`/projects?customer_id=${form.customer_id}&parent_projects_only=true&pageSize=100`)
+      .then(r => setParentProjects((r?.items ?? []).map((p: any) => ({ id: p.id, name: `${p.code} — ${p.name}` }))))
+      .catch(() => setParentProjects([]))
   }, [form.customer_id])
 
   const loadContracts = useCallback(async () => {
@@ -301,6 +311,8 @@ export default function ContratosPage() {
     setEditContract(full)
     setForm({
       customer_id:          String(full.customer_id),
+      project_name:         (full as any).project_name ?? '',
+      parent_project_id:    (full as any).parent_project_id ? String((full as any).parent_project_id) : '',
       code_seq:             '',
       code_year:            CURRENT_YEAR_2D,
       categoria:            full.categoria,
@@ -343,6 +355,8 @@ export default function ContratosPage() {
     try {
       const payload: Record<string, any> = {
         customer_id:          Number(form.customer_id),
+        project_name:         (form as any).project_name || null,
+        parent_project_id:    (form as any).parent_project_id ? Number((form as any).parent_project_id) : null,
         project_code_preview: codePreview || null,
         categoria:            form.categoria,
         service_type_id:      form.service_type_id ? Number(form.service_type_id) : null,
@@ -691,6 +705,32 @@ export default function ContratosPage() {
                       <p className="text-xs text-zinc-600 italic">Selecione um cliente para ver o código</p>
                     )}
                   </div>
+
+                  {/* Nome do Projeto */}
+                  <div>
+                    <label className={labelCls}>Nome do Projeto <span className="text-zinc-600 font-normal">(opcional)</span></label>
+                    <input
+                      type="text"
+                      placeholder="Gerado automaticamente se não preenchido"
+                      value={(form as any).project_name ?? ''}
+                      onChange={e => setForm(f => ({ ...f, project_name: e.target.value } as any))}
+                      className="w-full px-3 py-2 rounded-lg text-sm outline-none focus:ring-1 focus:ring-cyan-500/40"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  {/* Projeto Pai */}
+                  {form.customer_id && parentProjects.length > 0 && (
+                    <div>
+                      <label className={labelCls}>Projeto Pai <span className="text-zinc-600 font-normal">(opcional — para subprojetos)</span></label>
+                      <SearchSelect
+                        value={(form as any).parent_project_id ?? ''}
+                        onChange={v => setForm(f => ({ ...f, parent_project_id: v } as any))}
+                        options={parentProjects}
+                        placeholder="Selecionar projeto pai..."
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
