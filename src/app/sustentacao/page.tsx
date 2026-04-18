@@ -159,6 +159,116 @@ function KpiCard({ label, value, sub, color, icon: Icon }: {
   )
 }
 
+// ─── Debug Clientes Tab ───────────────────────────────────────────────────────
+
+function DebugClientesTab({ rows }: { rows: DebugClienteRow[] }) {
+  const [search, setSearch]     = useState('')
+  const [matchFilter, setMatchFilter] = useState<'all' | 'cnpj' | 'nome' | 'nao'>('all')
+  const [cnpjFilter, setCnpjFilter]   = useState<'all' | 'com' | 'sem'>('all')
+
+  const filtered = rows.filter(row => {
+    if (matchFilter !== 'all' && row.match !== matchFilter) return false
+    if (cnpjFilter === 'com' && !row.cnpj_norm) return false
+    if (cnpjFilter === 'sem' && row.cnpj_norm) return false
+    if (search) {
+      const q = search.toLowerCase()
+      if (!(row.org ?? '').toLowerCase().includes(q) && !(row.minutor_name ?? '').toLowerCase().includes(q)) return false
+    }
+    return true
+  })
+
+  const matchCounts = {
+    all:  rows.length,
+    cnpj: rows.filter(r => r.match === 'cnpj').length,
+    nome: rows.filter(r => r.match === 'nome').length,
+    nao:  rows.filter(r => r.match === 'nao').length,
+  }
+
+  const MATCH_OPTIONS: { key: 'all' | 'cnpj' | 'nome' | 'nao'; label: string; color: string }[] = [
+    { key: 'all',  label: `Todos (${matchCounts.all})`,        color: '#71717a' },
+    { key: 'cnpj', label: `✓ CNPJ (${matchCounts.cnpj})`,     color: '#22c55e' },
+    { key: 'nome', label: `~ Nome (${matchCounts.nome})`,      color: '#eab308' },
+    { key: 'nao',  label: `✗ Não vinc. (${matchCounts.nao})`,  color: '#ef4444' },
+  ]
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-zinc-300">Comparativo Clientes: Movidesk × Minutor</h2>
+        <span className="text-xs text-zinc-600">{filtered.length} de {rows.length} organizações</span>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <input
+          type="text"
+          placeholder="Buscar organização..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="px-3 py-1.5 rounded-lg text-xs bg-transparent outline-none"
+          style={{ border: '1px solid var(--brand-border)', color: 'var(--brand-text)', width: 200 }}
+        />
+
+        <div className="flex rounded-lg border border-zinc-700 overflow-hidden text-xs">
+          {MATCH_OPTIONS.map(opt => (
+            <button key={opt.key} onClick={() => setMatchFilter(opt.key)}
+              className="px-3 py-1.5 font-medium transition-colors"
+              style={{ background: matchFilter === opt.key ? 'rgba(255,255,255,0.06)' : 'transparent', color: matchFilter === opt.key ? opt.color : '#71717a' }}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex rounded-lg border border-zinc-700 overflow-hidden text-xs">
+          {([['all', 'Todos CNPJ'], ['com', 'Com CNPJ'], ['sem', 'Sem CNPJ']] as const).map(([v, l]) => (
+            <button key={v} onClick={() => setCnpjFilter(v)}
+              className="px-3 py-1.5 font-medium transition-colors"
+              style={{ background: cnpjFilter === v ? 'rgba(0,245,255,0.10)' : 'transparent', color: cnpjFilter === v ? CYAN : '#71717a' }}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--brand-border)' }}>
+        <table className="w-full text-xs">
+          <thead>
+            <tr style={{ background: 'var(--brand-surface)', borderBottom: '1px solid var(--brand-border)' }}>
+              <th className="text-left px-3 py-2.5 text-zinc-400 font-medium">Organização Movidesk</th>
+              <th className="text-left px-3 py-2.5 text-zinc-400 font-medium">CNPJ Movidesk</th>
+              <th className="text-right px-3 py-2.5 text-zinc-400 font-medium">Tickets</th>
+              <th className="text-right px-3 py-2.5 text-zinc-400 font-medium">Vinculados</th>
+              <th className="text-left px-3 py-2.5 text-zinc-400 font-medium">Cliente no Minutor</th>
+              <th className="text-left px-3 py-2.5 text-zinc-400 font-medium">CNPJ Minutor</th>
+              <th className="text-center px-3 py-2.5 text-zinc-400 font-medium">Vínculo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((row, i) => {
+              const matchColor = row.match === 'cnpj' ? '#22c55e' : row.match === 'nome' ? '#eab308' : '#ef4444'
+              const matchLabel = row.match === 'cnpj' ? '✓ CNPJ' : row.match === 'nome' ? '~ Nome' : '✗ Não'
+              return (
+                <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--brand-border)' : undefined, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
+                  <td className="px-3 py-2 text-zinc-200">{row.org ?? '—'}</td>
+                  <td className="px-3 py-2 font-mono text-zinc-400">{row.cnpj_norm ?? <span className="text-red-400 italic">vazio</span>}</td>
+                  <td className="px-3 py-2 text-right text-zinc-300">{row.tickets}</td>
+                  <td className="px-3 py-2 text-right" style={{ color: row.vinculados === row.tickets ? '#22c55e' : row.vinculados > 0 ? '#eab308' : '#ef4444' }}>{row.vinculados}</td>
+                  <td className="px-3 py-2 text-zinc-200">{row.minutor_name ?? <span className="text-zinc-600 italic">—</span>}</td>
+                  <td className="px-3 py-2 font-mono text-zinc-400">{row.minutor_cgc ?? <span className="text-zinc-600 italic">—</span>}</td>
+                  <td className="px-3 py-2 text-center font-semibold" style={{ color: matchColor }}>{matchLabel}</td>
+                </tr>
+              )
+            })}
+            {filtered.length === 0 && (
+              <tr><td colSpan={7} className="px-3 py-8 text-center text-zinc-600">Nenhum resultado para os filtros selecionados.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -668,49 +778,7 @@ export default function SustentacaoPage() {
           <p className="text-zinc-500 text-sm">Carregando comparativo...</p>
         )}
         {tab === 'debug' && debugClientes && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-zinc-300">Comparativo Clientes: Movidesk × Minutor</h2>
-              <div className="flex items-center gap-3 text-xs text-zinc-500">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"/>CNPJ</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500 inline-block"/>Nome</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block"/>Não vinculado</span>
-              </div>
-            </div>
-            <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--brand-border)' }}>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr style={{ background: 'var(--brand-surface)', borderBottom: '1px solid var(--brand-border)' }}>
-                    <th className="text-left px-3 py-2.5 text-zinc-400 font-medium">Organização Movidesk</th>
-                    <th className="text-left px-3 py-2.5 text-zinc-400 font-medium">CNPJ Movidesk</th>
-                    <th className="text-right px-3 py-2.5 text-zinc-400 font-medium">Tickets</th>
-                    <th className="text-right px-3 py-2.5 text-zinc-400 font-medium">Vinculados</th>
-                    <th className="text-left px-3 py-2.5 text-zinc-400 font-medium">Cliente no Minutor</th>
-                    <th className="text-left px-3 py-2.5 text-zinc-400 font-medium">CNPJ Minutor</th>
-                    <th className="text-center px-3 py-2.5 text-zinc-400 font-medium">Vínculo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {debugClientes.rows.map((row, i) => {
-                    const matchColor = row.match === 'cnpj' ? '#22c55e' : row.match === 'nome' ? '#eab308' : '#ef4444'
-                    const matchLabel = row.match === 'cnpj' ? '✓ CNPJ' : row.match === 'nome' ? '~ Nome' : '✗ Não'
-                    return (
-                      <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--brand-border)' : undefined, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
-                        <td className="px-3 py-2 text-zinc-200">{row.org ?? '—'}</td>
-                        <td className="px-3 py-2 font-mono text-zinc-400">{row.cnpj_norm ?? <span className="text-red-400 italic">vazio</span>}</td>
-                        <td className="px-3 py-2 text-right text-zinc-300">{row.tickets}</td>
-                        <td className="px-3 py-2 text-right" style={{ color: row.vinculados === row.tickets ? '#22c55e' : row.vinculados > 0 ? '#eab308' : '#ef4444' }}>{row.vinculados}</td>
-                        <td className="px-3 py-2 text-zinc-200">{row.minutor_name ?? <span className="text-zinc-600 italic">—</span>}</td>
-                        <td className="px-3 py-2 font-mono text-zinc-400">{row.minutor_cgc ?? <span className="text-zinc-600 italic">—</span>}</td>
-                        <td className="px-3 py-2 text-center font-semibold" style={{ color: matchColor }}>{matchLabel}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <p className="text-xs text-zinc-600">{debugClientes.rows.length} organizações distintas encontradas no Movidesk.</p>
-          </div>
+          <DebugClientesTab rows={debugClientes.rows} />
         )}
       </div>
     </div>
