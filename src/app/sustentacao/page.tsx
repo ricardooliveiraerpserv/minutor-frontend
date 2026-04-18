@@ -451,11 +451,13 @@ export default function SustentacaoPage() {
   const [evolution, setEvolution]     = useState<EvolutionData | null>(null)
   const [debugClientes, setDebugClientes]         = useState<{ rows: DebugClienteRow[] } | null>(null)
   const [debugResponsaveis, setDebugResponsaveis] = useState<{ rows: DebugResponsavelRow[] } | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const params = `from=${from}&to=${to}`
 
   const load = useCallback(async (t: string) => {
     setLoading(true)
+    setLoadError(null)
     try {
       if (t === 'kpis' && !kpis) {
         const r = await api.get<KPIs>(`/sustentacao/kpis?${params}`)
@@ -488,8 +490,9 @@ export default function SustentacaoPage() {
         const r = await api.get<{ rows: DebugResponsavelRow[] }>(`/sustentacao/debug-responsaveis`)
         setDebugResponsaveis(r)
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e)
+      setLoadError(e?.message ?? 'Erro ao carregar dados. Verifique se o deploy do backend foi feito.')
     } finally {
       setLoading(false)
     }
@@ -927,10 +930,15 @@ export default function SustentacaoPage() {
         )}
 
         {/* RESPONSÁVEIS */}
-        {tab === 'debug-resp' && !debugResponsaveis && !loading && (
+        {tab === 'debug-resp' && loading && (
           <p className="text-zinc-500 text-sm">Carregando responsáveis...</p>
         )}
-        {tab === 'debug-resp' && debugResponsaveis && (
+        {tab === 'debug-resp' && !loading && loadError && (
+          <div className="rounded-xl border border-red-900/40 bg-red-950/20 px-4 py-3 text-sm text-red-400">
+            {loadError}
+          </div>
+        )}
+        {tab === 'debug-resp' && !loading && debugResponsaveis && (
           <DebugResponsaveisTab rows={debugResponsaveis.rows} />
         )}
       </div>
