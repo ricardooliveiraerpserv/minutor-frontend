@@ -49,6 +49,7 @@ interface QueueTicket {
   id: number
   ticket_id: number
   titulo: string
+  status: string | null
   base_status: string
   urgencia: string
   categoria: string
@@ -684,6 +685,7 @@ export default function SustentacaoPage() {
   const [contextStats, setContextStats]   = useState<ContextStats | null>(null)
   const [indicadores, setIndicadores]     = useState<ContextStats | null>(null)
   const [indicadorOpen, setIndicadorOpen] = useState<string | null>(null)
+  const [queueStatusOptions, setQueueStatusOptions] = useState<{ value: string; label: string; base_status: string }[]>([])
 
   const params = `from=${from}&to=${to}`
 
@@ -767,6 +769,12 @@ export default function SustentacaoPage() {
   }, [])
 
   useEffect(() => { load(tab) }, [tab])
+
+  useEffect(() => {
+    api.get<{ statuses: { value: string; label: string; base_status: string }[] }>('/sustentacao/filter-options')
+      .then(r => setQueueStatusOptions(r.statuses ?? []))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (tab === 'queue') fetchQueue(queueFilterResp, queueFilterCliente, queueFilterUrgencia, queueFilterStatus, queueSearch)
@@ -1122,8 +1130,10 @@ export default function SustentacaoPage() {
             <MultiSelect label="Urgência"
               options={['Urgente', 'Alta', 'Normal', 'Baixa'].map(u => ({ value: u, label: u }))}
               selected={queueFilterUrgencia} onChange={setQueueFilterUrgencia} />
-            <MultiSelect label="Status"
-              options={[{ value: 'New', label: 'Novo' }, { value: 'InAttendance', label: 'Em Atendimento' }, { value: 'Stopped', label: 'Parado' }]}
+            <MultiSelect label="Status" placeholder="Buscar status..."
+              options={queueStatusOptions.length > 0
+                ? queueStatusOptions.map(o => ({ value: o.value, label: `${o.label} (${STATUS_LABEL[o.base_status] ?? o.base_status})` }))
+                : [{ value: 'New', label: 'Novo' }, { value: 'InAttendance', label: 'Em Atendimento' }, { value: 'Stopped', label: 'Parado' }]}
               selected={queueFilterStatus} onChange={setQueueFilterStatus} />
             <MultiSelect label="Responsável" placeholder="Buscar responsável..."
               options={Array.from(
@@ -1170,7 +1180,12 @@ export default function SustentacaoPage() {
                         {t.urgencia ?? '—'}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-zinc-300">{STATUS_LABEL[t.base_status] ?? t.base_status}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-zinc-300">{t.status ?? STATUS_LABEL[t.base_status] ?? t.base_status}</span>
+                        {t.status && <span className="text-[10px] text-zinc-500">{STATUS_LABEL[t.base_status] ?? t.base_status}</span>}
+                      </div>
+                    </td>
                     <td className="px-3 py-2 text-zinc-300">{clienteMovidesk(t)}</td>
                     <td className="px-3 py-2 text-zinc-400 max-w-[160px] truncate">{t.solicitante?.name ?? '—'}</td>
                     <td className="px-3 py-2 text-zinc-300">{t.responsavel?.name ?? t.user?.name ?? '—'}</td>
