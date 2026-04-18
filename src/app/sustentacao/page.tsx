@@ -991,19 +991,16 @@ export default function SustentacaoPage() {
                     <BarChart layout="vertical"
                       data={[...indicadores.by_consultant].sort((a, b) => b.total_open - a.total_open).map(c => ({
                         name: c.name.split(' ')[0], fullName: c.name, email: c.email,
-                        Abertos: c.total_open, 'Em Atend.': c.in_attendance, 'SLA Viol.': c.sla_breached,
+                        'Pendente Erpserv': c.total_open,
                       }))}
-                      margin={{ left: 0, right: 24, top: 0, bottom: 0 }}
+                      margin={{ left: 0, right: 40, top: 0, bottom: 0 }}
                       onClick={(d: any) => { const p = d?.activePayload?.[0]?.payload; if (p) fetchDrillDown('consultor', p.email, p.fullName) }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
                       <XAxis type="number" tick={{ fill: '#71717a', fontSize: 10 }} axisLine={false} tickLine={false} />
                       <YAxis type="category" dataKey="name" width={72} tick={{ fill: '#e4e4e7', fontSize: 11 }} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={{ background: '#18181b', border: '1px solid #3f3f46', borderRadius: 8, fontSize: 12 }}
                         labelFormatter={(_: any, pl: any) => pl?.[0]?.payload?.fullName ?? ''} />
-                      <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                      <Bar dataKey="Abertos" fill={CYAN} radius={[0,3,3,0]} cursor="pointer" />
-                      <Bar dataKey="Em Atend." fill={BLUE} radius={[0,3,3,0]} cursor="pointer" />
-                      <Bar dataKey="SLA Viol." fill={RED} radius={[0,3,3,0]} cursor="pointer" />
+                      <Bar dataKey="Pendente Erpserv" fill={CYAN} radius={[0,3,3,0]} cursor="pointer" label={{ position: 'right', fill: '#71717a', fontSize: 10, formatter: (v: any) => v > 0 ? v : '' }} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1013,19 +1010,16 @@ export default function SustentacaoPage() {
                     <BarChart layout="vertical"
                       data={[...indicadores.by_client].sort((a, b) => b.total_open - a.total_open).map(c => ({
                         name: c.name.length > 18 ? c.name.slice(0, 16) + '…' : c.name, fullName: c.name,
-                        Abertos: c.total_open, 'Em Atend.': c.in_attendance, 'SLA Viol.': c.sla_breached,
+                        'Pendente Erpserv': c.total_open,
                       }))}
-                      margin={{ left: 0, right: 24, top: 0, bottom: 0 }}
+                      margin={{ left: 0, right: 40, top: 0, bottom: 0 }}
                       onClick={(d: any) => { const p = d?.activePayload?.[0]?.payload; if (p) fetchDrillDown('cliente', p.fullName, p.fullName) }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
                       <XAxis type="number" tick={{ fill: '#71717a', fontSize: 10 }} axisLine={false} tickLine={false} />
                       <YAxis type="category" dataKey="name" width={110} tick={{ fill: '#e4e4e7', fontSize: 11 }} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={{ background: '#18181b', border: '1px solid #3f3f46', borderRadius: 8, fontSize: 12 }}
                         labelFormatter={(_: any, pl: any) => pl?.[0]?.payload?.fullName ?? ''} />
-                      <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                      <Bar dataKey="Abertos" fill={CYAN} radius={[0,3,3,0]} cursor="pointer" />
-                      <Bar dataKey="Em Atend." fill={BLUE} radius={[0,3,3,0]} cursor="pointer" />
-                      <Bar dataKey="SLA Viol." fill={RED} radius={[0,3,3,0]} cursor="pointer" />
+                      <Bar dataKey="Pendente Erpserv" fill={CYAN} radius={[0,3,3,0]} cursor="pointer" label={{ position: 'right', fill: '#71717a', fontSize: 10, formatter: (v: any) => v > 0 ? v : '' }} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
