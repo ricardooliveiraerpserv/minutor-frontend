@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { formatBRL } from '@/lib/format'
 import { Project, PaginatedResponse, ProjectChangeLog, HourContribution } from '@/types'
 import { toast } from 'sonner'
-import { FolderOpen, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, Search, ChevronDown, Eye, Clock, Users, TrendingUp, Tag, History, HandCoins, Save, AlertCircle, DollarSign, BarChart2, UserCheck, Layers, MessageCircle, CheckCircle } from 'lucide-react'
+import { FolderOpen, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, Search, ChevronDown, Eye, Clock, Users, TrendingUp, Tag, History, HandCoins, Save, AlertCircle, DollarSign, BarChart2, UserCheck, Layers, MessageCircle, CheckCircle, Paperclip, Download, FileText } from 'lucide-react'
 import { ProjectMessages } from '@/components/shared/ProjectMessages'
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
 import { RowMenu } from '@/components/ui/row-menu'
@@ -44,6 +44,13 @@ interface ProjectForm {
   consultant_ids: number[]
   coordinator_ids: number[]
   consultant_group_ids: number[]
+  // Campos de contrato
+  observacoes_contrato: string
+  condicao_pagamento: string
+  cobra_despesa_cliente: boolean
+  tipo_faturamento: string
+  tipo_alocacao: string
+  vendedor_id: string
 }
 
 interface SelectOption { id: number; name: string; code_prefix?: string | null }
@@ -102,6 +109,8 @@ const EMPTY_FORM: ProjectForm = {
   allow_manual_timesheets: true,
   allow_negative_balance: false,
   consultant_ids: [], coordinator_ids: [], consultant_group_ids: [],
+  observacoes_contrato: '', condicao_pagamento: '', cobra_despesa_cliente: false,
+  tipo_faturamento: '', tipo_alocacao: '', vendedor_id: '',
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -453,7 +462,7 @@ function ProjectsPageInner() {
   const [modal, setModal] = useState<{ open: boolean; item?: Project }>({ open: false })
   const [viewProject, setViewProject] = useState<Project | null>(null)
   const [viewLoading, setViewLoading] = useState(false)
-  const [viewTab, setViewTab] = useState<'overview' | 'contributions' | 'history' | 'costs' | 'messages' | 'contacts'>('overview')
+  const [viewTab, setViewTab] = useState<'overview' | 'contributions' | 'history' | 'costs' | 'messages' | 'contacts' | 'attachments'>('overview')
   const [unreadProjectIds, setUnreadProjectIds] = useState<Set<number>>(new Set())
   useEffect(() => {
     if (!user || (user.type !== 'admin' && user.type !== 'coordenador')) return
@@ -476,6 +485,64 @@ function ProjectsPageInner() {
   const [projectContactsLoading, setProjectContactsLoading] = useState(false)
   const [customerContactsForProject, setCustomerContactsForProject] = useState<CustomerContactItem[]>([])
   const [savingContacts, setSavingContacts]         = useState(false)
+
+  // Anexos do projeto
+  interface ProjectAttachmentItem { id: number; type?: string; original_name: string; mime_type?: string; size?: number; source: string; created_at: string }
+  const [projectAttachments, setProjectAttachments] = useState<ProjectAttachmentItem[]>([])
+  const [attachLoading, setAttachLoading]           = useState(false)
+  const [attachUploading, setAttachUploading]       = useState(false)
+  const [attachType, setAttachType]                 = useState<'proposta' | 'contrato' | 'logo' | 'outro'>('outro')
+  const attachInputRef = useRef<HTMLInputElement>(null)
+
+  const loadProjectAttachments = async (projectId: number) => {
+    setAttachLoading(true)
+    try {
+      const r = await api.get<ProjectAttachmentItem[]>(`/projects/${projectId}/attachments`)
+      setProjectAttachments(Array.isArray(r) ? r : [])
+    } catch { toast.error('Erro ao carregar anexos') }
+    finally { setAttachLoading(false) }
+  }
+
+  const uploadProjectAttachment = async (file: File) => {
+    if (!viewProject) return
+    setAttachUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('type', attachType)
+      await fetch(`/api/v1/projects/${viewProject.id}/attachments`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('minutor_token')}` },
+        body: fd,
+      })
+      await loadProjectAttachments(viewProject.id)
+      toast.success('Arquivo enviado')
+    } catch { toast.error('Erro ao enviar arquivo') }
+    finally { setAttachUploading(false) }
+  }
+
+  const downloadProjectAttachment = async (att: ProjectAttachmentItem) => {
+    if (!viewProject) return
+    const token = localStorage.getItem('minutor_token')
+    const resp = await fetch(`/api/v1/projects/${viewProject.id}/attachments/${att.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!resp.ok) { toast.error('Erro ao baixar arquivo'); return }
+    const blob = await resp.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = att.original_name; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const deleteProjectAttachment = async (att: ProjectAttachmentItem) => {
+    if (!viewProject) return
+    try {
+      await api.delete(`/projects/${viewProject.id}/attachments/${att.id}`)
+      setProjectAttachments(p => p.filter(a => a.id !== att.id))
+      toast.success('Anexo removido')
+    } catch { toast.error('Erro ao remover anexo') }
+  }
 
   const loadProjectContacts = async (projectId: number) => {
     setProjectContactsLoading(true)
@@ -806,6 +873,12 @@ function ProjectsPageInner() {
         consultant_ids: (d.consultants ?? []).map((c: any) => c.id),
         coordinator_ids: (d.coordinators ?? d.approvers ?? []).map((c: any) => c.id),
         consultant_group_ids: (d.consultant_groups ?? []).map((g: any) => g.id),
+        observacoes_contrato: d.observacoes_contrato ?? '',
+        condicao_pagamento:   d.condicao_pagamento ?? '',
+        cobra_despesa_cliente: d.cobra_despesa_cliente ?? false,
+        tipo_faturamento:     d.tipo_faturamento ?? '',
+        tipo_alocacao:        d.tipo_alocacao ?? '',
+        vendedor_id:          d.vendedor_id ? String(d.vendedor_id) : '',
       }
       setForm(f)
 
@@ -936,13 +1009,14 @@ function ProjectsPageInner() {
     } catch { toast.error('Erro ao excluir registro') }
   }
 
-  const handleViewTab = (tab: 'overview' | 'contributions' | 'history' | 'costs' | 'messages' | 'contacts') => {
+  const handleViewTab = (tab: 'overview' | 'contributions' | 'history' | 'costs' | 'messages' | 'contacts' | 'attachments') => {
     setViewTab(tab)
     if (!viewProject) return
     if (tab === 'contributions' && contributions.length === 0) loadContributions(viewProject.id)
     if (tab === 'history' && history.length === 0) loadHistory(viewProject.id, historyFieldFilter)
     if (tab === 'costs' && !costSummary) loadCosts(viewProject.id)
     if (tab === 'contacts') loadProjectContacts(viewProject.id)
+    if (tab === 'attachments') loadProjectAttachments(viewProject.id)
   }
 
   const savePrefix = async () => {
@@ -1000,6 +1074,12 @@ function ProjectsPageInner() {
       }
       if (form.max_expense_per_consultant) payload.max_expense_per_consultant = Number(form.max_expense_per_consultant)
       if (form.timesheet_retroactive_limit_days !== '') payload.timesheet_retroactive_limit_days = Number(form.timesheet_retroactive_limit_days)
+      payload.observacoes_contrato  = form.observacoes_contrato || null
+      payload.condicao_pagamento    = form.condicao_pagamento || null
+      payload.cobra_despesa_cliente = form.cobra_despesa_cliente
+      if (form.tipo_faturamento) payload.tipo_faturamento = form.tipo_faturamento
+      if (form.tipo_alocacao)    payload.tipo_alocacao    = form.tipo_alocacao
+      if (form.vendedor_id)      payload.vendedor_id      = Number(form.vendedor_id)
 
       if (modal.item) await api.put(`/projects/${modal.item.id}`, payload)
       else await api.post('/projects', payload)
@@ -1664,6 +1744,59 @@ function ProjectsPageInner() {
                 )}
 
                 {/* ── Política de Despesas ── */}
+                {/* ── Informações Comerciais ── */}
+                <SectionTitle>Informações Comerciais</SectionTitle>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <FieldLabel>Tipo de Faturamento</FieldLabel>
+                    <select value={form.tipo_faturamento} onChange={e => setF('tipo_faturamento')(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle}>
+                      <option value="">Não definido</option>
+                      <option value="on_demand">On Demand</option>
+                      <option value="banco_horas_mensal">Banco de Horas Mensal</option>
+                      <option value="banco_horas_fixo">Banco de Horas Fixo</option>
+                      <option value="por_servico">Por Serviço</option>
+                      <option value="saas">SaaS</option>
+                    </select>
+                  </div>
+                  <div>
+                    <FieldLabel>Tipo de Alocação</FieldLabel>
+                    <select value={form.tipo_alocacao} onChange={e => setF('tipo_alocacao')(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle}>
+                      <option value="">Não definido</option>
+                      <option value="remoto">Remoto</option>
+                      <option value="presencial">Presencial</option>
+                      <option value="ambos">Ambos</option>
+                    </select>
+                  </div>
+                  <div>
+                    <FieldLabel>Condição de Pagamento</FieldLabel>
+                    <FieldInput value={form.condicao_pagamento} onChange={setF('condicao_pagamento')} placeholder="Ex: 30/60/90 dias" />
+                  </div>
+                  <div>
+                    <FieldLabel>Vendedor</FieldLabel>
+                    <select value={form.vendedor_id} onChange={e => setF('vendedor_id')(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle}>
+                      <option value="">Não definido</option>
+                      {consultants.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-2 flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+                    <input type="checkbox" id="cobra_despesa" checked={form.cobra_despesa_cliente}
+                      onChange={e => setF('cobra_despesa_cliente')(e.target.checked)}
+                      className="w-4 h-4 rounded accent-cyan-400" />
+                    <label htmlFor="cobra_despesa" className="text-sm cursor-pointer" style={{ color: 'var(--brand-text)' }}>
+                      Cobra despesa do cliente
+                    </label>
+                  </div>
+                </div>
+                <div className="col-span-2">
+                  <FieldLabel>Observações do Contrato</FieldLabel>
+                  <textarea value={form.observacoes_contrato} onChange={e => setF('observacoes_contrato')(e.target.value)}
+                    rows={3} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle}
+                    placeholder="Observações, termos especiais, etc..." />
+                </div>
+
                 <SectionTitle>Política de Despesas</SectionTitle>
                 <div>
                   <FieldLabel>Valor Máximo por Consultor (R$)</FieldLabel>
@@ -1870,6 +2003,7 @@ function ProjectsPageInner() {
                   {([
                     { id: 'overview',      label: 'Visão Geral', icon: Eye },
                     { id: 'contacts',      label: 'Contatos',    icon: Users },
+                    { id: 'attachments',   label: 'Anexos',      icon: Paperclip },
                     { id: 'contributions', label: 'Aportes',     icon: HandCoins },
                     { id: 'history',       label: 'Histórico',   icon: History },
                     ...(canViewFinance ? [{ id: 'costs', label: 'Custos', icon: DollarSign }] : []),
@@ -1941,6 +2075,22 @@ function ProjectsPageInner() {
                         </div>
                       ))}
                     </div>
+
+                    {/* Informações Comerciais */}
+                    {((viewProject as any).observacoes_contrato || (viewProject as any).condicao_pagamento || (viewProject as any).tipo_faturamento || (viewProject as any).tipo_alocacao) && (
+                      <div className="mb-5 rounded-xl p-4 space-y-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Informações Comerciais</p>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          {(viewProject as any).tipo_faturamento && <div><p className="text-[10px] text-zinc-500 uppercase">Faturamento</p><p style={{ color: 'var(--brand-text)' }}>{(viewProject as any).tipo_faturamento?.replace(/_/g, ' ')}</p></div>}
+                          {(viewProject as any).tipo_alocacao && <div><p className="text-[10px] text-zinc-500 uppercase">Alocação</p><p style={{ color: 'var(--brand-text)' }}>{(viewProject as any).tipo_alocacao}</p></div>}
+                          {(viewProject as any).condicao_pagamento && <div className="col-span-2"><p className="text-[10px] text-zinc-500 uppercase">Condição de Pagamento</p><p style={{ color: 'var(--brand-text)' }}>{(viewProject as any).condicao_pagamento}</p></div>}
+                          {(viewProject as any).cobra_despesa_cliente && <div className="col-span-2"><span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.2)' }}>Cobra despesa do cliente</span></div>}
+                        </div>
+                        {(viewProject as any).observacoes_contrato && (
+                          <div><p className="text-[10px] text-zinc-500 uppercase mb-1">Observações</p><p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--brand-muted)' }}>{(viewProject as any).observacoes_contrato}</p></div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Grupos de Consultores */}
                     {(viewProject as any).consultant_groups?.length > 0 && (
@@ -2084,6 +2234,59 @@ function ProjectsPageInner() {
                       </div>
                     )}
                     {savingContacts && <p className="text-xs text-center text-zinc-500">Salvando...</p>}
+                  </div>
+                )}
+
+                {/* ── ABA: ANEXOS ── */}
+                {viewTab === 'attachments' && (
+                  <div className="space-y-4">
+                    <input ref={attachInputRef} type="file" className="hidden" onChange={e => {
+                      const f = e.target.files?.[0]; if (f) uploadProjectAttachment(f); e.target.value = ''
+                    }} />
+                    <div className="flex items-center gap-3">
+                      <select value={attachType} onChange={e => setAttachType(e.target.value as any)}
+                        className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
+                        style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}>
+                        <option value="proposta">Proposta</option>
+                        <option value="contrato">Contrato</option>
+                        <option value="logo">Logo</option>
+                        <option value="outro">Outro</option>
+                      </select>
+                      <button onClick={() => attachInputRef.current?.click()} disabled={attachUploading}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold shrink-0 disabled:opacity-60"
+                        style={{ background: 'var(--brand-primary)', color: '#0A0A0B' }}>
+                        <Paperclip size={13} /> {attachUploading ? 'Enviando...' : 'Anexar arquivo'}
+                      </button>
+                    </div>
+                    {attachLoading && <p className="text-xs text-center py-4" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p>}
+                    {!attachLoading && projectAttachments.length === 0 && (
+                      <p className="text-xs text-center py-6" style={{ color: 'var(--brand-subtle)' }}>Nenhum anexo adicionado.</p>
+                    )}
+                    <div className="space-y-2">
+                      {projectAttachments.map(att => (
+                        <div key={att.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg"
+                          style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+                          <FileText size={14} style={{ color: 'var(--brand-subtle)', shrink: 0 }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm truncate" style={{ color: 'var(--brand-text)' }}>{att.original_name}</p>
+                            <p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>
+                              {att.type ?? '—'} · {att.size ? `${(att.size / 1024).toFixed(0)} KB` : ''}
+                              {att.source === 'contract' ? ' · (do contrato)' : ''}
+                            </p>
+                          </div>
+                          <button onClick={() => downloadProjectAttachment(att)} title="Baixar"
+                            className="p-1.5 rounded-md hover:bg-zinc-700/60 transition-colors" style={{ color: 'var(--brand-subtle)' }}>
+                            <Download size={13} />
+                          </button>
+                          {att.source === 'project' && (
+                            <button onClick={() => deleteProjectAttachment(att)} title="Remover"
+                              className="p-1.5 rounded-md hover:bg-red-900/30 transition-colors text-red-400">
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
