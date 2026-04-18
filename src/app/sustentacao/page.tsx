@@ -52,7 +52,7 @@ interface SlaData {
 }
 
 interface ProductivityData {
-  by_consultant: { user_id: number; tickets_resolved: number; avg_solution_minutes: number; total_minutes_worked: number; user: { id: number; name: string } | null }[]
+  by_consultant: { owner_email: string; owner_name: string | null; tickets_resolved: number; avg_solution_minutes: number; total_minutes_worked: number }[]
   period: { from: string; to: string }
 }
 
@@ -876,9 +876,9 @@ export default function SustentacaoPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {productivity.by_consultant.map((c, i) => (
-                    <tr key={c.user_id} className="border-b" style={{ borderColor: 'var(--brand-border)' }}>
-                      <td className="px-4 py-2.5 text-white">{c.user?.name ?? `User #${c.user_id}`}</td>
+                  {productivity.by_consultant.map((c) => (
+                    <tr key={c.owner_email} className="border-b" style={{ borderColor: 'var(--brand-border)' }}>
+                      <td className="px-4 py-2.5 text-white">{c.owner_name ?? c.owner_email}</td>
                       <td className="px-4 py-2.5 font-bold" style={{ color: CYAN }}>{c.tickets_resolved}</td>
                       <td className="px-4 py-2.5 text-zinc-300">{fmt(Math.round(c.avg_solution_minutes))}</td>
                       <td className="px-4 py-2.5 text-zinc-300">{fmt(c.total_minutes_worked)}</td>
@@ -894,7 +894,7 @@ export default function SustentacaoPage() {
             {productivity.by_consultant.length > 0 && (
               <Section title="Tickets Resolvidos por Consultor">
                 <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={productivity.by_consultant.slice(0, 12).map(c => ({ name: c.user?.name?.split(' ')[0] ?? '?', tickets: c.tickets_resolved }))}>
+                  <BarChart data={productivity.by_consultant.slice(0, 12).map(c => ({ name: (c.owner_name ?? c.owner_email).split(' ')[0], tickets: c.tickets_resolved }))}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                     <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#71717a' }} />
                     <YAxis tick={{ fontSize: 10, fill: '#71717a' }} />
