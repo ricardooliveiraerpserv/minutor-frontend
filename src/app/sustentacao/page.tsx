@@ -42,6 +42,7 @@ interface QueueTicket {
   customer: { id: number; name: string } | null
   solicitante: { organization?: string; name?: string; email?: string; [k: string]: unknown } | null
   responsavel: { name?: string; [k: string]: unknown } | null
+  owner_email: string | null
   org_name: string | null
 }
 
@@ -567,6 +568,9 @@ export default function SustentacaoPage() {
     ? new Date(refYear, refMonth, 0).toISOString().split('T')[0]
     : dateTo
 
+  const [queueFilterResp,    setQueueFilterResp]    = useState('')
+  const [queueFilterCliente, setQueueFilterCliente] = useState('')
+
   const [kpis, setKpis]               = useState<KPIs | null>(null)
   const [queue, setQueue]             = useState<{ data: QueueTicket[]; total: number } | null>(null)
   const [slaData, setSlaData]         = useState<SlaData | null>(null)
@@ -589,7 +593,10 @@ export default function SustentacaoPage() {
         const r = await api.get<KPIs>(`/sustentacao/kpis?${params}`)
         setKpis(r)
       } else if (t === 'queue') {
-        const r = await api.get<any>(`/sustentacao/queue?per_page=100`)
+        const qp = new URLSearchParams({ per_page: '100' })
+        if (queueFilterResp)    qp.set('responsavel', queueFilterResp)
+        if (queueFilterCliente) qp.set('cliente', queueFilterCliente)
+        const r = await api.get<any>(`/sustentacao/queue?${qp}`)
         setQueue({ data: r.data ?? [], total: r.total ?? 0 })
       } else if (t === 'sla' && !slaData) {
         const r = await api.get<SlaData>(`/sustentacao/sla?${params}`)
@@ -628,6 +635,11 @@ export default function SustentacaoPage() {
   }, [params, kpis, slaData, productivity, financial, clients, distribution, evolution, debugClientes, debugResponsaveis])
 
   useEffect(() => { load(tab) }, [tab])
+
+  // Recarrega a fila quando os filtros mudam
+  useEffect(() => {
+    if (tab === 'queue') load('queue')
+  }, [queueFilterResp, queueFilterCliente])
 
   const invalidateAll = () => {
     setKpis(null); setSlaData(null); setProductivity(null)
@@ -735,6 +747,44 @@ export default function SustentacaoPage() {
 
         {/* FILA OPERACIONAL */}
         {tab === 'queue' && queue && (
+          <div className="space-y-3">
+          {/* Filtros */}
+          <div className="flex gap-3 flex-wrap">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-zinc-500 font-medium uppercase tracking-wide">Responsável</label>
+              <select value={queueFilterResp} onChange={e => setQueueFilterResp(e.target.value)}
+                className="text-xs rounded-lg px-2.5 py-1.5 border outline-none"
+                style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: '#e4e4e7', minWidth: 180 }}>
+                <option value="">Todos</option>
+                {[...new Map(queue.data.filter(t => t.responsavel?.name).map(t => [t.responsavel!.name, t.owner_email])).entries()]
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([name, email]) => <option key={email ?? name} value={email ?? ''}>{name}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-zinc-500 font-medium uppercase tracking-wide">Cliente</label>
+              <select value={queueFilterCliente} onChange={e => setQueueFilterCliente(e.target.value)}
+                className="text-xs rounded-lg px-2.5 py-1.5 border outline-none"
+                style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: '#e4e4e7', minWidth: 180 }}>
+                <option value="">Todos</option>
+                {[...new Set(queue.data.map(t => t.org_name ?? clienteMovidesk(t)).filter(Boolean))]
+                  .sort()
+                  .map(name => <option key={name} value={name!}>{name}</option>)}
+              </select>
+            </div>
+            {(queueFilterResp || queueFilterCliente) && (
+              <div className="flex items-end">
+                <button onClick={() => { setQueueFilterResp(''); setQueueFilterCliente('') }}
+                  className="text-xs px-3 py-1.5 rounded-lg border transition-colors hover:bg-zinc-800"
+                  style={{ borderColor: 'var(--brand-border)', color: '#71717a' }}>
+                  Limpar filtros
+                </button>
+              </div>
+            )}
+            <div className="flex items-end ml-auto">
+              <span className="text-xs text-zinc-500">{queue.total} tickets</span>
+            </div>
+          </div>
           <div className="overflow-auto rounded-xl border" style={{ borderColor: 'var(--brand-border)' }}>
             <table className="w-full text-xs">
               <thead>
@@ -780,6 +830,7 @@ export default function SustentacaoPage() {
                 )}
               </tbody>
             </table>
+          </div>
           </div>
         )}
 
