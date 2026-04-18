@@ -48,9 +48,8 @@ interface Column {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const FIXED_COLUMNS: Column[] = [
-  { id: 'novo',        label: 'Novo Contrato',      type: 'fixed', emoji: '🆕' },
-  { id: 'em_cadastro', label: 'Em Cadastro (ADM)',  type: 'fixed', emoji: '📝' },
-  { id: 'pronto',      label: 'Pronto para Iniciar', type: 'fixed', emoji: '✅' },
+  { id: 'novo',   label: 'Novo Contrato',      type: 'fixed', emoji: '🆕' },
+  { id: 'pronto', label: 'Pronto para Iniciar', type: 'fixed', emoji: '✅' },
 ]
 
 function cardColumn(card: KanbanCard): string {
