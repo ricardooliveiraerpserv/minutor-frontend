@@ -756,9 +756,14 @@ export default function SustentacaoPage() {
                 className="text-xs rounded-lg px-2.5 py-1.5 border outline-none"
                 style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: '#e4e4e7', minWidth: 180 }}>
                 <option value="">Todos</option>
-                {[...new Map(queue.data.filter(t => t.responsavel?.name).map(t => [t.responsavel!.name, t.owner_email])).entries()]
-                  .sort(([a], [b]) => a.localeCompare(b))
-                  .map(([name, email]) => <option key={email ?? name} value={email ?? ''}>{name}</option>)}
+                {Array.from(
+                  new Map(
+                    queue.data
+                      .filter(t => t.responsavel?.name && t.owner_email)
+                      .map(t => [t.responsavel!.name as string, t.owner_email as string])
+                  ).entries()
+                ).sort(([a], [b]) => a.localeCompare(b))
+                  .map(([name, email]) => <option key={email} value={email}>{name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1">
@@ -767,9 +772,9 @@ export default function SustentacaoPage() {
                 className="text-xs rounded-lg px-2.5 py-1.5 border outline-none"
                 style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: '#e4e4e7', minWidth: 180 }}>
                 <option value="">Todos</option>
-                {[...new Set(queue.data.map(t => t.org_name ?? clienteMovidesk(t)).filter(Boolean))]
-                  .sort()
-                  .map(name => <option key={name} value={name!}>{name}</option>)}
+                {[...new Set(
+                  queue.data.map(t => (t.org_name ?? clienteMovidesk(t)) as string).filter(s => !!s)
+                )].sort().map(name => <option key={name} value={name}>{name}</option>)}
               </select>
             </div>
             {(queueFilterResp || queueFilterCliente) && (
