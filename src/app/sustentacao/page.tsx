@@ -79,6 +79,7 @@ interface EvolutionData {
 interface DebugClienteRow {
   org: string | null
   cnpj_movidesk: string | null
+  is_active: boolean | null
   tickets: number
   vinculados: number
   match: 'cnpj' | 'nome' | 'nao'
@@ -90,6 +91,7 @@ interface DebugResponsavelRow {
   owner_email: string
   owner_name: string | null
   team: string | null
+  is_active: boolean | null
   tickets: number
   vinculados: number
   match: 'encontrado' | 'nao'
@@ -272,6 +274,7 @@ function DebugClientesTab({ rows, onSync }: { rows: DebugClienteRow[]; onSync: (
           <thead>
             <tr style={{ background: 'var(--brand-surface)', borderBottom: '1px solid var(--brand-border)' }}>
               <th className="text-left px-3 py-2.5 text-zinc-400 font-medium">Organização Movidesk</th>
+              <th className="text-center px-3 py-2.5 text-zinc-400 font-medium">Status</th>
               <th className="text-left px-3 py-2.5 text-zinc-400 font-medium">CNPJ Movidesk</th>
               <th className="text-right px-3 py-2.5 text-zinc-400 font-medium">Tickets</th>
               <th className="text-right px-3 py-2.5 text-zinc-400 font-medium">Vinculados</th>
@@ -287,6 +290,11 @@ function DebugClientesTab({ rows, onSync }: { rows: DebugClienteRow[]; onSync: (
               return (
                 <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--brand-border)' : undefined, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
                   <td className="px-3 py-2 text-zinc-200">{row.org ?? '—'}</td>
+                  <td className="px-3 py-2 text-center">
+                    {row.is_active === null
+                      ? <span className="text-zinc-600 text-[10px]">—</span>
+                      : <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: row.is_active ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', color: row.is_active ? '#22c55e' : '#ef4444' }}>{row.is_active ? 'Ativo' : 'Inativo'}</span>}
+                  </td>
                   <td className="px-3 py-2 font-mono text-zinc-400">
                     {row.cnpj_movidesk
                       ? row.cnpj_movidesk
@@ -303,7 +311,7 @@ function DebugClientesTab({ rows, onSync }: { rows: DebugClienteRow[]; onSync: (
               )
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-3 py-8 text-center text-zinc-600">Nenhum resultado para os filtros selecionados.</td></tr>
+              <tr><td colSpan={8} className="px-3 py-8 text-center text-zinc-600">Nenhum resultado para os filtros selecionados.</td></tr>
             )}
           </tbody>
         </table>
@@ -370,6 +378,7 @@ function DebugResponsaveisTab({ rows }: { rows: DebugResponsavelRow[] }) {
           <thead>
             <tr style={{ background: 'var(--brand-surface)', borderBottom: '1px solid var(--brand-border)' }}>
               <th className="text-left px-3 py-2.5 text-zinc-400 font-medium">Nome Movidesk</th>
+              <th className="text-center px-3 py-2.5 text-zinc-400 font-medium">Status</th>
               <th className="text-left px-3 py-2.5 text-zinc-400 font-medium">Email Movidesk</th>
               <th className="text-left px-3 py-2.5 text-zinc-400 font-medium">Equipe</th>
               <th className="text-right px-3 py-2.5 text-zinc-400 font-medium">Tickets</th>
@@ -385,6 +394,11 @@ function DebugResponsaveisTab({ rows }: { rows: DebugResponsavelRow[] }) {
               return (
                 <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--brand-border)' : undefined, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
                   <td className="px-3 py-2 text-zinc-200">{row.owner_name ?? '—'}</td>
+                  <td className="px-3 py-2 text-center">
+                    {row.is_active === null
+                      ? <span className="text-zinc-600 text-[10px]">—</span>
+                      : <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: row.is_active ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', color: row.is_active ? '#22c55e' : '#ef4444' }}>{row.is_active ? 'Ativo' : 'Inativo'}</span>}
+                  </td>
                   <td className="px-3 py-2 font-mono text-zinc-400">{row.owner_email}</td>
                   <td className="px-3 py-2 text-zinc-500">{row.team ?? '—'}</td>
                   <td className="px-3 py-2 text-right text-zinc-300">{row.tickets}</td>
@@ -397,7 +411,7 @@ function DebugResponsaveisTab({ rows }: { rows: DebugResponsavelRow[] }) {
               )
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-3 py-8 text-center text-zinc-600 text-xs">Nenhum resultado para os filtros selecionados.</td></tr>
+              <tr><td colSpan={8} className="px-3 py-8 text-center text-zinc-600 text-xs">Nenhum resultado para os filtros selecionados.</td></tr>
             )}
           </tbody>
         </table>
