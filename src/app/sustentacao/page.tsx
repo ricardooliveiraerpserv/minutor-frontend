@@ -160,11 +160,17 @@ function KpiCard({ label, value, sub, color, icon: Icon }: {
 
 // ─── Debug Clientes Tab ───────────────────────────────────────────────────────
 
-function DebugClientesTab({ rows }: { rows: DebugClienteRow[] }) {
+function DebugClientesTab({ rows, onSync }: { rows: DebugClienteRow[]; onSync: () => Promise<void> }) {
   const [search, setSearch]           = useState('')
   const [matchFilter, setMatchFilter] = useState<'all' | 'cnpj' | 'nome' | 'nao'>('all')
   const [cnpjFilter, setCnpjFilter]   = useState<'all' | 'com' | 'sem'>('all')
   const [hideDept, setHideDept]       = useState(true)
+  const [syncing, setSyncing]         = useState(false)
+
+  const handleSync = async () => {
+    setSyncing(true)
+    try { await onSync() } finally { setSyncing(false) }
+  }
 
   // "provável departamento" = sem CNPJ no Movidesk E sem match no Minutor
   const isDept = (row: DebugClienteRow) => !row.cnpj_movidesk && row.match === 'nao'
@@ -201,7 +207,14 @@ function DebugClientesTab({ rows }: { rows: DebugClienteRow[] }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-zinc-300">Comparativo Clientes: Movidesk × Minutor</h2>
-        <span className="text-xs text-zinc-600">{filtered.length} de {rows.length} organizações</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-zinc-600">{filtered.length} de {rows.length} organizações</span>
+          <button onClick={handleSync} disabled={syncing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+            style={{ background: 'rgba(0,245,255,0.10)', border: '1px solid rgba(0,245,255,0.25)', color: '#00F5FF' }}>
+            {syncing ? '⏳ Integrando...' : '⚡ Integrar agora'}
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -796,7 +809,11 @@ export default function SustentacaoPage() {
           <p className="text-zinc-500 text-sm">Carregando comparativo...</p>
         )}
         {tab === 'debug' && debugClientes && (
-          <DebugClientesTab rows={debugClientes.rows} />
+          <DebugClientesTab rows={debugClientes.rows} onSync={async () => {
+            await api.post('/sustentacao/sync-orgs', {})
+            const r = await api.get<{ rows: DebugClienteRow[] }>('/sustentacao/debug-clientes')
+            setDebugClientes(r)
+          }} />
         )}
       </div>
     </div>
