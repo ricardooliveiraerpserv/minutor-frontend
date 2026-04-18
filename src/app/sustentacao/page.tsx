@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { AppLayout } from '@/components/layout/app-layout'
 import { api } from '@/lib/api'
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -228,6 +229,7 @@ export default function SustentacaoPage() {
   }
 
   return (
+    <AppLayout>
     <div className="flex flex-col h-full overflow-hidden" style={{ background: 'var(--brand-bg)' }}>
       {/* ── Header ── */}
       <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: 'var(--brand-border)' }}>
@@ -617,5 +619,6 @@ export default function SustentacaoPage() {
         )}
       </div>
     </div>
+    </AppLayout>
   )
 }
