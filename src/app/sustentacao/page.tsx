@@ -664,6 +664,9 @@ export default function SustentacaoPage() {
         )}
 
         {/* DIAGNÓSTICO */}
+        {tab === 'debug' && !debugClientes && !loading && (
+          <p className="text-zinc-500 text-sm">Carregando comparativo...</p>
+        )}
         {tab === 'debug' && debugClientes && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
