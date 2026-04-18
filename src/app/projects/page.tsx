@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { formatBRL } from '@/lib/format'
 import { Project, PaginatedResponse, ProjectChangeLog, HourContribution } from '@/types'
 import { toast } from 'sonner'
-import { FolderOpen, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, Search, ChevronDown, Eye, Clock, Users, TrendingUp, Tag, History, HandCoins, Save, AlertCircle, DollarSign, BarChart2, UserCheck, Layers, MessageCircle } from 'lucide-react'
+import { FolderOpen, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, Search, ChevronDown, Eye, Clock, Users, TrendingUp, Tag, History, HandCoins, Save, AlertCircle, DollarSign, BarChart2, UserCheck, Layers, MessageCircle, CheckCircle } from 'lucide-react'
 import { ProjectMessages } from '@/components/shared/ProjectMessages'
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
 import { RowMenu } from '@/components/ui/row-menu'
@@ -453,7 +453,7 @@ function ProjectsPageInner() {
   const [modal, setModal] = useState<{ open: boolean; item?: Project }>({ open: false })
   const [viewProject, setViewProject] = useState<Project | null>(null)
   const [viewLoading, setViewLoading] = useState(false)
-  const [viewTab, setViewTab] = useState<'overview' | 'contributions' | 'history' | 'costs' | 'messages'>('overview')
+  const [viewTab, setViewTab] = useState<'overview' | 'contributions' | 'history' | 'costs' | 'messages' | 'contacts'>('overview')
   const [unreadProjectIds, setUnreadProjectIds] = useState<Set<number>>(new Set())
   useEffect(() => {
     if (!user || (user.type !== 'admin' && user.type !== 'coordenador')) return
@@ -469,6 +469,40 @@ function ProjectsPageInner() {
   const [contribModal, setContribModal] = useState<{ open: boolean; item?: HourContribution }>({ open: false })
   const [contribForm, setContribForm] = useState({ contributed_hours: '', hourly_rate: '', contributed_at: '', description: '' })
   const [contribSaving, setContribSaving] = useState(false)
+  // Contatos do projeto
+  interface ProjectContactItem { id: number; name: string; cargo?: string; email?: string; phone?: string; customer_contact_id?: number }
+  interface CustomerContactItem { id: number; customer_id: number; name: string; cargo?: string; email?: string; phone?: string }
+  const [projectContacts, setProjectContacts]       = useState<ProjectContactItem[]>([])
+  const [projectContactsLoading, setProjectContactsLoading] = useState(false)
+  const [customerContactsForProject, setCustomerContactsForProject] = useState<CustomerContactItem[]>([])
+  const [savingContacts, setSavingContacts]         = useState(false)
+
+  const loadProjectContacts = async (projectId: number) => {
+    setProjectContactsLoading(true)
+    try {
+      const [pc, cc] = await Promise.all([
+        api.get<ProjectContactItem[]>(`/projects/${projectId}/contacts`),
+        viewProject?.customer_id
+          ? api.get<CustomerContactItem[]>(`/customer-contacts?customer_id=${viewProject.customer_id}`)
+          : Promise.resolve([] as CustomerContactItem[]),
+      ])
+      setProjectContacts(Array.isArray(pc) ? pc : [])
+      setCustomerContactsForProject(Array.isArray(cc) ? cc : [])
+    } catch { toast.error('Erro ao carregar contatos') }
+    finally { setProjectContactsLoading(false) }
+  }
+
+  const syncProjectContacts = async (contacts: ProjectContactItem[]) => {
+    if (!viewProject) return
+    setSavingContacts(true)
+    try {
+      const r = await api.put<ProjectContactItem[]>(`/projects/${viewProject.id}/contacts`, { contacts })
+      setProjectContacts(Array.isArray(r) ? r : [])
+      toast.success('Contatos atualizados')
+    } catch { toast.error('Erro ao salvar contatos') }
+    finally { setSavingContacts(false) }
+  }
+
   // Histórico
   const [history, setHistory] = useState<ProjectChangeLog[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -902,12 +936,13 @@ function ProjectsPageInner() {
     } catch { toast.error('Erro ao excluir registro') }
   }
 
-  const handleViewTab = (tab: 'overview' | 'contributions' | 'history' | 'costs' | 'messages') => {
+  const handleViewTab = (tab: 'overview' | 'contributions' | 'history' | 'costs' | 'messages' | 'contacts') => {
     setViewTab(tab)
     if (!viewProject) return
     if (tab === 'contributions' && contributions.length === 0) loadContributions(viewProject.id)
     if (tab === 'history' && history.length === 0) loadHistory(viewProject.id, historyFieldFilter)
     if (tab === 'costs' && !costSummary) loadCosts(viewProject.id)
+    if (tab === 'contacts') loadProjectContacts(viewProject.id)
   }
 
   const savePrefix = async () => {
@@ -1834,6 +1869,7 @@ function ProjectsPageInner() {
                 <div className="flex gap-1 border-b" style={{ borderColor: 'var(--brand-border)' }}>
                   {([
                     { id: 'overview',      label: 'Visão Geral', icon: Eye },
+                    { id: 'contacts',      label: 'Contatos',    icon: Users },
                     { id: 'contributions', label: 'Aportes',     icon: HandCoins },
                     { id: 'history',       label: 'Histórico',   icon: History },
                     ...(canViewFinance ? [{ id: 'costs', label: 'Custos', icon: DollarSign }] : []),
@@ -1961,6 +1997,93 @@ function ProjectsPageInner() {
                         </div>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* ── ABA: CONTATOS ── */}
+                {viewTab === 'contacts' && (
+                  <div className="space-y-4">
+                    {projectContactsLoading && <p className="text-xs text-center py-6" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p>}
+
+                    {/* Contatos do cadastro do cliente */}
+                    {!projectContactsLoading && customerContactsForProject.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">Do cadastro do cliente</p>
+                        <div className="space-y-1.5">
+                          {customerContactsForProject.map(cc => {
+                            const added = projectContacts.some(pc => pc.customer_contact_id === cc.id || (pc.name === cc.name && pc.email === cc.email))
+                            return (
+                              <div key={cc.id}
+                                className="flex items-center justify-between rounded-lg border px-3 py-2.5 cursor-pointer transition-colors"
+                                style={{ borderColor: added ? 'rgba(0,245,255,0.4)' : 'var(--brand-border)', background: added ? 'rgba(0,245,255,0.06)' : 'transparent' }}
+                                onClick={() => {
+                                  if (added) {
+                                    const next = projectContacts.filter(pc => !(pc.customer_contact_id === cc.id || (pc.name === cc.name && pc.email === cc.email)))
+                                    syncProjectContacts(next)
+                                  } else {
+                                    const next = [...projectContacts, { id: 0, name: cc.name, cargo: cc.cargo, email: cc.email, phone: cc.phone, customer_contact_id: cc.id }]
+                                    syncProjectContacts(next)
+                                  }
+                                }}
+                              >
+                                <div>
+                                  <p className="text-xs font-medium text-zinc-200">{cc.name}</p>
+                                  <p className="text-[10px] text-zinc-500">{[cc.cargo, cc.email].filter(Boolean).join(' · ')}</p>
+                                </div>
+                                <div className="w-4 h-4 rounded flex items-center justify-center shrink-0"
+                                  style={{ background: added ? '#00F5FF' : 'transparent', border: added ? 'none' : '1px solid #52525b' }}>
+                                  {added && <CheckCircle size={12} style={{ color: '#000' }} />}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Contatos do projeto */}
+                    {!projectContactsLoading && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+                          Contatos do projeto ({projectContacts.length})
+                        </p>
+                        {projectContacts.length === 0
+                          ? <p className="text-xs text-zinc-600 py-2 text-center">Nenhum contato vinculado.</p>
+                          : (
+                            <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--brand-border)' }}>
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="border-b" style={{ borderColor: 'var(--brand-border)', background: 'rgba(255,255,255,0.02)' }}>
+                                    <th className="px-3 py-2 text-left font-medium text-zinc-400">Nome</th>
+                                    <th className="px-3 py-2 text-left font-medium text-zinc-400">Cargo</th>
+                                    <th className="px-3 py-2 text-left font-medium text-zinc-400">E-mail</th>
+                                    <th className="px-3 py-2 text-left font-medium text-zinc-400">Telefone</th>
+                                    <th className="w-8" />
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {projectContacts.map(pc => (
+                                    <tr key={pc.id} className="border-b last:border-0" style={{ borderColor: 'var(--brand-border)' }}>
+                                      <td className="px-3 py-2.5 text-zinc-200 font-medium">{pc.name}</td>
+                                      <td className="px-3 py-2.5 text-zinc-400">{pc.cargo || '—'}</td>
+                                      <td className="px-3 py-2.5 text-zinc-400">{pc.email || '—'}</td>
+                                      <td className="px-3 py-2.5 text-zinc-400">{pc.phone || '—'}</td>
+                                      <td className="px-2 py-2.5">
+                                        <button onClick={() => syncProjectContacts(projectContacts.filter(c => c !== pc))}
+                                          className="text-zinc-600 hover:text-red-400 transition-colors">
+                                          <X size={12} />
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )
+                        }
+                      </div>
+                    )}
+                    {savingContacts && <p className="text-xs text-center text-zinc-500">Salvando...</p>}
                   </div>
                 )}
 

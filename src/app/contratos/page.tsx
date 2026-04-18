@@ -19,6 +19,15 @@ interface ContractContact {
   phone: string
 }
 
+interface CustomerContact {
+  id: number
+  customer_id: number
+  name: string
+  cargo: string
+  email: string
+  phone: string
+}
+
 interface ContractAttachment {
   id: number
   type: 'proposta' | 'contrato' | 'logo'
@@ -191,6 +200,9 @@ export default function ContratosPage() {
   const [saving, setSaving]       = useState(false)
   const [activeTab, setActiveTab] = useState(0)
 
+  // Contatos do cadastro do cliente selecionado
+  const [customerContacts, setCustomerContacts] = useState<CustomerContact[]>([])
+
   // Attachments in modal
   const [pendingFiles, setPendingFiles] = useState<{ file: File; type: 'proposta' | 'contrato' | 'logo' }[]>([])
   const [uploading, setUploading] = useState(false)
@@ -248,6 +260,14 @@ export default function ContratosPage() {
     api.get<any>('/service-types?pageSize=100').then(r => setServiceTypes(r?.items ?? r?.data ?? r ?? [])).catch(() => {})
     api.get<any>('/contract-types?pageSize=100').then(r => setContractTypes(r?.items ?? r?.data ?? r ?? [])).catch(() => {})
   }, [])
+
+  // Carrega contatos do cliente selecionado
+  useEffect(() => {
+    if (!form.customer_id) { setCustomerContacts([]); return }
+    api.get<CustomerContact[]>(`/customer-contacts?customer_id=${form.customer_id}`)
+      .then(r => setCustomerContacts(Array.isArray(r) ? r : []))
+      .catch(() => setCustomerContacts([]))
+  }, [form.customer_id])
 
   const loadContracts = useCallback(async () => {
     setLoading(true)
@@ -832,46 +852,94 @@ export default function ContratosPage() {
 
               {/* Tab 5: Contatos */}
               {activeTab === 5 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-400">{contacts.length} contato{contacts.length !== 1 ? 's' : ''}</span>
-                    <button onClick={addContact}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
-                      style={{ background: 'rgba(0,245,255,0.10)', border: '1px solid rgba(0,245,255,0.25)', color: '#00F5FF' }}>
-                      <Plus size={12} /> Adicionar contato
-                    </button>
-                  </div>
-                  {contacts.length === 0 && <p className="text-xs text-zinc-600 py-4 text-center">Nenhum contato adicionado.</p>}
-                  {contacts.map((ct, i) => (
-                    <div key={i} className="rounded-lg border p-3 space-y-2" style={{ borderColor: 'var(--brand-border)' }}>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-zinc-300">Contato {i + 1}</span>
-                        <button onClick={() => removeContact(i)} className="text-zinc-600 hover:text-red-400 transition-colors"><X size={12} /></button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className={labelCls}>Nome *</label>
-                          <input value={ct.name} onChange={e => updateContact(i, 'name', e.target.value)}
-                            className={inputCls} style={inputStyle} placeholder="Nome completo" />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Cargo</label>
-                          <input value={ct.cargo} onChange={e => updateContact(i, 'cargo', e.target.value)}
-                            className={inputCls} style={inputStyle} placeholder="Cargo / Função" />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Email</label>
-                          <input type="email" value={ct.email} onChange={e => updateContact(i, 'email', e.target.value)}
-                            className={inputCls} style={inputStyle} placeholder="email@empresa.com" />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Telefone</label>
-                          <input value={ct.phone} onChange={e => updateContact(i, 'phone', e.target.value)}
-                            className={inputCls} style={inputStyle} placeholder="(11) 99999-9999" />
-                        </div>
+                <div className="space-y-4">
+                  {/* Contatos do cadastro do cliente */}
+                  {customerContacts.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">Do cadastro do cliente</p>
+                      <div className="space-y-1.5">
+                        {customerContacts.map(cc => {
+                          const alreadyAdded = contacts.some(c => c.name === cc.name && c.email === cc.email)
+                          return (
+                            <div key={cc.id}
+                              className="flex items-center justify-between rounded-lg border px-3 py-2.5 cursor-pointer transition-colors"
+                              style={{
+                                borderColor: alreadyAdded ? 'rgba(0,245,255,0.4)' : 'var(--brand-border)',
+                                background: alreadyAdded ? 'rgba(0,245,255,0.06)' : 'transparent',
+                              }}
+                              onClick={() => {
+                                if (alreadyAdded) {
+                                  setContacts(cs => cs.filter(c => !(c.name === cc.name && c.email === cc.email)))
+                                } else {
+                                  setContacts(cs => [...cs, { name: cc.name, cargo: cc.cargo ?? '', email: cc.email ?? '', phone: cc.phone ?? '' }])
+                                }
+                              }}
+                            >
+                              <div>
+                                <p className="text-xs font-medium text-zinc-200">{cc.name}</p>
+                                <p className="text-[10px] text-zinc-500">{[cc.cargo, cc.email].filter(Boolean).join(' · ')}</p>
+                              </div>
+                              <div className="w-4 h-4 rounded flex items-center justify-center shrink-0"
+                                style={{ background: alreadyAdded ? '#00F5FF' : 'transparent', border: alreadyAdded ? 'none' : '1px solid #52525b' }}>
+                                {alreadyAdded && <CheckCircle size={12} style={{ color: '#000' }} />}
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
-                  ))}
+                  )}
+                  {!form.customer_id && (
+                    <p className="text-xs text-zinc-600 py-2 text-center">Selecione um cliente na aba Cliente para carregar os contatos do cadastro.</p>
+                  )}
+                  {form.customer_id && customerContacts.length === 0 && (
+                    <p className="text-[10px] text-zinc-600">Nenhum contato cadastrado para este cliente. <a href="/cadastros?tab=customer_contacts" target="_blank" className="text-cyan-500 hover:underline">Adicionar no cadastro →</a></p>
+                  )}
+
+                  {/* Contatos adicionados */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                        Contatos selecionados ({contacts.length})
+                      </p>
+                      <button onClick={addContact}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium"
+                        style={{ background: 'rgba(0,245,255,0.08)', border: '1px solid rgba(0,245,255,0.2)', color: '#00F5FF' }}>
+                        <Plus size={10} /> Adicionar manual
+                      </button>
+                    </div>
+                    {contacts.length === 0 && <p className="text-xs text-zinc-600 py-2 text-center">Nenhum contato selecionado.</p>}
+                    {contacts.map((ct, i) => (
+                      <div key={i} className="rounded-lg border p-3 space-y-2 mb-2" style={{ borderColor: 'var(--brand-border)' }}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-zinc-300">Contato {i + 1}</span>
+                          <button onClick={() => removeContact(i)} className="text-zinc-600 hover:text-red-400 transition-colors"><X size={12} /></button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className={labelCls}>Nome *</label>
+                            <input value={ct.name} onChange={e => updateContact(i, 'name', e.target.value)}
+                              className={inputCls} style={inputStyle} placeholder="Nome completo" />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Cargo</label>
+                            <input value={ct.cargo} onChange={e => updateContact(i, 'cargo', e.target.value)}
+                              className={inputCls} style={inputStyle} placeholder="Cargo / Função" />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Email</label>
+                            <input type="email" value={ct.email} onChange={e => updateContact(i, 'email', e.target.value)}
+                              className={inputCls} style={inputStyle} placeholder="email@empresa.com" />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Telefone</label>
+                            <input value={ct.phone} onChange={e => updateContact(i, 'phone', e.target.value)}
+                              className={inputCls} style={inputStyle} placeholder="(11) 99999-9999" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

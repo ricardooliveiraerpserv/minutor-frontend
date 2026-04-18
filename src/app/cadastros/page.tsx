@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
-import { FileType, Wrench, Users, Star, UserCheck, CalendarDays, Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Search, Check, Tag, CreditCard, Receipt } from 'lucide-react'
+import { FileType, Wrench, Users, Star, UserCheck, CalendarDays, Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Search, Check, Tag, CreditCard, Receipt, Contact } from 'lucide-react'
+import { SearchSelect } from '@/components/ui/search-select'
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
 import { RowMenu } from '@/components/ui/row-menu'
 import type { CustomerFull, Executive, ConsultantGroup } from '@/types'
@@ -55,6 +56,7 @@ const TABS = [
   { id: 'contracts',          label: 'Tipos de Contrato',     icon: FileType },
   { id: 'services',           label: 'Tipos de Serviço',      icon: Wrench },
   { id: 'customers',          label: 'Clientes',               icon: Users },
+  { id: 'customer_contacts',  label: 'Contatos de Clientes',  icon: Contact },
   { id: 'executives',         label: 'Executivos',             icon: Star },
   { id: 'groups',             label: 'Grupos de Consultor',   icon: UserCheck },
   { id: 'holidays',           label: 'Feriados',              icon: CalendarDays },
@@ -1152,6 +1154,200 @@ function IsActiveCrudTab({ endpoint, label }: { endpoint: string; label: string 
   )
 }
 
+// ─── TAB: CONTATOS DE CLIENTES ───────────────────────────────────────────────
+
+interface CustomerContact {
+  id: number
+  customer_id: number
+  customer?: { id: number; name: string }
+  name: string
+  cargo: string
+  email: string
+  phone: string
+}
+
+interface CustomerOption { id: number; name: string }
+
+function CustomerContactsTab() {
+  const [customers, setCustomers]       = useState<CustomerOption[]>([])
+  const [customerId, setCustomerId]     = useState('')
+  const [contacts, setContacts]         = useState<CustomerContact[]>([])
+  const [loading, setLoading]           = useState(false)
+  const [modal, setModal]               = useState<{ open: boolean; item?: CustomerContact }>({ open: false })
+  const [form, setForm]                 = useState({ name: '', cargo: '', email: '', phone: '' })
+  const [saving, setSaving]             = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; item?: CustomerContact }>({ open: false })
+
+  const inputCls  = 'w-full rounded-lg border px-3 py-2 text-xs text-white bg-transparent outline-none transition-colors focus:border-cyan-500'
+  const inputStyle = { borderColor: 'var(--brand-border)' }
+  const labelCls  = 'block text-[10px] font-medium text-zinc-400 mb-1'
+
+  useEffect(() => {
+    api.get<any>('/customers?pageSize=500').then(r => setCustomers(r?.items ?? [])).catch(() => {})
+  }, [])
+
+  const load = useCallback(async (cid: string) => {
+    if (!cid) { setContacts([]); return }
+    setLoading(true)
+    try {
+      const r = await api.get<CustomerContact[]>(`/customer-contacts?customer_id=${cid}`)
+      setContacts(Array.isArray(r) ? r : [])
+    } catch { toast.error('Erro ao carregar contatos') }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { load(customerId) }, [customerId, load])
+
+  const openCreate = () => {
+    setForm({ name: '', cargo: '', email: '', phone: '' })
+    setModal({ open: true })
+  }
+  const openEdit = (item: CustomerContact) => {
+    setForm({ name: item.name, cargo: item.cargo ?? '', email: item.email ?? '', phone: item.phone ?? '' })
+    setModal({ open: true, item })
+  }
+
+  const save = async () => {
+    if (!form.name.trim()) { toast.error('Nome obrigatório'); return }
+    if (!customerId) { toast.error('Selecione o cliente'); return }
+    setSaving(true)
+    try {
+      if (modal.item) {
+        await api.put(`/customer-contacts/${modal.item.id}`, form)
+        toast.success('Contato atualizado')
+      } else {
+        await api.post('/customer-contacts', { ...form, customer_id: Number(customerId) })
+        toast.success('Contato criado')
+      }
+      setModal({ open: false })
+      load(customerId)
+    } catch (e: any) { toast.error(e?.message ?? 'Erro') }
+    finally { setSaving(false) }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm.item) return
+    try {
+      await api.delete(`/customer-contacts/${deleteConfirm.item.id}`)
+      toast.success('Contato excluído')
+      setDeleteConfirm({ open: false })
+      load(customerId)
+    } catch { toast.error('Erro ao excluir') }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Seletor de cliente */}
+      <div className="flex items-end gap-4">
+        <div className="flex-1 max-w-sm">
+          <label className={labelCls}>Cliente</label>
+          <SearchSelect
+            value={customerId}
+            onChange={setCustomerId}
+            options={customers}
+            placeholder="Selecione o cliente..."
+          />
+        </div>
+        {customerId && (
+          <button onClick={openCreate}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium"
+            style={{ background: 'rgba(0,245,255,0.10)', border: '1px solid rgba(0,245,255,0.25)', color: '#00F5FF' }}>
+            <Plus size={13} /> Novo Contato
+          </button>
+        )}
+      </div>
+
+      {!customerId && (
+        <p className="text-xs text-zinc-600 py-8 text-center">Selecione um cliente para ver e gerenciar seus contatos.</p>
+      )}
+
+      {customerId && loading && (
+        <table className="w-full text-xs"><tbody><TableSkeleton cols={5} /></tbody></table>
+      )}
+
+      {customerId && !loading && contacts.length === 0 && (
+        <p className="text-xs text-zinc-600 py-6 text-center">Nenhum contato cadastrado para este cliente.</p>
+      )}
+
+      {customerId && !loading && contacts.length > 0 && (
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--brand-border)' }}>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b" style={{ borderColor: 'var(--brand-border)', background: 'rgba(255,255,255,0.02)' }}>
+                <th className="w-10" />
+                <th className="px-3 py-2.5 text-left font-medium text-zinc-400">Nome</th>
+                <th className="px-3 py-2.5 text-left font-medium text-zinc-400">Cargo</th>
+                <th className="px-3 py-2.5 text-left font-medium text-zinc-400">E-mail</th>
+                <th className="px-3 py-2.5 text-left font-medium text-zinc-400">Telefone</th>
+              </tr>
+            </thead>
+            <tbody>
+              {contacts.map(c => (
+                <tr key={c.id} className="border-b last:border-0" style={{ borderColor: 'var(--brand-border)' }}>
+                  <td className="px-2 py-2.5 w-10">
+                    <RowMenu items={[
+                      { label: 'Editar',  icon: <Pencil size={12} />, onClick: () => openEdit(c) },
+                      { label: 'Excluir', icon: <Trash2 size={12} />, onClick: () => setDeleteConfirm({ open: true, item: c }), danger: true },
+                    ]} />
+                  </td>
+                  <td className="px-3 py-2.5 text-zinc-200 font-medium">{c.name}</td>
+                  <td className="px-3 py-2.5 text-zinc-400">{c.cargo || '—'}</td>
+                  <td className="px-3 py-2.5 text-zinc-400">{c.email || '—'}</td>
+                  <td className="px-3 py-2.5 text-zinc-400">{c.phone || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Modal add/edit */}
+      {modal.open && (
+        <ModalOverlay onClose={() => setModal({ open: false })}>
+          <div className="p-5">
+            <h3 className="text-sm font-semibold text-white mb-4">{modal.item ? 'Editar Contato' : 'Novo Contato'}</h3>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className={labelCls}>Nome *</label>
+                  <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                    className={inputCls} style={inputStyle} placeholder="Nome completo" />
+                </div>
+                <div>
+                  <label className={labelCls}>Cargo</label>
+                  <input value={form.cargo} onChange={e => setForm(f => ({ ...f, cargo: e.target.value }))}
+                    className={inputCls} style={inputStyle} placeholder="Cargo / Função" />
+                </div>
+                <div>
+                  <label className={labelCls}>Telefone</label>
+                  <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                    className={inputCls} style={inputStyle} placeholder="(11) 99999-9999" />
+                </div>
+                <div className="col-span-2">
+                  <label className={labelCls}>E-mail</label>
+                  <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                    className={inputCls} style={inputStyle} placeholder="email@empresa.com" />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <Button variant="outline" size="sm" onClick={() => setModal({ open: false })}>Cancelar</Button>
+              <Button size="sm" onClick={save} disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</Button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+
+      <ConfirmDeleteModal
+        open={deleteConfirm.open}
+        message="Deseja excluir este contato? Esta ação não pode ser desfeita."
+        onClose={() => setDeleteConfirm({ open: false })}
+        onConfirm={confirmDelete}
+      />
+    </div>
+  )
+}
+
 // ─── PAGE ────────────────────────────────────────────────────────────────────
 
 // Mapa de tab → permissão extra necessária (admin vê tudo)
@@ -1159,6 +1355,7 @@ const TAB_PERMISSION: Record<string, string> = {
   contracts:          'contracts.manage',
   services:           'services.manage',
   customers:          'customers.manage',
+  customer_contacts:  'customers.manage',
   executives:         'executives.manage',
   groups:             'groups.manage',
   holidays:           'holidays.manage',
@@ -1196,6 +1393,7 @@ function CadastrosContent() {
           {activeTab === 'contracts'          && <CrudTab endpoint="contract-types"    label="Tipo de Contrato" />}
           {activeTab === 'services'           && <CrudTab endpoint="service-types"     label="Tipo de Serviço" />}
           {activeTab === 'customers'          && <CustomersTab />}
+          {activeTab === 'customer_contacts'  && <CustomerContactsTab />}
           {activeTab === 'executives'         && <ExecutivesTab />}
           {activeTab === 'groups'             && <ConsultantGroupsTab />}
           {activeTab === 'holidays'           && <HolidaysTab />}

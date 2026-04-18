@@ -32,6 +32,7 @@ import {
   Tag,
   CreditCard,
   FileText,
+  Contact,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
@@ -138,7 +139,8 @@ const NAV: NavEntry[] = [
       { label: 'Projetos',              href: '/projects',                        icon: FolderOpen },
       { label: 'Tipos de Contrato',     href: '/cadastros?tab=contracts',         icon: FileType },
       { label: 'Tipos de Serviço',      href: '/cadastros?tab=services',          icon: Wrench },
-      { label: 'Clientes',              href: '/cadastros?tab=customers',         icon: Users },
+      { label: 'Clientes',              href: '/cadastros?tab=customers',          icon: Users },
+      { label: 'Contatos de Clientes', href: '/cadastros?tab=customer_contacts',  icon: Contact },
       { label: 'Executivos',            href: '/cadastros?tab=executives',        icon: Star },
       { label: 'Grupos de Consultor',   href: '/cadastros?tab=groups',            icon: UserCheck },
       { label: 'Feriados',              href: '/cadastros?tab=holidays',          icon: CalendarDays },
@@ -234,6 +236,7 @@ function SidebarInner({ user }: { user: User }) {
       if (has('contracts.manage'))          cadastrosItems.push({ label: 'Tipos de Contrato',     href: '/cadastros?tab=contracts',          icon: FileType })
       if (has('services.manage'))           cadastrosItems.push({ label: 'Tipos de Serviço',      href: '/cadastros?tab=services',           icon: Wrench })
       if (has('customers.manage'))          cadastrosItems.push({ label: 'Clientes',              href: '/cadastros?tab=customers',          icon: Users })
+      if (has('customers.manage'))          cadastrosItems.push({ label: 'Contatos de Clientes',  href: '/cadastros?tab=customer_contacts',   icon: Contact })
       if (has('executives.manage'))         cadastrosItems.push({ label: 'Executivos',            href: '/cadastros?tab=executives',         icon: Star })
       if (has('groups.manage'))             cadastrosItems.push({ label: 'Grupos de Consultor',   href: '/cadastros?tab=groups',             icon: UserCheck })
       if (has('holidays.manage'))           cadastrosItems.push({ label: 'Feriados',              href: '/cadastros?tab=holidays',           icon: CalendarDays })
