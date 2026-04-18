@@ -141,12 +141,7 @@ function fmt(min: number | null | undefined): string {
 }
 
 function clienteMovidesk(t: QueueTicket): string {
-  const s = t.solicitante
-  if (!s) return t.customer?.name ?? '—'
-  if (s.organization) return s.organization
-  // só mostra name se for cliente externo (email não-@erpserv)
-  if (s.name && !String(s.email ?? '').includes('@erpserv')) return s.name
-  return t.customer?.name ?? '—'
+  return t.solicitante?.organization ?? t.customer?.name ?? '—'
 }
 
 function fmtDate(dt: string | null | undefined): string {
@@ -743,7 +738,7 @@ export default function SustentacaoPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b" style={{ borderColor: 'var(--brand-border)', background: 'var(--brand-surface)' }}>
-                  {['#', 'Título', 'Urgência', 'Status', 'Cliente', 'Responsável', 'Equipe', 'SLA Solução', 'Aberto em'].map(h => (
+                  {['#', 'Título', 'Urgência', 'Status', 'Cliente', 'Solicitante', 'Responsável', 'Equipe', 'SLA Solução', 'Aberto em'].map(h => (
                     <th key={h} className="px-3 py-2.5 text-left font-medium text-zinc-400">{h}</th>
                   ))}
                 </tr>
@@ -762,6 +757,7 @@ export default function SustentacaoPage() {
                     </td>
                     <td className="px-3 py-2 text-zinc-300">{STATUS_LABEL[t.base_status] ?? t.base_status}</td>
                     <td className="px-3 py-2 text-zinc-300">{clienteMovidesk(t)}</td>
+                    <td className="px-3 py-2 text-zinc-400 max-w-[160px] truncate">{t.solicitante?.name ?? '—'}</td>
                     <td className="px-3 py-2 text-zinc-300">{t.responsavel?.name ?? t.user?.name ?? '—'}</td>
                     <td className="px-3 py-2 text-zinc-400">{t.owner_team ?? '—'}</td>
                     <td className="px-3 py-2">
@@ -773,7 +769,7 @@ export default function SustentacaoPage() {
                   </tr>
                 ))}
                 {queue.data.length === 0 && (
-                  <tr><td colSpan={9} className="px-3 py-8 text-center text-zinc-500">Nenhum ticket em aberto</td></tr>
+                  <tr><td colSpan={10} className="px-3 py-8 text-center text-zinc-500">Nenhum ticket em aberto</td></tr>
                 )}
               </tbody>
             </table>
