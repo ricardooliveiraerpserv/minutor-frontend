@@ -37,8 +37,11 @@ interface ContextStats {
   sla_rate: number | null
   avg_solution_min: number | null
   oldest_open_days: number | null
+  over_4h: number
   hours_worked_min: number | null
   productivity: number | null
+  by_consultant: { name: string; total_open: number; in_attendance: number; sla_breached: number; sla_ok_pct: number }[]
+  by_client: { name: string; total_open: number; in_attendance: number; sla_breached: number }[]
   filter: { responsavel: string[]; cliente: string[] }
 }
 
@@ -925,6 +928,11 @@ export default function SustentacaoPage() {
                     {contextStats.oldest_open_days != null ? `${contextStats.oldest_open_days}d` : '—'}
                   </p>
                 </div>
+                {/* +4h */}
+                <div className="rounded-lg p-3 text-center" style={{ background: 'var(--brand-surface)' }}>
+                  <p className="text-[10px] text-zinc-500 mb-1">Abertos +4h</p>
+                  <p className="text-xl font-bold" style={{ color: contextStats.over_4h > 0 ? ORANGE : GREEN }}>{contextStats.over_4h}</p>
+                </div>
                 {/* Horas apontadas (só quando filtra por responsável) */}
                 {contextStats.filter.responsavel.length > 0 && (
                   <div className="rounded-lg p-3 text-center" style={{ background: 'var(--brand-surface)' }}>
@@ -937,6 +945,64 @@ export default function SustentacaoPage() {
                   <div className="rounded-lg p-3 text-center" style={{ background: 'var(--brand-surface)' }}>
                     <p className="text-[10px] text-zinc-500 mb-1">Tickets/h</p>
                     <p className="text-xl font-bold" style={{ color: CYAN }}>{contextStats.productivity != null ? contextStats.productivity : '—'}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Tabelas de breakdown */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                {/* Por Consultor */}
+                {contextStats.by_consultant.length > 0 && (
+                  <div>
+                    <p className="text-[10px] text-zinc-500 font-medium uppercase tracking-wide mb-2">Por Consultor</p>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b" style={{ borderColor: 'var(--brand-border)' }}>
+                          <th className="text-left py-1.5 text-zinc-500 font-medium">Consultor</th>
+                          <th className="text-center py-1.5 text-zinc-500 font-medium">Abertos</th>
+                          <th className="text-center py-1.5 text-zinc-500 font-medium">Em Atend.</th>
+                          <th className="text-center py-1.5 text-zinc-500 font-medium">SLA Viol.</th>
+                          <th className="text-center py-1.5 text-zinc-500 font-medium">SLA %</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {contextStats.by_consultant.map(c => (
+                          <tr key={c.name} className="border-b" style={{ borderColor: 'var(--brand-border)' }}>
+                            <td className="py-1.5 text-white font-medium">{c.name}</td>
+                            <td className="py-1.5 text-center text-zinc-300">{c.total_open}</td>
+                            <td className="py-1.5 text-center" style={{ color: CYAN }}>{c.in_attendance}</td>
+                            <td className="py-1.5 text-center" style={{ color: c.sla_breached > 0 ? RED : '#71717a' }}>{c.sla_breached}</td>
+                            <td className="py-1.5 text-center font-bold" style={{ color: c.sla_ok_pct >= 90 ? GREEN : c.sla_ok_pct >= 70 ? YELLOW : RED }}>{c.sla_ok_pct}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {/* Por Cliente */}
+                {contextStats.by_client.length > 0 && (
+                  <div>
+                    <p className="text-[10px] text-zinc-500 font-medium uppercase tracking-wide mb-2">Por Cliente</p>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b" style={{ borderColor: 'var(--brand-border)' }}>
+                          <th className="text-left py-1.5 text-zinc-500 font-medium">Cliente</th>
+                          <th className="text-center py-1.5 text-zinc-500 font-medium">Abertos</th>
+                          <th className="text-center py-1.5 text-zinc-500 font-medium">Em Atend.</th>
+                          <th className="text-center py-1.5 text-zinc-500 font-medium">SLA Viol.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {contextStats.by_client.map(c => (
+                          <tr key={c.name} className="border-b" style={{ borderColor: 'var(--brand-border)' }}>
+                            <td className="py-1.5 text-white font-medium max-w-[180px] truncate">{c.name}</td>
+                            <td className="py-1.5 text-center text-zinc-300">{c.total_open}</td>
+                            <td className="py-1.5 text-center" style={{ color: CYAN }}>{c.in_attendance}</td>
+                            <td className="py-1.5 text-center" style={{ color: c.sla_breached > 0 ? RED : '#71717a' }}>{c.sla_breached}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>
