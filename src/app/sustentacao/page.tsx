@@ -127,7 +127,6 @@ const TABS = [
   { id: 'distribution', label: 'Distribuição',      icon: BarChart2 },
   { id: 'evolution',    label: 'Evolução',           icon: TrendingUp },
   { id: 'debug',        label: 'Diagnóstico',        icon: Wrench },
-  { id: 'debug-resp',  label: 'Responsáveis',       icon: Users },
 ]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -476,6 +475,67 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
+// ─── Diagnóstico Tab (wrapper com sub-abas) ────────────────────────────────────
+
+function DiagnosticoTab({
+  debugClientes,
+  debugResponsaveis,
+  loading,
+  loadError,
+  onSyncClientes,
+  onSyncResponsaveis,
+}: {
+  debugClientes: { rows: DebugClienteRow[] } | null
+  debugResponsaveis: { rows: DebugResponsavelRow[] } | null
+  loading: boolean
+  loadError: string | null
+  onSyncClientes: () => Promise<void>
+  onSyncResponsaveis: () => Promise<void>
+}) {
+  const [sub, setSub] = useState<'empresas' | 'usuarios'>('empresas')
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-tabs */}
+      <div className="flex gap-1 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+        {([['empresas', 'Empresas'], ['usuarios', 'Usuários']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setSub(id)}
+            className="px-4 py-2 text-sm font-medium transition-colors"
+            style={{
+              color: sub === id ? '#00F5FF' : '#71717a',
+              borderBottom: sub === id ? '2px solid #00F5FF' : '2px solid transparent',
+              marginBottom: -1,
+            }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Empresas */}
+      {sub === 'empresas' && (
+        loading && !debugClientes
+          ? <p className="text-zinc-500 text-sm">Carregando comparativo...</p>
+          : debugClientes
+            ? <DebugClientesTab rows={debugClientes.rows} onSync={onSyncClientes} />
+            : null
+      )}
+
+      {/* Usuários */}
+      {sub === 'usuarios' && (
+        loading && !debugResponsaveis
+          ? <p className="text-zinc-500 text-sm">Carregando responsáveis...</p>
+          : loadError && !debugResponsaveis
+            ? <div className="rounded-xl border border-red-900/40 bg-red-950/20 px-4 py-3 text-sm text-red-400">{loadError}</div>
+            : debugResponsaveis
+              ? <DebugResponsaveisTab rows={debugResponsaveis.rows} onSync={onSyncResponsaveis} />
+              : null
+      )}
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SustentacaoPage() {
@@ -542,12 +602,15 @@ export default function SustentacaoPage() {
       } else if (t === 'evolution' && !evolution) {
         const r = await api.get<EvolutionData>(`/sustentacao/evolution`)
         setEvolution(r)
-      } else if (t === 'debug' && !debugClientes) {
-        const r = await api.get<{ rows: DebugClienteRow[] }>(`/sustentacao/debug-clientes`)
-        setDebugClientes(r)
-      } else if (t === 'debug-resp' && !debugResponsaveis) {
-        const r = await api.get<{ rows: DebugResponsavelRow[] }>(`/sustentacao/debug-responsaveis`)
-        setDebugResponsaveis(r)
+      } else if (t === 'debug') {
+        if (!debugClientes) {
+          const r = await api.get<{ rows: DebugClienteRow[] }>(`/sustentacao/debug-clientes`)
+          setDebugClientes(r)
+        }
+        if (!debugResponsaveis) {
+          const r = await api.get<{ rows: DebugResponsavelRow[] }>(`/sustentacao/debug-responsaveis`)
+          setDebugResponsaveis(r)
+        }
       }
     } catch (e: any) {
       console.error(e)
@@ -977,35 +1040,25 @@ export default function SustentacaoPage() {
         )}
 
         {/* DIAGNÓSTICO */}
-        {tab === 'debug' && !debugClientes && !loading && (
-          <p className="text-zinc-500 text-sm">Carregando comparativo...</p>
-        )}
-        {tab === 'debug' && debugClientes && (
-          <DebugClientesTab rows={debugClientes.rows} onSync={async () => {
-            await api.post('/sustentacao/sync-orgs', {})
-            const r = await api.get<{ rows: DebugClienteRow[] }>('/sustentacao/debug-clientes')
-            setDebugClientes(r)
-          }} />
-        )}
-
-        {/* RESPONSÁVEIS */}
-        {tab === 'debug-resp' && loading && (
-          <p className="text-zinc-500 text-sm">Carregando responsáveis...</p>
-        )}
-        {tab === 'debug-resp' && !loading && loadError && (
-          <div className="rounded-xl border border-red-900/40 bg-red-950/20 px-4 py-3 text-sm text-red-400">
-            {loadError}
-          </div>
-        )}
-        {tab === 'debug-resp' && !loading && debugResponsaveis && (
-          <DebugResponsaveisTab rows={debugResponsaveis.rows} onSync={async () => {
-            await api.post('/sustentacao/sync-agents', {})
-            // Comando roda em background (~3 min). Recarrega após 3 min.
-            setTimeout(async () => {
-              const r = await api.get<{ rows: DebugResponsavelRow[] }>('/sustentacao/debug-responsaveis')
-              setDebugResponsaveis(r)
-            }, 3 * 60 * 1000)
-          }} />
+        {tab === 'debug' && (
+          <DiagnosticoTab
+            debugClientes={debugClientes}
+            debugResponsaveis={debugResponsaveis}
+            loading={loading}
+            loadError={loadError}
+            onSyncClientes={async () => {
+              await api.post('/sustentacao/sync-orgs', {})
+              const r = await api.get<{ rows: DebugClienteRow[] }>('/sustentacao/debug-clientes')
+              setDebugClientes(r)
+            }}
+            onSyncResponsaveis={async () => {
+              await api.post('/sustentacao/sync-agents', {})
+              setTimeout(async () => {
+                const r = await api.get<{ rows: DebugResponsavelRow[] }>('/sustentacao/debug-responsaveis')
+                setDebugResponsaveis(r)
+              }, 3 * 60 * 1000)
+            }}
+          />
         )}
       </div>
     </div>
