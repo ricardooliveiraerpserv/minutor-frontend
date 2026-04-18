@@ -1041,15 +1041,6 @@ export default function ContratosPage() {
               {activeTab === 7 && (
                 <div className="space-y-4">
                   <div>
-                    <label className={labelCls}>Executivo de Contas</label>
-                    <SearchSelect
-                      value={form.executivo_conta_id}
-                      onChange={v => setForm(f => ({ ...f, executivo_conta_id: v }))}
-                      options={executives}
-                      placeholder="Buscar executivo..."
-                    />
-                  </div>
-                  <div>
                     <label className={labelCls}>Vendedor</label>
                     <SearchSelect
                       value={form.vendedor_id}
