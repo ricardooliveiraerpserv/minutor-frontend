@@ -220,6 +220,12 @@ export default function ContratosPage() {
   const [codeExists, setCodeExists] = useState(false)
   const [codeChecking, setCodeChecking] = useState(false)
 
+  // Generate project modal
+  const [genModal, setGenModal] = useState<{ contract: Contract } | null>(null)
+  const [genCoordinatorIds, setGenCoordinatorIds] = useState<number[]>([])
+  const [generating, setGenerating] = useState(false)
+  const [coordinators, setCoordinators] = useState<SelectOption[]>([])
+
   // Derived: selected contract type for conditional fields
   const selectedContractType = useMemo(
     () => contractTypes.find(t => String(t.id) === String(form.contract_type_id)),
@@ -264,6 +270,7 @@ export default function ContratosPage() {
     api.get<any>('/customers?pageSize=500').then(r => setCustomers(r?.items ?? r ?? [])).catch(() => {})
     api.get<any>('/users?pageSize=500').then(r => setUsers(r?.items ?? r ?? [])).catch(() => {})
     api.get<any>('/executives?pageSize=100').then(r => setExecutives(r?.items ?? [])).catch(() => {})
+    api.get<any>('/users?type=coordenador&pageSize=500').then(r => setCoordinators((r?.items ?? r ?? []).map((u: any) => ({ id: u.id, name: u.name })))).catch(() => {})
     api.get<any>('/service-types?pageSize=100').then(r => setServiceTypes(r?.items ?? r?.data ?? r ?? [])).catch(() => {})
     api.get<any>('/contract-types?pageSize=100').then(r => setContractTypes(r?.items ?? r?.data ?? r ?? [])).catch(() => {})
   }, [])
@@ -425,17 +432,30 @@ export default function ContratosPage() {
 
   // ─── Generate project ─────────────────────────────────────────────────────
 
-  const generateProject = async (c: Contract) => {
-    if (!confirm(`Isso irá gerar um projeto para "${c.customer?.name}". Continuar?`)) return
+  const openGenModal = (c: Contract) => {
+    // Pre-select architect if set
+    const preIds: number[] = c.architect_id ? [c.architect_id] : []
+    setGenCoordinatorIds(preIds)
+    setGenModal({ contract: c })
+  }
+
+  const confirmGenerateProject = async () => {
+    if (!genModal) return
+    const c = genModal.contract
+    setGenerating(true)
     try {
       if (c.status !== 'inicio_autorizado' && c.status !== 'aprovado') {
         await api.patch(`/contracts/${c.id}/status`, { status: 'inicio_autorizado' })
       }
-      const r = await api.post<{ project_id: number; project_code: string }>(`/contracts/${c.id}/generate-project`, {})
+      const r = await api.post<{ project_id: number; project_code: string }>(`/contracts/${c.id}/generate-project`, {
+        coordinator_ids: genCoordinatorIds,
+      })
       toast.success(`Projeto ${r.project_code} gerado com sucesso!`)
+      setGenModal(null)
       loadContracts()
       router.push(`/projects?highlight=${r.project_id}`)
     } catch (e: any) { toast.error(e?.message ?? 'Erro ao gerar projeto') }
+    finally { setGenerating(false) }
   }
 
   // ─── Attachment helpers ───────────────────────────────────────────────────
@@ -573,7 +593,7 @@ export default function ContratosPage() {
                       </button>
                     )}
                     {(c.status === 'aprovado' || c.status === 'rascunho') && !c.project_id && (
-                      <button onClick={() => generateProject(c)} title="Gerar Projeto"
+                      <button onClick={() => openGenModal(c)} title="Gerar Projeto"
                         className="p-1.5 rounded-md transition-colors hover:bg-yellow-900/40 text-zinc-400 hover:text-yellow-400">
                         <Rocket size={14} />
                       </button>
@@ -1254,7 +1274,7 @@ export default function ContratosPage() {
                   </button>
                 )}
                 {!viewContract.project_id && (viewContract.status === 'aprovado' || viewContract.status === 'rascunho') && (
-                  <button onClick={() => { generateProject(viewContract); setViewContract(null) }}
+                  <button onClick={() => { openGenModal(viewContract); setViewContract(null) }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
                     style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.3)', color: '#eab308' }}>
                     <Rocket size={13} /> Gerar Projeto
@@ -1264,6 +1284,63 @@ export default function ContratosPage() {
               <button onClick={() => setViewContract(null)}
                 className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white transition-colors">
                 Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Generate Project Modal ── */}
+      {genModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
+          <div className="w-full max-w-md rounded-2xl border overflow-hidden" style={{ background: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
+            <div className="px-6 py-4 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+              <h2 className="text-base font-semibold text-white flex items-center gap-2">
+                <Rocket size={16} style={{ color: '#eab308' }} /> Gerar Projeto
+              </h2>
+              <p className="text-xs text-zinc-500 mt-1">{genModal.contract.customer?.name}</p>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-3">Coordenadores do Projeto</p>
+                <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
+                  {coordinators.length === 0 && (
+                    <p className="text-xs text-zinc-600 italic">Nenhum coordenador cadastrado.</p>
+                  )}
+                  {coordinators.map(u => {
+                    const sel = genCoordinatorIds.includes(u.id)
+                    return (
+                      <button key={u.id} type="button"
+                        onClick={() => setGenCoordinatorIds(ids => sel ? ids.filter(i => i !== u.id) : [...ids, u.id])}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left"
+                        style={{
+                          background: sel ? 'rgba(0,245,255,0.08)' : 'rgba(255,255,255,0.03)',
+                          border: `1px solid ${sel ? 'var(--brand-primary)' : 'var(--brand-border)'}`,
+                          color: sel ? 'var(--brand-primary)' : 'var(--brand-text)',
+                        }}>
+                        <span className="w-4 h-4 rounded flex items-center justify-center shrink-0 text-[10px] font-bold"
+                          style={{ background: sel ? 'var(--brand-primary)' : 'transparent', border: `1px solid ${sel ? 'var(--brand-primary)' : 'var(--brand-border)'}`, color: '#0A0A0B' }}>
+                          {sel ? '✓' : ''}
+                        </span>
+                        {u.name}
+                      </button>
+                    )
+                  })}
+                </div>
+                {genCoordinatorIds.length === 0 && (
+                  <p className="text-[11px] text-amber-400 mt-2">Nenhum coordenador selecionado — o arquiteto do contrato será usado como fallback.</p>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t" style={{ borderColor: 'var(--brand-border)' }}>
+              <button onClick={() => setGenModal(null)} disabled={generating}
+                className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white transition-colors">
+                Cancelar
+              </button>
+              <button onClick={confirmGenerateProject} disabled={generating}
+                className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60"
+                style={{ background: '#eab308', color: '#0A0A0B' }}>
+                <Rocket size={14} />
+                {generating ? 'Gerando...' : 'Confirmar e Gerar'}
               </button>
             </div>
           </div>
