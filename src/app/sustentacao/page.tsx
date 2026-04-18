@@ -29,6 +29,19 @@ interface KPIs {
   period: { from: string; to: string }
 }
 
+interface ContextStats {
+  tickets_open: number
+  tickets_resolved: number
+  sla_breached: number
+  sla_at_risk: number
+  sla_rate: number | null
+  avg_solution_min: number | null
+  oldest_open_days: number | null
+  hours_worked_min: number | null
+  productivity: number | null
+  filter: { responsavel: string[]; cliente: string[] }
+}
+
 interface QueueTicket {
   id: number
   ticket_id: number
@@ -663,7 +676,8 @@ export default function SustentacaoPage() {
   const [evolution, setEvolution]     = useState<EvolutionData | null>(null)
   const [debugClientes, setDebugClientes]         = useState<{ rows: DebugClienteRow[] } | null>(null)
   const [debugResponsaveis, setDebugResponsaveis] = useState<{ rows: DebugResponsavelRow[] } | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const [loadError, setLoadError]       = useState<string | null>(null)
+  const [contextStats, setContextStats] = useState<ContextStats | null>(null)
 
   const params = `from=${from}&to=${to}`
 
@@ -731,11 +745,27 @@ export default function SustentacaoPage() {
     }
   }, [])
 
+  const fetchContextStats = useCallback(async (resp: string[], cliente: string[], fromStr: string, toStr: string) => {
+    const hasFilter = resp.length > 0 || cliente.length > 0
+    if (!hasFilter) { setContextStats(null); return }
+    try {
+      const qp = new URLSearchParams({ from: fromStr, to: toStr })
+      if (resp.length)    qp.set('responsavel', resp.join(','))
+      if (cliente.length) qp.set('cliente', cliente.join(','))
+      const r = await api.get<ContextStats>(`/sustentacao/context-stats?${qp}`)
+      setContextStats(r)
+    } catch { setContextStats(null) }
+  }, [])
+
   useEffect(() => { load(tab) }, [tab])
 
   useEffect(() => {
     if (tab === 'queue') fetchQueue(queueFilterResp, queueFilterCliente, queueFilterUrgencia, queueFilterStatus, queueSearch)
   }, [queueFilterResp, queueFilterCliente, queueFilterUrgencia, queueFilterStatus, queueSearch])
+
+  useEffect(() => {
+    fetchContextStats(queueFilterResp, queueFilterCliente, from, to)
+  }, [queueFilterResp, queueFilterCliente, from, to])
 
   const invalidateAll = () => {
     setKpis(null); setSlaData(null); setProductivity(null)
@@ -844,6 +874,75 @@ export default function SustentacaoPage() {
         {/* FILA OPERACIONAL */}
         {tab === 'queue' && queue && (
           <div className="space-y-3">
+          {/* Painel Contextual */}
+          {contextStats && (
+            <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: 'rgba(0,245,255,0.2)', background: 'rgba(0,245,255,0.03)' }}>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wide">
+                  {contextStats.filter.responsavel.length > 0 && contextStats.filter.cliente.length > 0
+                    ? 'Visão por Responsável + Cliente'
+                    : contextStats.filter.responsavel.length > 0 ? 'Visão por Responsável' : 'Visão por Cliente'}
+                </p>
+                <span className="text-[10px] text-zinc-500">período: {contextStats.filter.responsavel.length} resp. · {contextStats.filter.cliente.length} cliente(s)</span>
+              </div>
+              <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-3">
+                {/* Abertos */}
+                <div className="rounded-lg p-3 text-center" style={{ background: 'var(--brand-surface)' }}>
+                  <p className="text-[10px] text-zinc-500 mb-1">Abertos</p>
+                  <p className="text-xl font-bold text-white">{contextStats.tickets_open}</p>
+                </div>
+                {/* Resolvidos */}
+                <div className="rounded-lg p-3 text-center" style={{ background: 'var(--brand-surface)' }}>
+                  <p className="text-[10px] text-zinc-500 mb-1">Resolvidos</p>
+                  <p className="text-xl font-bold" style={{ color: GREEN }}>{contextStats.tickets_resolved}</p>
+                </div>
+                {/* SLA violado */}
+                <div className="rounded-lg p-3 text-center" style={{ background: 'var(--brand-surface)' }}>
+                  <p className="text-[10px] text-zinc-500 mb-1">SLA Violado</p>
+                  <p className="text-xl font-bold" style={{ color: contextStats.sla_breached > 0 ? RED : GREEN }}>{contextStats.sla_breached}</p>
+                </div>
+                {/* SLA em risco */}
+                <div className="rounded-lg p-3 text-center" style={{ background: 'var(--brand-surface)' }}>
+                  <p className="text-[10px] text-zinc-500 mb-1">Em Risco (4h)</p>
+                  <p className="text-xl font-bold" style={{ color: contextStats.sla_at_risk > 0 ? ORANGE : GREEN }}>{contextStats.sla_at_risk}</p>
+                </div>
+                {/* Taxa SLA */}
+                <div className="rounded-lg p-3 text-center" style={{ background: 'var(--brand-surface)' }}>
+                  <p className="text-[10px] text-zinc-500 mb-1">SLA %</p>
+                  <p className="text-xl font-bold" style={{ color: contextStats.sla_rate == null ? '#71717a' : contextStats.sla_rate >= 90 ? GREEN : contextStats.sla_rate >= 70 ? YELLOW : RED }}>
+                    {contextStats.sla_rate != null ? `${contextStats.sla_rate}%` : '—'}
+                  </p>
+                </div>
+                {/* Tempo médio */}
+                <div className="rounded-lg p-3 text-center" style={{ background: 'var(--brand-surface)' }}>
+                  <p className="text-[10px] text-zinc-500 mb-1">Tempo Médio</p>
+                  <p className="text-xl font-bold text-white">{contextStats.avg_solution_min ? fmt(contextStats.avg_solution_min) : '—'}</p>
+                </div>
+                {/* Ticket mais antigo */}
+                <div className="rounded-lg p-3 text-center" style={{ background: 'var(--brand-surface)' }}>
+                  <p className="text-[10px] text-zinc-500 mb-1">Mais Antigo</p>
+                  <p className="text-xl font-bold" style={{ color: (contextStats.oldest_open_days ?? 0) > 30 ? RED : (contextStats.oldest_open_days ?? 0) > 7 ? ORANGE : GREEN }}>
+                    {contextStats.oldest_open_days != null ? `${contextStats.oldest_open_days}d` : '—'}
+                  </p>
+                </div>
+                {/* Horas apontadas (só quando filtra por responsável) */}
+                {contextStats.filter.responsavel.length > 0 && (
+                  <div className="rounded-lg p-3 text-center" style={{ background: 'var(--brand-surface)' }}>
+                    <p className="text-[10px] text-zinc-500 mb-1">H. Apontadas</p>
+                    <p className="text-xl font-bold text-white">{contextStats.hours_worked_min != null ? fmt(contextStats.hours_worked_min) : '—'}</p>
+                  </div>
+                )}
+                {/* Produtividade (só quando filtra por responsável) */}
+                {contextStats.filter.responsavel.length > 0 && (
+                  <div className="rounded-lg p-3 text-center" style={{ background: 'var(--brand-surface)' }}>
+                    <p className="text-[10px] text-zinc-500 mb-1">Tickets/h</p>
+                    <p className="text-xl font-bold" style={{ color: CYAN }}>{contextStats.productivity != null ? contextStats.productivity : '—'}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Barra de filtros */}
           <div className="flex gap-2 flex-wrap items-end">
             {/* Busca livre */}
