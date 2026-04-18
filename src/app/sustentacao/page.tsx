@@ -78,8 +78,7 @@ interface EvolutionData {
 
 interface DebugClienteRow {
   org: string | null
-  cnpj_raw: string | null
-  cnpj_norm: string | null
+  cnpj_movidesk: string | null
   tickets: number
   vinculados: number
   match: 'cnpj' | 'nome' | 'nao'
@@ -168,8 +167,8 @@ function DebugClientesTab({ rows }: { rows: DebugClienteRow[] }) {
 
   const filtered = rows.filter(row => {
     if (matchFilter !== 'all' && row.match !== matchFilter) return false
-    if (cnpjFilter === 'com' && !row.cnpj_norm) return false
-    if (cnpjFilter === 'sem' && row.cnpj_norm) return false
+    if (cnpjFilter === 'com' && !row.cnpj_movidesk) return false
+    if (cnpjFilter === 'sem' && row.cnpj_movidesk) return false
     if (search) {
       const q = search.toLowerCase()
       if (!(row.org ?? '').toLowerCase().includes(q) && !(row.minutor_name ?? '').toLowerCase().includes(q)) return false
@@ -250,7 +249,7 @@ function DebugClientesTab({ rows }: { rows: DebugClienteRow[] }) {
               return (
                 <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--brand-border)' : undefined, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
                   <td className="px-3 py-2 text-zinc-200">{row.org ?? '—'}</td>
-                  <td className="px-3 py-2 font-mono text-zinc-400">{row.cnpj_norm ?? <span className="text-red-400 italic">vazio</span>}</td>
+                  <td className="px-3 py-2 font-mono text-zinc-400">{row.cnpj_movidesk ?? <span className="text-red-400 italic">vazio</span>}</td>
                   <td className="px-3 py-2 text-right text-zinc-300">{row.tickets}</td>
                   <td className="px-3 py-2 text-right" style={{ color: row.vinculados === row.tickets ? '#22c55e' : row.vinculados > 0 ? '#eab308' : '#ef4444' }}>{row.vinculados}</td>
                   <td className="px-3 py-2 text-zinc-200">{row.minutor_name ?? <span className="text-zinc-600 italic">—</span>}</td>
