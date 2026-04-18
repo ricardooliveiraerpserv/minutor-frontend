@@ -62,7 +62,7 @@ interface Contract {
   created_at: string
 }
 
-interface SelectOption { id: number; name: string }
+interface SelectOption { id: number; name: string; code_prefix?: string | null }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -85,6 +85,8 @@ const CATEGORIA_LABEL: Record<string, string> = {
   sustentacao: 'Sustentação',
 }
 
+const CURRENT_YEAR_2D = new Date().getFullYear().toString().slice(-2)
+
 const ATTACHMENT_TYPE_LABEL: Record<string, string> = {
   proposta: 'Proposta',
   contrato: 'Contrato',
@@ -93,6 +95,8 @@ const ATTACHMENT_TYPE_LABEL: Record<string, string> = {
 
 type FormState = {
   customer_id: string
+  code_seq: string
+  code_year: string
   categoria: 'projeto' | 'sustentacao'
   service_type_id: string
   contract_type_id: string
@@ -115,6 +119,8 @@ type FormState = {
 
 const EMPTY_FORM: FormState = {
   customer_id: '',
+  code_seq: '',
+  code_year: CURRENT_YEAR_2D,
   categoria: 'projeto',
   service_type_id: '',
   contract_type_id: '',
@@ -185,6 +191,10 @@ export default function ContratosPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedAttachType, setSelectedAttachType] = useState<'proposta' | 'contrato' | 'logo'>('proposta')
 
+  // Code validation
+  const [codeExists, setCodeExists] = useState(false)
+  const [codeChecking, setCodeChecking] = useState(false)
+
   // Derived: selected contract type for conditional fields
   const selectedContractType = useMemo(
     () => contractTypes.find(t => String(t.id) === String(form.contract_type_id)),
@@ -202,6 +212,27 @@ export default function ContratosPage() {
     const coord   = Number(form.pct_horas_coordenador) || 0
     return sold - consult - Math.round((coord / 100) * consult)
   }, [isFechado, form.horas_contratadas, form.horas_consultor, form.pct_horas_coordenador])
+
+  // Derived: project code preview
+  const selectedCustomerObj = useMemo(
+    () => customers.find(c => String(c.id) === String(form.customer_id)),
+    [customers, form.customer_id]
+  )
+  const codePrefix = selectedCustomerObj?.code_prefix?.toUpperCase() ?? ''
+  const codePreview = useMemo(() => {
+    if (!codePrefix || !form.code_seq.trim()) return ''
+    return `${codePrefix}${form.code_seq.padStart(3, '0')}-${form.code_year}`
+  }, [codePrefix, form.code_seq, form.code_year])
+
+  const checkCodeExists = useCallback(async () => {
+    if (!codePreview) { setCodeExists(false); return }
+    setCodeChecking(true)
+    try {
+      const r = await api.get<any>(`/projects?code=${encodeURIComponent(codePreview)}&per_page=1`)
+      setCodeExists((r?.total ?? r?.data?.length ?? 0) > 0)
+    } catch { setCodeExists(false) }
+    finally { setCodeChecking(false) }
+  }, [codePreview])
 
   // Load master data
   useEffect(() => {
@@ -244,6 +275,8 @@ export default function ContratosPage() {
     setEditContract(full)
     setForm({
       customer_id:          String(full.customer_id),
+      code_seq:             '',
+      code_year:            CURRENT_YEAR_2D,
       categoria:            full.categoria,
       service_type_id:      full.service_type_id ? String(full.service_type_id) : '',
       contract_type_id:     full.contract_type_id ? String(full.contract_type_id) : '',
@@ -284,6 +317,7 @@ export default function ContratosPage() {
     try {
       const payload: Record<string, any> = {
         customer_id:          Number(form.customer_id),
+        project_code_preview: codePreview || null,
         categoria:            form.categoria,
         service_type_id:      form.service_type_id ? Number(form.service_type_id) : null,
         contract_type_id:     form.contract_type_id ? Number(form.contract_type_id) : null,
@@ -552,20 +586,76 @@ export default function ContratosPage() {
 
               {/* Tab 0: Cliente */}
               {activeTab === 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className={labelCls} style={{ marginBottom: 0 }}>Cliente *</label>
-                    <a href="/cadastros?tab=customers" target="_blank" rel="noreferrer"
-                      className="flex items-center gap-1 text-[10px] text-cyan-500 hover:text-cyan-400 transition-colors">
-                      <Plus size={10} /> Novo cliente <ExternalLink size={9} />
-                    </a>
+                <div className="space-y-5">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className={labelCls} style={{ marginBottom: 0 }}>Cliente *</label>
+                      <a href="/cadastros?tab=customers" target="_blank" rel="noreferrer"
+                        className="flex items-center gap-1 text-[10px] text-cyan-500 hover:text-cyan-400 transition-colors">
+                        <Plus size={10} /> Novo cliente <ExternalLink size={9} />
+                      </a>
+                    </div>
+                    <SearchSelect
+                      value={form.customer_id}
+                      onChange={v => { setForm(f => ({ ...f, customer_id: v })); setCodeExists(false) }}
+                      options={customers}
+                      placeholder="Buscar cliente..."
+                    />
                   </div>
-                  <SearchSelect
-                    value={form.customer_id}
-                    onChange={v => setForm(f => ({ ...f, customer_id: v }))}
-                    options={customers}
-                    placeholder="Buscar cliente..."
-                  />
+
+                  {/* Código do Projeto */}
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">Código do Projeto</p>
+                    {codePrefix ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          {/* Prefix read-only */}
+                          <div className="px-3 py-2 rounded-lg text-sm font-mono tracking-widest text-center select-none"
+                            style={{ ...inputStyle, opacity: 0.5, minWidth: '4.5rem' }}>
+                            {codePrefix}
+                          </div>
+                          {/* Sequence */}
+                          <input type="text" maxLength={3} placeholder="001"
+                            value={form.code_seq}
+                            onChange={e => { setForm(f => ({ ...f, code_seq: e.target.value.replace(/\D/g, '').slice(0, 3) })); setCodeExists(false) }}
+                            onBlur={checkCodeExists}
+                            className="px-3 py-2 rounded-lg text-sm font-mono text-center outline-none focus:ring-1 focus:ring-cyan-500/40"
+                            style={{ ...inputStyle, width: '5rem' }} />
+                          <span className="text-zinc-500 text-sm font-mono">-</span>
+                          {/* Year */}
+                          <input type="text" maxLength={2} placeholder="26"
+                            value={form.code_year}
+                            onChange={e => setForm(f => ({ ...f, code_year: e.target.value.replace(/\D/g, '').slice(0, 2) }))}
+                            onBlur={checkCodeExists}
+                            className="px-3 py-2 rounded-lg text-sm font-mono text-center outline-none focus:ring-1 focus:ring-cyan-500/40"
+                            style={{ ...inputStyle, width: '4rem' }} />
+                          {codePreview && (
+                            <span className="text-xs font-mono px-2 py-1 rounded-lg" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--brand-subtle)' }}>
+                              {codePreview}
+                            </span>
+                          )}
+                          {!form.code_seq && (
+                            <span className="text-xs text-zinc-500 italic">deixe vazio para gerar automaticamente</span>
+                          )}
+                        </div>
+                        {codeChecking && <p className="text-[11px] text-zinc-500">Verificando código...</p>}
+                        {codeExists && !codeChecking && (
+                          <p className="text-[11px] text-red-400">⚠ Código <span className="font-mono font-semibold">{codePreview}</span> já existe em outro projeto.</p>
+                        )}
+                      </div>
+                    ) : form.customer_id ? (
+                      <div className="flex items-center gap-3 px-3 py-2 rounded-lg" style={inputStyle}>
+                        <span className="text-xs text-amber-400 italic flex-1">Cliente sem prefixo configurado</span>
+                        <a href="/cadastros?tab=customers" target="_blank" rel="noreferrer"
+                          className="text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors hover:opacity-80 shrink-0"
+                          style={{ background: 'var(--brand-primary)', color: '#0A0A0B' }}>
+                          Configurar prefixo
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-zinc-600 italic">Selecione um cliente para ver o código</p>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -903,11 +993,13 @@ export default function ContratosPage() {
                 <button onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white transition-colors">
                   Cancelar
                 </button>
-                <button onClick={save} disabled={saving || uploading}
-                  className="px-5 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
-                  style={{ background: 'rgba(0,245,255,0.15)', border: '1px solid rgba(0,245,255,0.3)', color: '#00F5FF' }}>
-                  {saving ? 'Salvando...' : uploading ? 'Enviando arquivos...' : editContract ? 'Salvar alterações' : 'Criar contrato'}
-                </button>
+                {(editContract || activeTab === TABS.length - 1) && (
+                  <button onClick={save} disabled={saving || uploading || codeExists}
+                    className="px-5 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+                    style={{ background: 'rgba(0,245,255,0.15)', border: '1px solid rgba(0,245,255,0.3)', color: '#00F5FF' }}>
+                    {saving ? 'Salvando...' : uploading ? 'Enviando arquivos...' : editContract ? 'Salvar alterações' : 'Criar contrato'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
