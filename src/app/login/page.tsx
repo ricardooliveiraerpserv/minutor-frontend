@@ -136,7 +136,7 @@ export default function LoginPage() {
             <MinutorIcon size={38} />
             <div>
               <p className="text-white text-xl font-bold tracking-tight leading-none">Minutor</p>
-              <p className="text-[11px] tracking-widest uppercase mt-0.5" style={{ color: '#00F5FF', opacity: 0.7 }}>
+              <p className="text-[11px] tracking-wider mt-0.5" style={{ color: '#00F5FF', opacity: 0.7 }}>
                 Gestão de Projetos e Serviços
               </p>
             </div>
