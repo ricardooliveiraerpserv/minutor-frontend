@@ -57,10 +57,24 @@ type AnyCard = ContractCard | ProjectCard
 
 interface Coordinator { id: number; name: string }
 
+interface RequestCard {
+  card_type: 'request'
+  id: number
+  customer_name: string
+  customer_id: number
+  area_requisitante: string
+  tipo_necessidade: string
+  tipo_necessidade_outro?: string
+  nivel_urgencia: string
+  status: string
+  created_at: string
+}
+
 interface KanbanResponse {
   demand_cards: ContractCard[]
   transition_cards: ContractCard[]
   project_cards: ProjectCard[]
+  request_cards: RequestCard[]
   coordinators: Coordinator[]
   user_role: string
 }
@@ -128,6 +142,34 @@ const STATUS_LABEL: Record<string, string> = {
   finished:             'Encerrado',
   paused:               'Pausado',
   cancelled:            'Cancelado',
+}
+
+const URGENCIA_COLOR: Record<string, string> = {
+  altissimo:       '#ef4444',
+  alto:            '#f97316',
+  medio:           '#eab308',
+  baixo:           '#22c55e',
+  quando_possivel: '#64748b',
+}
+
+const URGENCIA_LABEL: Record<string, string> = {
+  altissimo:       'Altíssimo',
+  alto:            'Alto',
+  medio:           'Médio',
+  baixo:           'Baixo',
+  quando_possivel: 'Quando possível',
+}
+
+const TIPO_NECESSIDADE_LABEL: Record<string, string> = {
+  implantacao_modulo:        'Implantação de Módulo',
+  treinamento_erp:           'Treinamento ERP',
+  atualizacao_versao_erp:    'Atualização de Versão do ERP',
+  entrega_obrigacao:         'Entrega de Obrigação',
+  fluig:                     'Fluig',
+  desenvolvimento_web_app:   'Desenvolvimento Web/App',
+  customizacao_erp_protheus: 'Customização ERP Protheus',
+  integracao_erp_protheus:   'Integração com ERP Protheus',
+  outro:                     'Outro',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -223,6 +265,63 @@ function ContractKanbanCard({
                 {card.project_code}
               </span>
             )}
+          </div>
+        </div>
+      )}
+    </Draggable>
+  )
+}
+
+// ─── Request Card ─────────────────────────────────────────────────────────────
+
+function RequestKanbanCard({ card, index, onClick }: { card: RequestCard; index: number; onClick: () => void }) {
+  const urgColor = URGENCIA_COLOR[card.nivel_urgencia] ?? '#64748b'
+  const tipoLabel = card.tipo_necessidade === 'outro' && card.tipo_necessidade_outro
+    ? card.tipo_necessidade_outro
+    : (TIPO_NECESSIDADE_LABEL[card.tipo_necessidade] ?? card.tipo_necessidade)
+
+  return (
+    <Draggable draggableId={`request-${card.id}`} index={index} isDragDisabled>
+      {(prov, snap) => (
+        <div
+          ref={prov.innerRef}
+          {...prov.draggableProps}
+          {...prov.dragHandleProps}
+          onClick={onClick}
+          className="rounded-xl p-3 cursor-pointer select-none transition-all"
+          style={{
+            background: snap.isDragging ? 'rgba(139,92,246,0.08)' : 'var(--brand-surface)',
+            border: '1px solid rgba(139,92,246,0.35)',
+            boxShadow: snap.isDragging ? '0 8px 24px rgba(0,0,0,0.45)' : 'none',
+            ...prov.draggableProps.style,
+          }}
+        >
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold truncate" style={{ color: 'var(--brand-text)' }}>
+                {card.customer_name}
+              </p>
+              <p className="text-xs truncate" style={{ color: 'var(--brand-subtle)' }}>{card.area_requisitante}</p>
+            </div>
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
+              style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
+              Requisição
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-1 mb-2">
+            <span className="text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(139,92,246,0.08)', color: '#a78bfa' }}>
+              {tipoLabel}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between mt-1 pt-2" style={{ borderTop: '1px solid rgba(139,92,246,0.15)' }}>
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: `${urgColor}18`, color: urgColor }}>
+              {URGENCIA_LABEL[card.nivel_urgencia] ?? card.nivel_urgencia}
+            </span>
+            <span className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>
+              {new Date(card.created_at).toLocaleDateString('pt-BR')}
+            </span>
           </div>
         </div>
       )}
@@ -487,19 +586,21 @@ function ProjectDetailModal({ card, onClose }: { card: ProjectCard; onClose: () 
 // ─── Column Component ─────────────────────────────────────────────────────────
 
 function KanbanColumn({
-  col, contractCards, projectCards, canDrag, canDrop, onContractClick, onProjectClick,
+  col, contractCards, projectCards, requestCards = [], canDrag, canDrop, onContractClick, onProjectClick, onRequestClick,
 }: {
   col: Column
   contractCards: ContractCard[]
   projectCards: ProjectCard[]
+  requestCards?: RequestCard[]
   canDrag: boolean
   canDrop: boolean
   onContractClick: (card: ContractCard) => void
   onProjectClick: (card: ProjectCard) => void
+  onRequestClick?: (card: RequestCard) => void
 }) {
   const isTransition = col.phase === 'transition'
   const isProject    = col.phase === 'project'
-  const totalCards   = contractCards.length + projectCards.length
+  const totalCards   = contractCards.length + projectCards.length + requestCards.length
 
   const borderColor = isTransition
     ? 'rgba(234,179,8,0.25)'
@@ -561,8 +662,11 @@ function KanbanColumn({
                 : 'transparent',
             }}
           >
+            {requestCards.map((card, idx) => (
+              <RequestKanbanCard key={`request-${card.id}`} card={card} index={idx} onClick={() => onRequestClick?.(card)} />
+            ))}
             {contractCards.map((card, idx) => (
-              <ContractKanbanCard key={uniqueCardId(card)} card={card} index={idx} canDrag={canDrag} onClick={() => onContractClick(card)} />
+              <ContractKanbanCard key={uniqueCardId(card)} card={card} index={requestCards.length + idx} canDrag={canDrag} onClick={() => onContractClick(card)} />
             ))}
             {projectCards.map((card, idx) => (
               <ProjectKanbanCard key={uniqueCardId(card)} card={card} index={contractCards.length + idx} canDrag={canDrag} onClick={() => onProjectClick(card)} />
@@ -600,9 +704,11 @@ function KanbanContent() {
   const [demandCards,     setDemandCards]     = useState<ContractCard[]>([])
   const [transitionCards, setTransitionCards] = useState<ContractCard[]>([])
   const [projectCards,    setProjectCards]    = useState<ProjectCard[]>([])
+  const [requestCards,    setRequestCards]    = useState<RequestCard[]>([])
   const [coordinators,    setCoordinators]    = useState<Coordinator[]>([])
   const [userRole,        setUserRole]        = useState<string>('admin')
   const [loading,         setLoading]         = useState(true)
+  const [selectedRequest, setSelectedRequest] = useState<RequestCard | null>(null)
 
   const [selectedContract, setSelectedContract] = useState<ContractCard | null>(null)
   const [selectedProject,  setSelectedProject]  = useState<ProjectCard | null>(null)
@@ -625,6 +731,7 @@ function KanbanContent() {
       setDemandCards(r.demand_cards ?? [])
       setTransitionCards(r.transition_cards ?? [])
       setProjectCards(r.project_cards ?? [])
+      setRequestCards(r.request_cards ?? [])
       setCoordinators(r.coordinators ?? [])
       setUserRole(r.user_role ?? 'admin')
     } catch {
@@ -852,10 +959,12 @@ function KanbanContent() {
                   col={col}
                   contractCards={contractsInCol(col.id)}
                   projectCards={[]}
+                  requestCards={col.id === 'backlog' ? requestCards : []}
                   canDrag={colCanInteract(col.id)}
                   canDrop={colCanInteract(col.id)}
                   onContractClick={setSelectedContract}
                   onProjectClick={setSelectedProject}
+                  onRequestClick={setSelectedRequest}
                 />
               ))}
 
@@ -912,6 +1021,46 @@ function KanbanContent() {
       )}
       {selectedProject && (
         <ProjectDetailModal card={selectedProject} onClose={() => setSelectedProject(null)} />
+      )}
+      {selectedRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
+          <div className="w-full max-w-lg rounded-2xl overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid rgba(139,92,246,0.35)' }}>
+            <div className="px-6 py-5 border-b flex items-start justify-between gap-3" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
+              <div>
+                <p className="text-base font-bold" style={{ color: 'var(--brand-text)' }}>{selectedRequest.customer_name}</p>
+                <p className="text-sm" style={{ color: '#a78bfa' }}>{selectedRequest.area_requisitante}</p>
+              </div>
+              <span className="text-xs px-2 py-1 rounded-full font-semibold shrink-0" style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
+                Requisição Pendente
+              </span>
+            </div>
+            <div className="px-6 py-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                {([
+                  ['Tipo de Necessidade', selectedRequest.tipo_necessidade === 'outro' && selectedRequest.tipo_necessidade_outro
+                    ? selectedRequest.tipo_necessidade_outro
+                    : (TIPO_NECESSIDADE_LABEL[selectedRequest.tipo_necessidade] ?? selectedRequest.tipo_necessidade)],
+                  ['Urgência', URGENCIA_LABEL[selectedRequest.nivel_urgencia] ?? selectedRequest.nivel_urgencia],
+                  ['Status', selectedRequest.status === 'pendente' ? 'Pendente' : selectedRequest.status === 'em_analise' ? 'Em Análise' : selectedRequest.status],
+                  ['Data', new Date(selectedRequest.created_at).toLocaleDateString('pt-BR')],
+                ] as [string, string][]).map(([label, value]) => (
+                  <div key={label}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{label}</p>
+                    <p className="text-sm" style={{ color: 'var(--brand-text)' }}>{value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
+              <button onClick={() => setSelectedRequest(null)} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--brand-muted)' }}>Fechar</button>
+              <button onClick={() => { setSelectedRequest(null); window.location.href = '/portal-cliente/requisicoes' }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+                style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>
+                Ver todas as requisições
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {generateTarget && (
         <GenerateProjectModal
