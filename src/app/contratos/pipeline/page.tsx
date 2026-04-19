@@ -1522,7 +1522,7 @@ function KanbanContent() {
   useEffect(() => { load() }, [load])
 
   // Compute visible columns based on role
-  const visibleDemandCols = isConsultor ? [] : DEMAND_COLS.filter(c => !REQ_ONLY_COLS.has(c.id) || (!isCliente))
+  const visibleDemandCols = isConsultor ? [] : DEMAND_COLS
 
   const showTransition = !isConsultor && !isCliente
   const visibleProjectCols = PROJECT_COLS
