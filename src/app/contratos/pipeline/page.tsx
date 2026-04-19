@@ -64,9 +64,14 @@ interface RequestCard {
   customer_name: string
   customer_id: number
   area_requisitante: string
+  product_owner?: string
+  modulo_tecnologia?: string
   tipo_necessidade: string
   tipo_necessidade_outro?: string
   nivel_urgencia: string
+  descricao?: string
+  cenario_atual?: string
+  cenario_desejado?: string
   status: string
   created_at: string
 }
@@ -744,28 +749,47 @@ function RequestDetailModal({ card, onClose }: { card: RequestCard; onClose: () 
         {/* Body */}
         {tab === 'details' ? (
           <>
-            <div className="px-6 py-4 space-y-3">
+            <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
+              {/* Grid de campos curtos */}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {([
+                  ['Área Requisitante', card.area_requisitante],
                   ['Tipo de Necessidade', tipoLabel],
                   ['Urgência', URGENCIA_LABEL[card.nivel_urgencia] ?? card.nivel_urgencia],
                   ['Status', statusMap[card.status] ?? card.status],
                   ['Data', new Date(card.created_at).toLocaleDateString('pt-BR')],
+                  ...(card.product_owner ? [['Product Owner', card.product_owner]] : []),
+                  ...(card.modulo_tecnologia ? [['Módulo / Tecnologia', card.modulo_tecnologia]] : []),
                 ] as [string, string][]).map(([label, value]) => (
                   <div key={label}>
                     <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{label}</p>
-                    <p className="text-sm" style={{ color: label === 'Urgência' ? urgColor : 'var(--brand-text)' }}>{value}</p>
+                    <p className="text-sm" style={{ color: label === 'Urgência' ? urgColor : 'var(--brand-text)' }}>{value || '—'}</p>
                   </div>
                 ))}
               </div>
+
+              {/* Campos de texto longo */}
+              {card.descricao && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Descrição</p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--brand-text)' }}>{card.descricao}</p>
+                </div>
+              )}
+              {card.cenario_atual && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Cenário Atual</p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--brand-text)' }}>{card.cenario_atual}</p>
+                </div>
+              )}
+              {card.cenario_desejado && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Cenário Desejado</p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--brand-text)' }}>{card.cenario_desejado}</p>
+                </div>
+              )}
             </div>
-            <div className="flex justify-end gap-3 px-6 py-4 border-t shrink-0" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
+            <div className="flex justify-end px-6 py-4 border-t shrink-0" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
               <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--brand-muted)' }}>Fechar</button>
-              <button onClick={() => { onClose(); window.location.href = '/portal-cliente/requisicoes' }}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
-                style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>
-                Ver todas as requisições
-              </button>
             </div>
           </>
         ) : (
