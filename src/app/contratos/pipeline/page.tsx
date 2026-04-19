@@ -978,9 +978,10 @@ function KanbanLogTab({ logs, loading }: { logs: KanbanLogEntry[]; loading: bool
           <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: '#a78bfa' }} />
           <div className="flex-1 min-w-0">
             <p className="text-sm" style={{ color: 'var(--brand-text)' }}>
-              <span style={{ color: 'var(--brand-subtle)' }}>{label(l.from_column ?? l.from_status)}</span>
-              {' → '}
-              <span style={{ color: '#a78bfa' }}>{label(l.to_column ?? l.to_status)}</span>
+              {(l.from_column ?? l.from_status) == null
+                ? <span style={{ color: '#22c55e' }}>Incluído em <span style={{ color: '#a78bfa' }}>{label(l.to_column ?? l.to_status)}</span></span>
+                : <><span style={{ color: 'var(--brand-subtle)' }}>{label(l.from_column ?? l.from_status)}</span>{' → '}<span style={{ color: '#a78bfa' }}>{label(l.to_column ?? l.to_status)}</span></>
+              }
             </p>
             <p className="text-xs mt-0.5" style={{ color: 'var(--brand-subtle)' }}>
               {l.moved_by} · {new Date(l.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
