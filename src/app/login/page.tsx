@@ -130,21 +130,36 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-950">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-5">
+        <div className="mb-10">
+          {/* Minutor brand — icon + name em linha */}
+          <div className="flex items-center gap-3 mb-6">
+            <MinutorIcon size={38} />
+            <div>
+              <p className="text-white text-xl font-bold tracking-tight leading-none">Minutor</p>
+              <p className="text-[11px] tracking-widest uppercase mt-0.5" style={{ color: '#00F5FF', opacity: 0.7 }}>
+                Gestão de Projetos e Serviços
+              </p>
+            </div>
+          </div>
+
+          {/* Linha divisória sutil */}
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
+            <span className="text-[10px] tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.2)' }}>powered by</span>
+            <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
+          </div>
+
+          {/* Logo empresa */}
+          <div className="flex justify-start">
             <Image
               src="/logo.png"
               alt="ERPServ"
-              width={130}
-              height={52}
+              width={100}
+              height={40}
               className="object-contain"
-              style={{ filter: 'grayscale(1) invert(1) brightness(10)' }}
+              style={{ filter: 'grayscale(1) invert(1) brightness(10)', opacity: 0.55 }}
               priority
             />
-          </div>
-          <div className="flex items-center justify-center gap-2.5">
-            <MinutorIcon size={26} />
-            <p className="text-white text-sm font-semibold tracking-widest uppercase">Minutor · Gestão de Projetos e Serviços</p>
           </div>
         </div>
         <Suspense fallback={null}>
