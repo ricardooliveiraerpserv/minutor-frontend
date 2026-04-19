@@ -981,18 +981,6 @@ function KanbanColumn({
         )}
       </div>
 
-      {/* Request cards ficam FORA do Droppable para não quebrar índices de DnD */}
-      {requestCards.length > 0 && (
-        <div className="px-3 pt-3 space-y-2.5">
-          {requestCards.map(card => (
-            <div key={`request-${card.id}`} onClick={() => onRequestClick?.(card)}>
-              <RequestKanbanCard card={card} />
-            </div>
-          ))}
-          <div style={{ borderTop: '1px dashed rgba(139,92,246,0.2)', marginBottom: -4 }} />
-        </div>
-      )}
-
       <Droppable droppableId={col.id} isDropDisabled={!canDrop}>
         {(prov, snap) => (
           <div
@@ -1006,14 +994,36 @@ function KanbanColumn({
                 : 'transparent',
             }}
           >
+            {/* Request cards com índices ANTES dos contratos */}
+            {requestCards.map((card, idx) => (
+              <Draggable key={`request-${card.id}`} draggableId={`request-${card.id}`} index={idx} isDragDisabled={!canDrag}>
+                {(rProv, rSnap) => (
+                  <div
+                    ref={rProv.innerRef}
+                    {...rProv.draggableProps}
+                    {...rProv.dragHandleProps}
+                    onClick={() => onRequestClick?.(card)}
+                    style={{
+                      ...rProv.draggableProps.style,
+                      opacity: rSnap.isDragging ? 0.85 : 1,
+                    }}
+                  >
+                    <RequestKanbanCard card={card} />
+                  </div>
+                )}
+              </Draggable>
+            ))}
+            {requestCards.length > 0 && (contractCards.length > 0 || projectCards.length > 0) && (
+              <div style={{ borderTop: '1px dashed rgba(139,92,246,0.2)' }} />
+            )}
             {contractCards.map((card, idx) => (
-              <ContractKanbanCard key={uniqueCardId(card)} card={card} index={idx} canDrag={canDrag} onClick={() => onContractClick(card)} />
+              <ContractKanbanCard key={uniqueCardId(card)} card={card} index={requestCards.length + idx} canDrag={canDrag} onClick={() => onContractClick(card)} />
             ))}
             {projectCards.map((card, idx) => (
-              <ProjectKanbanCard key={uniqueCardId(card)} card={card} index={contractCards.length + idx} canDrag={canDrag} onClick={() => onProjectClick(card)} />
+              <ProjectKanbanCard key={uniqueCardId(card)} card={card} index={requestCards.length + contractCards.length + idx} canDrag={canDrag} onClick={() => onProjectClick(card)} />
             ))}
             {prov.placeholder}
-            {contractCards.length === 0 && projectCards.length === 0 && !snap.isDraggingOver && requestCards.length === 0 && (
+            {contractCards.length === 0 && projectCards.length === 0 && requestCards.length === 0 && !snap.isDraggingOver && (
               <p className="text-center text-xs py-6" style={{ color: 'var(--brand-subtle)' }}>Vazio</p>
             )}
           </div>
@@ -1174,6 +1184,19 @@ function KanbanContent() {
         toast.error(e?.message ?? 'Erro ao mover card')
         load()
       }
+      return
+    }
+
+    // ── Moving a request card (reorder only — no backend state change) ──
+    if (cardType === 'request') {
+      setRequestCards(prev => {
+        const items = [...prev]
+        const from  = items.findIndex(r => r.id === cardId)
+        if (from < 0) return prev
+        const [moved] = items.splice(from, 1)
+        items.splice(destination.index, 0, moved)
+        return items
+      })
       return
     }
 
