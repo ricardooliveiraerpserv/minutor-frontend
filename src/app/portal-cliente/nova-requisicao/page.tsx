@@ -130,6 +130,7 @@ function NovaRequisicaoContent() {
 
   const [form, setForm] = useState({
     area_requisitante:  '',
+    project_name:       '',
     product_owner:      '',
     modulo_tecnologia:  '',
     tipo_necessidade:   '',
@@ -164,7 +165,7 @@ function NovaRequisicaoContent() {
   }
 
   const resetForm = () => {
-    setForm({ area_requisitante: '', product_owner: '', modulo_tecnologia: '', tipo_necessidade: '', tipo_necessidade_outro: '', nivel_urgencia: '', descricao: '', cenario_atual: '', cenario_desejado: '' })
+    setForm({ area_requisitante: '', project_name: '', product_owner: '', modulo_tecnologia: '', tipo_necessidade: '', tipo_necessidade_outro: '', nivel_urgencia: '', descricao: '', cenario_atual: '', cenario_desejado: '' })
     setSubmitted(false)
   }
 
@@ -197,6 +198,10 @@ function NovaRequisicaoContent() {
                   <div>
                     <Label required>Área Requisitante</Label>
                     <Input value={form.area_requisitante} onChange={set('area_requisitante')} placeholder="Ex: Financeiro, RH, TI..." />
+                  </div>
+                  <div>
+                    <Label>Nome do Projeto</Label>
+                    <Input value={form.project_name} onChange={set('project_name')} placeholder="Ex: Implantação SIGAFIN, Migração ERP..." />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>

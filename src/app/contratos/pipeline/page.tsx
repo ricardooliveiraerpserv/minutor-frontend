@@ -64,6 +64,7 @@ interface RequestCard {
   customer_name: string
   customer_id: number
   area_requisitante: string
+  project_name?: string
   product_owner?: string
   modulo_tecnologia?: string
   tipo_necessidade: string
@@ -303,9 +304,11 @@ function RequestKanbanCard({ card, onFinalize }: { card: RequestCard; onFinalize
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold truncate" style={{ color: 'var(--brand-text)' }}>
-            {card.customer_name}
+            {card.project_name || card.customer_name}
           </p>
-          <p className="text-xs truncate" style={{ color: 'var(--brand-subtle)' }}>{card.area_requisitante}</p>
+          <p className="text-xs truncate" style={{ color: 'var(--brand-subtle)' }}>
+            {card.project_name ? card.customer_name : card.area_requisitante}
+          </p>
         </div>
         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
           style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
@@ -1238,6 +1241,7 @@ function RequestDetailModal({ card, onClose }: { card: RequestCard; onClose: () 
               {/* Grid de campos curtos */}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {([
+                  ...(card.project_name ? [['Nome do Projeto', card.project_name]] : []),
                   ['Área Requisitante', card.area_requisitante],
                   ['Tipo de Necessidade', tipoLabel],
                   ['Urgência', URGENCIA_LABEL[card.nivel_urgencia] ?? card.nivel_urgencia],
