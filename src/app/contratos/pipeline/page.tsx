@@ -107,7 +107,7 @@ const DEMAND_COLS: Column[] = [
   { id: 'em_planejamento',     label: 'Em Planejamento',  phase: 'demand' },
   { id: 'em_validacao',        label: 'Em Validação',     phase: 'demand', clientVisible: true },
   { id: 'em_revisao',          label: 'Em Revisão',       phase: 'demand', clientCanDrop: true, clientLocked: true },
-  { id: 'aprovado',            label: 'Aprovado',         phase: 'demand', clientVisible: true },
+  { id: 'aprovado',            label: 'Aprovado',         phase: 'demand', clientCanDrop: true, clientLocked: true },
   { id: 'req_inicio_autorizado', label: 'Aguardando Início (Req.)', phase: 'demand' },
 ]
 
