@@ -275,58 +275,43 @@ function ContractKanbanCard({
 
 // ─── Request Card ─────────────────────────────────────────────────────────────
 
-function RequestKanbanCard({ card, index, onClick }: { card: RequestCard; index: number; onClick: () => void }) {
+function RequestKanbanCard({ card }: { card: RequestCard }) {
   const urgColor = URGENCIA_COLOR[card.nivel_urgencia] ?? '#64748b'
   const tipoLabel = card.tipo_necessidade === 'outro' && card.tipo_necessidade_outro
     ? card.tipo_necessidade_outro
     : (TIPO_NECESSIDADE_LABEL[card.tipo_necessidade] ?? card.tipo_necessidade)
 
   return (
-    <Draggable draggableId={`request-${card.id}`} index={index} isDragDisabled>
-      {(prov, snap) => (
-        <div
-          ref={prov.innerRef}
-          {...prov.draggableProps}
-          {...prov.dragHandleProps}
-          onClick={onClick}
-          className="rounded-xl p-3 cursor-pointer select-none transition-all"
-          style={{
-            background: snap.isDragging ? 'rgba(139,92,246,0.08)' : 'var(--brand-surface)',
-            border: '1px solid rgba(139,92,246,0.35)',
-            boxShadow: snap.isDragging ? '0 8px 24px rgba(0,0,0,0.45)' : 'none',
-            ...prov.draggableProps.style,
-          }}
-        >
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold truncate" style={{ color: 'var(--brand-text)' }}>
-                {card.customer_name}
-              </p>
-              <p className="text-xs truncate" style={{ color: 'var(--brand-subtle)' }}>{card.area_requisitante}</p>
-            </div>
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
-              style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
-              Requisição
-            </span>
-          </div>
-
-          <div className="flex flex-wrap gap-1 mb-2">
-            <span className="text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(139,92,246,0.08)', color: '#a78bfa' }}>
-              {tipoLabel}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between mt-1 pt-2" style={{ borderTop: '1px solid rgba(139,92,246,0.15)' }}>
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: `${urgColor}18`, color: urgColor }}>
-              {URGENCIA_LABEL[card.nivel_urgencia] ?? card.nivel_urgencia}
-            </span>
-            <span className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>
-              {new Date(card.created_at).toLocaleDateString('pt-BR')}
-            </span>
-          </div>
+    <div
+      className="rounded-xl p-3 cursor-pointer select-none transition-all hover:opacity-90"
+      style={{ background: 'var(--brand-surface)', border: '1px solid rgba(139,92,246,0.35)' }}
+    >
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold truncate" style={{ color: 'var(--brand-text)' }}>
+            {card.customer_name}
+          </p>
+          <p className="text-xs truncate" style={{ color: 'var(--brand-subtle)' }}>{card.area_requisitante}</p>
         </div>
-      )}
-    </Draggable>
+        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
+          style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
+          Requisição
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1 mb-2">
+        <span className="text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(139,92,246,0.08)', color: '#a78bfa' }}>
+          {tipoLabel}
+        </span>
+      </div>
+      <div className="flex items-center justify-between mt-1 pt-2" style={{ borderTop: '1px solid rgba(139,92,246,0.15)' }}>
+        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: `${urgColor}18`, color: urgColor }}>
+          {URGENCIA_LABEL[card.nivel_urgencia] ?? card.nivel_urgencia}
+        </span>
+        <span className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>
+          {new Date(card.created_at).toLocaleDateString('pt-BR')}
+        </span>
+      </div>
+    </div>
   )
 }
 
@@ -680,6 +665,18 @@ function KanbanColumn({
         )}
       </div>
 
+      {/* Request cards ficam FORA do Droppable para não quebrar índices de DnD */}
+      {requestCards.length > 0 && (
+        <div className="px-3 pt-3 space-y-2.5">
+          {requestCards.map(card => (
+            <div key={`request-${card.id}`} onClick={() => onRequestClick?.(card)}>
+              <RequestKanbanCard card={card} />
+            </div>
+          ))}
+          <div style={{ borderTop: '1px dashed rgba(139,92,246,0.2)', marginBottom: -4 }} />
+        </div>
+      )}
+
       <Droppable droppableId={col.id} isDropDisabled={!canDrop}>
         {(prov, snap) => (
           <div
@@ -693,17 +690,14 @@ function KanbanColumn({
                 : 'transparent',
             }}
           >
-            {requestCards.map((card, idx) => (
-              <RequestKanbanCard key={`request-${card.id}`} card={card} index={idx} onClick={() => onRequestClick?.(card)} />
-            ))}
             {contractCards.map((card, idx) => (
-              <ContractKanbanCard key={uniqueCardId(card)} card={card} index={requestCards.length + idx} canDrag={canDrag} onClick={() => onContractClick(card)} />
+              <ContractKanbanCard key={uniqueCardId(card)} card={card} index={idx} canDrag={canDrag} onClick={() => onContractClick(card)} />
             ))}
             {projectCards.map((card, idx) => (
               <ProjectKanbanCard key={uniqueCardId(card)} card={card} index={contractCards.length + idx} canDrag={canDrag} onClick={() => onProjectClick(card)} />
             ))}
             {prov.placeholder}
-            {totalCards === 0 && !snap.isDraggingOver && (
+            {contractCards.length === 0 && projectCards.length === 0 && !snap.isDraggingOver && requestCards.length === 0 && (
               <p className="text-center text-xs py-6" style={{ color: 'var(--brand-subtle)' }}>Vazio</p>
             )}
           </div>
