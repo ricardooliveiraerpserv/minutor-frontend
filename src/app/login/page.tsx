@@ -50,17 +50,19 @@ function LoginForm() {
   }
 
   const inputStyle = {
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.11)',
     color: 'white',
   }
   const focusStyle = {
-    border: '1px solid rgba(0,245,255,0.4)',
-    boxShadow: '0 0 0 3px rgba(0,245,255,0.07)',
+    border: '1px solid rgba(0,245,255,0.5)',
+    boxShadow: '0 0 0 3px rgba(0,245,255,0.08)',
+    background: 'rgba(255,255,255,0.08)',
   }
   const blurStyle = {
-    border: '1px solid rgba(255,255,255,0.08)',
+    border: '1px solid rgba(255,255,255,0.11)',
     boxShadow: 'none',
+    background: 'rgba(255,255,255,0.06)',
   }
 
   return (
@@ -128,9 +130,9 @@ function LoginForm() {
           disabled={loading}
           className="w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200 disabled:opacity-60"
           style={{
-            background: 'linear-gradient(135deg, #4F46E5 0%, #6366F1 100%)',
+            background: 'linear-gradient(160deg, #4338CA 0%, #4F46E5 100%)',
             color: 'white',
-            boxShadow: loading ? 'none' : '0 4px 20px rgba(99,102,241,0.35)',
+            boxShadow: loading ? 'none' : '0 2px 8px rgba(67,56,202,0.4), 0 1px 2px rgba(0,0,0,0.4)',
           }}
         >
           {loading ? (
@@ -173,14 +175,14 @@ export default function LoginPage() {
         <div className="rounded-2xl px-8 py-8" style={{
           background: '#111113',
           border: '1px solid rgba(255,255,255,0.07)',
-          boxShadow: '0 40px 100px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.02)',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.05) inset',
         }}>
 
           {/* Header */}
           <div className="flex items-center gap-3 mb-7">
             <MinutorIcon size={32} />
             <div>
-              <p className="text-[15px] font-semibold tracking-[0.18em] text-white uppercase leading-none">
+              <p className="text-[15px] font-semibold tracking-[0.08em] text-white uppercase leading-none">
                 Minutor
               </p>
               <p className="text-[11px] mt-0.5 tracking-wide leading-none" style={{ color: 'rgba(0,245,255,0.55)' }}>
@@ -190,7 +192,7 @@ export default function LoginPage() {
           </div>
 
           {/* Divider */}
-          <div className="mb-6" style={{ height: 1, background: 'rgba(255,255,255,0.05)' }} />
+          <div className="mb-6" style={{ height: 1, background: 'rgba(255,255,255,0.08)' }} />
 
           {/* Form */}
           <Suspense fallback={null}>
@@ -199,14 +201,14 @@ export default function LoginPage() {
         </div>
 
         {/* ERPServ — discreto no rodapé */}
-        <div className="flex justify-center mt-7">
+        <div className="flex justify-center mt-9">
           <Image
             src="/logo.png"
             alt="ERPServ Consultoria"
-            width={68}
-            height={26}
+            width={60}
+            height={22}
             className="object-contain"
-            style={{ filter: 'grayscale(1) invert(1) brightness(10)', opacity: 0.18 }}
+            style={{ filter: 'grayscale(1) invert(1) brightness(10)', opacity: 0.14 }}
           />
         </div>
       </div>
