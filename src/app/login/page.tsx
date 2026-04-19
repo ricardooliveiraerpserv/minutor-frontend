@@ -144,7 +144,7 @@ export default function LoginPage() {
           </div>
           <div className="flex items-center justify-center gap-2.5">
             <MinutorIcon size={26} />
-            <p className="text-white text-sm font-semibold tracking-widest uppercase">Minutor · Gestão de Horas</p>
+            <p className="text-white text-sm font-semibold tracking-widest uppercase">Minutor · Gestão de Projetos e Serviços</p>
           </div>
         </div>
         <Suspense fallback={null}>
