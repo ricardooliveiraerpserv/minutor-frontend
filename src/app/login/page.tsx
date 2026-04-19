@@ -8,7 +8,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { ApiError } from '@/lib/api'
 
-function MinutorIcon({ size = 32 }: { size?: number }) {
+function MinutorIcon({ size = 52 }: { size?: number }) {
   const bars = [
     { x: 0,    h: 0.45, y: 0.55 },
     { x: 0.28, h: 0.75, y: 0.25 },
@@ -49,32 +49,30 @@ function LoginForm() {
     }
   }
 
-  const inputStyle = {
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.11)',
+  const inputBase: React.CSSProperties = {
+    background: 'rgba(255,255,255,0.055)',
+    border: '1px solid rgba(255,255,255,0.10)',
     color: 'white',
-  }
-  const focusStyle = {
-    border: '1px solid rgba(0,245,255,0.5)',
-    boxShadow: '0 0 0 3px rgba(0,245,255,0.08)',
-    background: 'rgba(255,255,255,0.08)',
-  }
-  const blurStyle = {
-    border: '1px solid rgba(255,255,255,0.11)',
-    boxShadow: 'none',
-    background: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
+    width: '100%',
+    padding: '13px 16px',
+    fontSize: 14,
+    outline: 'none',
+    transition: 'border 0.15s, box-shadow 0.15s, background 0.15s',
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
       {passwordChanged && (
-        <div className="px-3.5 py-2.5 rounded-xl text-xs" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)', color: '#4ade80' }}>
+        <div style={{ padding: '10px 14px', borderRadius: 10, fontSize: 12, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)', color: '#4ade80' }}>
           Senha alterada com sucesso. Faça login com a nova senha.
         </div>
       )}
 
-      <div className="space-y-1.5">
-        <label className="block text-[11px] font-medium tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.35)' }}>
+      {/* E-mail */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>
           E-mail
         </label>
         <input
@@ -83,71 +81,79 @@ function LoginForm() {
           onChange={e => setEmail(e.target.value.toLowerCase())}
           placeholder="seu@email.com"
           required
-          className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-150 placeholder:text-zinc-700"
-          style={inputStyle}
-          onFocus={e => Object.assign(e.target.style, focusStyle)}
-          onBlur={e => Object.assign(e.target.style, blurStyle)}
+          style={{ ...inputBase, caretColor: '#00F5FF' }}
+          className="login-input"
         />
       </div>
 
-      <div className="space-y-1.5">
-        <label className="block text-[11px] font-medium tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.35)' }}>
+      {/* Senha */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>
           Senha
         </label>
-        <div className="relative">
+        <div style={{ position: 'relative' }}>
           <input
             type={showPassword ? 'text' : 'password'}
             value={password}
             onChange={e => setPassword(e.target.value)}
             placeholder="••••••••"
             required
-            className="w-full px-4 py-3 pr-11 rounded-xl text-sm outline-none transition-all duration-150 placeholder:text-zinc-700"
-            style={inputStyle}
-            onFocus={e => Object.assign(e.target.style, focusStyle)}
-            onBlur={e => Object.assign(e.target.style, blurStyle)}
+            style={{ ...inputBase, paddingRight: 44, caretColor: '#00F5FF' }}
+            className="login-input"
           />
           <button
             type="button"
             onClick={() => setShowPass(v => !v)}
             tabIndex={-1}
-            className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors hover:opacity-70"
-            style={{ color: 'rgba(255,255,255,0.25)' }}
+            style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.15s' }}
           >
-            {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="px-3.5 py-2.5 rounded-xl text-xs" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', color: '#f87171' }}>
+        <div style={{ padding: '10px 14px', borderRadius: 10, fontSize: 12, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', color: '#f87171' }}>
           {error}
         </div>
       )}
 
-      <div className="pt-1">
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200 disabled:opacity-60"
-          style={{
-            background: 'linear-gradient(160deg, #4338CA 0%, #4F46E5 100%)',
-            color: 'white',
-            boxShadow: loading ? 'none' : '0 2px 8px rgba(67,56,202,0.4), 0 1px 2px rgba(0,0,0,0.4)',
-          }}
-        >
-          {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <svg className="animate-spin" width={13} height={13} viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeDashoffset="10" strokeLinecap="round" />
-              </svg>
-              Entrando...
-            </span>
-          ) : 'Entrar'}
-        </button>
-      </div>
+      {/* Botão */}
+      <button
+        type="submit"
+        disabled={loading}
+        className="login-btn"
+        style={{
+          width: '100%',
+          padding: '15px',
+          borderRadius: 14,
+          fontSize: 15,
+          fontWeight: 700,
+          color: 'white',
+          border: 'none',
+          cursor: loading ? 'not-allowed' : 'pointer',
+          opacity: loading ? 0.7 : 1,
+          background: 'linear-gradient(160deg, #3730A3 0%, #4F46E5 60%, #6366F1 100%)',
+          boxShadow: '0 6px 24px rgba(79,70,229,0.45), 0 2px 6px rgba(0,0,0,0.5)',
+          transition: 'all 0.2s',
+          letterSpacing: '0.02em',
+        }}
+      >
+        {loading ? (
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <svg style={{ animation: 'spin 0.8s linear infinite' }} width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeDashoffset="10" strokeLinecap="round" />
+            </svg>
+            Entrando...
+          </span>
+        ) : 'Entrar'}
+      </button>
 
-      <div className="text-center">
-        <Link href="/esqueci-senha" className="text-xs transition-colors hover:opacity-60" style={{ color: 'rgba(255,255,255,0.25)' }}>
+      <div style={{ textAlign: 'center' }}>
+        <Link href="/esqueci-senha" style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', textDecoration: 'none', transition: 'color 0.15s' }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.55)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.3)')}
+        >
           Esqueceu a senha?
         </Link>
       </div>
@@ -157,42 +163,45 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0A0B' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#080B12', position: 'relative', overflow: 'hidden' }}>
 
-      {/* Glow radial sutil */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
-        <div style={{
-          width: 700,
-          height: 500,
-          background: 'radial-gradient(ellipse at 50% 45%, rgba(0,245,255,0.045) 0%, transparent 65%)',
-          filter: 'blur(24px)',
-        }} />
+      {/* Glow atmosférico — fundo */}
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', top: '-10%', left: '-15%', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(29,78,216,0.18) 0%, transparent 70%)', filter: 'blur(60px)' }} />
+        <div style={{ position: 'absolute', bottom: '-10%', right: '-15%', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(79,70,229,0.15) 0%, transparent 70%)', filter: 'blur(60px)' }} />
+        <div style={{ position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%,-50%)', width: 600, height: 400, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(0,245,255,0.04) 0%, transparent 65%)', filter: 'blur(30px)' }} />
       </div>
 
-      <div className="w-full max-w-[360px] relative px-4" style={{ animation: 'fadeUp 0.35s ease both' }}>
-
-        {/* Card */}
-        <div className="rounded-2xl px-8 py-8" style={{
-          background: '#111113',
-          border: '1px solid rgba(255,255,255,0.07)',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.05) inset',
+      {/* Card */}
+      <div style={{ animation: 'fadeUp 0.4s ease both', width: '100%', maxWidth: 420, padding: '0 20px', position: 'relative' }}>
+        <div style={{
+          borderRadius: 20,
+          padding: '44px 40px 36px',
+          background: 'rgba(18,20,28,0.85)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          backdropFilter: 'blur(20px)',
+          boxShadow: '0 24px 60px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06)',
         }}>
 
-          {/* Header */}
-          <div className="flex items-center gap-3 mb-7">
-            <MinutorIcon size={32} />
-            <div>
-              <p className="text-[15px] font-semibold tracking-[0.08em] text-white uppercase leading-none">
-                Minutor
-              </p>
-              <p className="text-[11px] mt-0.5 tracking-wide leading-none" style={{ color: 'rgba(0,245,255,0.55)' }}>
-                Gestão de Projetos e Serviços
-              </p>
+          {/* Header — CENTRALIZADO */}
+          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+              <MinutorIcon size={52} />
             </div>
+            <h1 style={{ margin: 0, fontSize: 30, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#FFFFFF', lineHeight: 1 }}>
+              Minutor
+            </h1>
+            <p style={{ margin: '8px 0 0', fontSize: 14, color: '#00D4E8', letterSpacing: '0.02em', fontWeight: 400 }}>
+              Gestão de Projetos e Serviços
+            </p>
           </div>
 
-          {/* Divider */}
-          <div className="mb-6" style={{ height: 1, background: 'rgba(255,255,255,0.08)' }} />
+          {/* Divider com accent central */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginBottom: 28 }}>
+            <div style={{ flex: 1, height: 1, background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.1))' }} />
+            <div style={{ width: 28, height: 2, borderRadius: 2, background: '#00D4E8', margin: '0 10px', opacity: 0.7 }} />
+            <div style={{ flex: 1, height: 1, background: 'linear-gradient(to left, transparent, rgba(255,255,255,0.1))' }} />
+          </div>
 
           {/* Form */}
           <Suspense fallback={null}>
@@ -200,23 +209,43 @@ export default function LoginPage() {
           </Suspense>
         </div>
 
-        {/* ERPServ — discreto no rodapé */}
-        <div className="flex justify-center mt-9">
+        {/* Rodapé — ERPServ */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 28, opacity: 0.38 }}>
           <Image
             src="/logo.png"
-            alt="ERPServ Consultoria"
-            width={60}
-            height={22}
-            className="object-contain"
-            style={{ filter: 'grayscale(1) invert(1) brightness(10)', opacity: 0.14 }}
+            alt="ERPServ"
+            width={72}
+            height={28}
+            style={{ objectFit: 'contain', filter: 'grayscale(1) invert(1) brightness(10)' }}
           />
+          <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.25)' }} />
+          <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.8)', lineHeight: 1.4 }}>
+            Uma solução{' '}
+            <span style={{ color: '#00D4E8', fontWeight: 600 }}>erpserv.</span>
+          </p>
         </div>
       </div>
 
       <style>{`
         @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(14px); }
+          from { opacity: 0; transform: translateY(16px); }
           to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        .login-input::placeholder { color: rgba(255,255,255,0.22); }
+        .login-input:focus {
+          border: 1px solid rgba(0,212,232,0.55) !important;
+          box-shadow: 0 0 0 3px rgba(0,212,232,0.08) !important;
+          background: rgba(255,255,255,0.075) !important;
+        }
+        .login-btn:hover:not(:disabled) {
+          box-shadow: 0 8px 32px rgba(79,70,229,0.55), 0 2px 6px rgba(0,0,0,0.5);
+          transform: translateY(-1px);
+        }
+        .login-btn:active:not(:disabled) {
+          transform: translateY(0);
         }
       `}</style>
     </div>
