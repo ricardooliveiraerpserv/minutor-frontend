@@ -5,6 +5,22 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Eye, EyeOff } from 'lucide-react'
+
+function MinutorIcon({ size = 32 }: { size?: number }) {
+  const bars = [
+    { x: 0,    h: 0.45, y: 0.55 },
+    { x: 0.28, h: 0.75, y: 0.25 },
+    { x: 0.56, h: 1.00, y: 0.00 },
+    { x: 0.84, h: 0.60, y: 0.40 },
+  ]
+  return (
+    <svg width={size} height={size} viewBox="0 0 28 28" fill="none">
+      {bars.map((b, i) => (
+        <rect key={i} x={b.x * 28 * 0.9 + 2} y={b.y * 20 + 4} width={4.2} height={b.h * 20} rx={1.6} fill="#00F5FF" />
+      ))}
+    </svg>
+  )
+}
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -115,18 +131,21 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-zinc-950">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-3">
+          <div className="flex justify-center mb-5">
             <Image
               src="/logo.png"
               alt="ERPServ"
-              width={140}
-              height={56}
+              width={130}
+              height={52}
               className="object-contain"
               style={{ filter: 'grayscale(1) invert(1) brightness(10)' }}
               priority
             />
           </div>
-          <p className="text-zinc-500 text-xs tracking-widest uppercase mt-1">Minutor · Gestão de Horas</p>
+          <div className="flex items-center justify-center gap-2.5">
+            <MinutorIcon size={26} />
+            <p className="text-white text-sm font-semibold tracking-widest uppercase">Minutor · Gestão de Horas</p>
+          </div>
         </div>
         <Suspense fallback={null}>
           <LoginForm />
