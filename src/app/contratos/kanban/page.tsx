@@ -525,6 +525,11 @@ function KanbanColumn({
             {isProject && <FolderKanban size={13} style={{ color: '#818cf8' }} />}
             {!isTransition && !isProject && <Layers size={13} style={{ color: 'var(--brand-subtle)' }} />}
             <p className="text-sm font-semibold" style={{ color: headerColor }}>{col.label}</p>
+            {col.clientVisible && !isTransition && !isProject && (
+              <span className="text-[9px] font-bold px-1 py-0.5 rounded" style={{ background: 'rgba(0,245,255,0.1)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.2)' }}>
+                C
+              </span>
+            )}
           </div>
           <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--brand-subtle)' }}>
             {totalCards}
@@ -599,7 +604,13 @@ function KanbanContent() {
 
   const isConsultor = userRole === 'consultor'
   const isCliente   = userRole === 'cliente'
-  const canDrag     = !isConsultor && !isCliente
+
+  // Returns whether drag/drop is allowed for a given column id
+  const colCanInteract = (colId: string): boolean => {
+    if (isConsultor) return false
+    if (isCliente) return DEMAND_COLS.find(c => c.id === colId)?.clientVisible ?? false
+    return true
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -620,11 +631,7 @@ function KanbanContent() {
   useEffect(() => { load() }, [load])
 
   // Compute visible columns based on role
-  const visibleDemandCols = isConsultor
-    ? []
-    : isCliente
-    ? DEMAND_COLS.filter(c => c.clientVisible)
-    : DEMAND_COLS
+  const visibleDemandCols = isConsultor ? [] : DEMAND_COLS
 
   const showTransition = !isConsultor && !isCliente
   const visibleProjectCols = PROJECT_COLS
@@ -645,7 +652,12 @@ function KanbanContent() {
     if (!destination) return
     if (source.droppableId === destination.droppableId && source.index === destination.index) return
 
-    const toCol = destination.droppableId
+    const toCol   = destination.droppableId
+    const fromCol = source.droppableId
+
+    // Client can only move within/between [C] columns
+    if (isCliente && (!colCanInteract(fromCol) || !colCanInteract(toCol))) return
+
     const [cardType, rawId] = draggableId.split('-')
     const cardId = Number(rawId)
 
@@ -797,8 +809,9 @@ function KanbanContent() {
             <FolderKanban size={11} style={{ color: '#818cf8' }} />
             Projetos em Execução
           </span>
-          {canDrag && <span className="ml-auto opacity-50">Arraste para mover entre colunas</span>}
-          {!canDrag && <span className="ml-auto opacity-50">Visualização somente leitura</span>}
+          {isConsultor && <span className="ml-auto opacity-50">Visualização somente leitura</span>}
+          {isCliente && <span className="ml-auto opacity-50">Pode mover somente nas colunas marcadas [C]</span>}
+          {!isConsultor && !isCliente && <span className="ml-auto opacity-50">Arraste para mover entre colunas</span>}
         </div>
 
         {/* Board */}
@@ -813,8 +826,8 @@ function KanbanContent() {
                   col={col}
                   contractCards={contractsInCol(col.id)}
                   projectCards={[]}
-                  canDrag={canDrag}
-                  canDrop={canDrag}
+                  canDrag={colCanInteract(col.id)}
+                  canDrop={colCanInteract(col.id)}
                   onContractClick={setSelectedContract}
                   onProjectClick={setSelectedProject}
                 />
