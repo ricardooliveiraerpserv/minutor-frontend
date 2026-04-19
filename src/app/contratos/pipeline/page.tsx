@@ -109,9 +109,10 @@ const DEMAND_COLS: Column[] = [
   { id: 'em_revisao',          label: 'Em Revisão',       phase: 'demand', clientCanDrop: true, clientLocked: true },
   { id: 'aprovado',            label: 'Aprovado',         phase: 'demand', clientCanDrop: true, clientLocked: true },
   { id: 'req_inicio_autorizado', label: 'Aguardando Início (Req.)', phase: 'demand' },
+  { id: 'req_autorizado',        label: 'Início Autorizado (Req.)', phase: 'demand' },
 ]
 
-const REQ_ONLY_COLS = new Set(['req_planejamento', 'req_inicio_autorizado', 'req_em_andamento'])
+const REQ_ONLY_COLS = new Set(['req_planejamento', 'req_inicio_autorizado', 'req_autorizado', 'req_em_andamento'])
 
 const TRANSITION_COL: Column = {
   id: 'inicio_autorizado', label: 'Início Autorizado', phase: 'transition',
@@ -685,18 +686,32 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone }: {
   const [projects, setProjects] = useState<{ id: number; name: string; code?: string }[]>([])
   const [projectsLoading, setProjectsLoading] = useState(false)
   const [projectSearch, setProjectSearch] = useState('')
+  const [serviceTypes, setServiceTypes]   = useState<{ id: number; name: string }[]>([])
+  const [contractTypes, setContractTypes] = useState<{ id: number; name: string }[]>([])
 
   // "Novo Projeto" form state
-  const [categoria, setCategoria]               = useState<'projeto' | 'sustentacao'>('projeto')
-  const [horasContratadas, setHorasContratadas] = useState('')
-  const [tipoFaturamento, setTipoFaturamento]   = useState('')
-  const [valorProjeto, setValorProjeto]         = useState('')
+  const [projectName, setProjectName]             = useState('')
+  const [categoria, setCategoria]                 = useState<'projeto' | 'sustentacao'>('projeto')
+  const [serviceTypeId, setServiceTypeId]         = useState<number | ''>('')
+  const [contractTypeId, setContractTypeId]       = useState<number | ''>('')
+  const [horasContratadas, setHorasContratadas]   = useState('')
+  const [tipoFaturamento, setTipoFaturamento]     = useState('')
+  const [valorProjeto, setValorProjeto]           = useState('')
 
   // "Subprojeto" state
   const [selectedProjectId, setSelectedProjectId]       = useState<number | null>(null)
   const [selectedCoordinatorId, setSelectedCoordinatorId] = useState<number | null>(null)
 
   useEffect(() => {
+    if (step === 'novo_projeto' && serviceTypes.length === 0) {
+      Promise.all([
+        api.get<any>('/service-types'),
+        api.get<any>('/contract-types'),
+      ]).then(([st, ct]) => {
+        setServiceTypes(Array.isArray(st) ? st : (st.data ?? []))
+        setContractTypes(Array.isArray(ct) ? ct : (ct.data ?? []))
+      }).catch(() => toast.error('Erro ao carregar opções'))
+    }
     if (step === 'subprojeto' && projects.length === 0) {
       setProjectsLoading(true)
       api.get<{ hasNext: boolean; items: { id: number; name: string; code?: string }[] }>(
@@ -714,12 +729,15 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone }: {
     try {
       const res = await api.post<{ ok: boolean; linked_contract_id: number }>(`/contract-requests/${card.id}/plan-decision`, {
         decision: 'novo_projeto',
+        project_name: projectName || undefined,
         categoria,
+        service_type_id: serviceTypeId || undefined,
+        contract_type_id: contractTypeId || undefined,
         horas_contratadas: Number(horasContratadas),
         tipo_faturamento: tipoFaturamento || undefined,
         valor_projeto: valorProjeto ? Number(valorProjeto) : undefined,
       })
-      toast.success('Novo projeto criado e requisição movida para Início Autorizado')
+      toast.success('Contrato criado — requisição aguardando início')
       onDone({ ...card, kanban_column: 'req_inicio_autorizado', req_decision: 'novo_projeto', linked_contract_id: res.linked_contract_id })
       onClose()
     } catch (e: any) {
@@ -738,8 +756,8 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone }: {
         project_id: selectedProjectId,
         coordinator_id: selectedCoordinatorId ?? undefined,
       })
-      toast.success('Requisição vinculada ao projeto e movida para Início Autorizado')
-      onDone({ ...card, kanban_column: 'req_inicio_autorizado', req_decision: 'subprojeto', linked_coordinator_id: selectedCoordinatorId ?? undefined })
+      toast.success('Requisição vinculada ao projeto — Início Autorizado')
+      onDone({ ...card, kanban_column: 'req_autorizado', req_decision: 'subprojeto', linked_coordinator_id: selectedCoordinatorId ?? undefined })
       onClose()
     } catch (e: any) {
       toast.error(e?.message ?? 'Erro ao processar')
@@ -794,14 +812,51 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone }: {
 
         {/* Step: Novo Projeto */}
         {step === 'novo_projeto' && (
-          <div className="px-6 py-5 space-y-4">
+          <div className="px-6 py-5 space-y-3 overflow-y-auto max-h-[70vh]">
             <div>
-              <label className="block text-xs font-semibold mb-1.5" style={labelStyle}>CATEGORIA</label>
-              <select value={categoria} onChange={e => setCategoria(e.target.value as any)}
-                className="w-full rounded-lg px-3 py-2 text-sm" style={inputStyle}>
-                <option value="projeto">Projeto</option>
-                <option value="sustentacao">Sustentação</option>
-              </select>
+              <label className="block text-xs font-semibold mb-1.5" style={labelStyle}>NOME DO PROJETO</label>
+              <input type="text" value={projectName} onChange={e => setProjectName(e.target.value)}
+                className="w-full rounded-lg px-3 py-2 text-sm" style={inputStyle} placeholder="Ex: Implementação ERP" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={labelStyle}>CATEGORIA *</label>
+                <select value={categoria} onChange={e => setCategoria(e.target.value as any)}
+                  className="w-full rounded-lg px-3 py-2 text-sm" style={inputStyle}>
+                  <option value="projeto">Projeto</option>
+                  <option value="sustentacao">Sustentação</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={labelStyle}>TIPO DE FATURAMENTO</label>
+                <select value={tipoFaturamento} onChange={e => setTipoFaturamento(e.target.value)}
+                  className="w-full rounded-lg px-3 py-2 text-sm" style={inputStyle}>
+                  <option value="">Selecionar...</option>
+                  <option value="on_demand">On Demand</option>
+                  <option value="banco_horas_mensal">Banco de Horas Mensal</option>
+                  <option value="banco_horas_fixo">Banco de Horas Fixo</option>
+                  <option value="por_servico">Por Serviço</option>
+                  <option value="saas">SaaS</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={labelStyle}>TIPO DE CONTRATO</label>
+                <select value={contractTypeId} onChange={e => setContractTypeId(e.target.value ? Number(e.target.value) : '')}
+                  className="w-full rounded-lg px-3 py-2 text-sm" style={inputStyle}>
+                  <option value="">Selecionar...</option>
+                  {contractTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={labelStyle}>TIPO DE SERVIÇO</label>
+                <select value={serviceTypeId} onChange={e => setServiceTypeId(e.target.value ? Number(e.target.value) : '')}
+                  className="w-full rounded-lg px-3 py-2 text-sm" style={inputStyle}>
+                  <option value="">Selecionar...</option>
+                  {serviceTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -815,24 +870,12 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone }: {
                   className="w-full rounded-lg px-3 py-2 text-sm" style={inputStyle} placeholder="R$ 0,00" />
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-semibold mb-1.5" style={labelStyle}>TIPO DE FATURAMENTO</label>
-              <select value={tipoFaturamento} onChange={e => setTipoFaturamento(e.target.value)}
-                className="w-full rounded-lg px-3 py-2 text-sm" style={inputStyle}>
-                <option value="">Selecionar...</option>
-                <option value="on_demand">On Demand</option>
-                <option value="banco_horas_mensal">Banco de Horas Mensal</option>
-                <option value="banco_horas_fixo">Banco de Horas Fixo</option>
-                <option value="por_servico">Por Serviço</option>
-                <option value="saas">SaaS</option>
-              </select>
-            </div>
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => setStep('decision')} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--brand-muted)' }}>Voltar</button>
               <button onClick={submitNovoProjeto} disabled={loading}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
                 style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>
-                {loading ? 'Criando...' : 'Criar Projeto'}
+                {loading ? 'Criando...' : 'Criar Contrato'}
               </button>
             </div>
           </div>
@@ -992,7 +1035,7 @@ function KanbanLogTab({ logs, loading }: { logs: KanbanLogEntry[]; loading: bool
     backlog: 'Backlog', novo_projeto: 'Novo Projeto', em_planejamento: 'Em Planejamento',
     em_validacao: 'Em Validação', em_revisao: 'Em Revisão', aprovado: 'Aprovado',
     inicio_autorizado: 'Início Autorizado', req_planejamento: 'Planejamento',
-    req_inicio_autorizado: 'Início Autorizado', req_em_andamento: 'Em Andamento',
+    req_inicio_autorizado: 'Aguardando Início', req_autorizado: 'Início Autorizado', req_em_andamento: 'Em Andamento',
     awaiting_start: 'Aguardando Início', started: 'Em Andamento', liberado_para_testes: 'Lib. p/ Testes',
     paused: 'Pausado', finished: 'Encerrado', cancelled: 'Cancelado',
   }
@@ -1462,7 +1505,7 @@ function KanbanColumn({
                   >
                     <RequestKanbanCard
                       card={card}
-                      onFinalize={card.kanban_column === 'req_inicio_autorizado' && card.req_decision && onFinalizeRequest
+                      onFinalize={(card.kanban_column === 'req_inicio_autorizado' || card.kanban_column === 'req_autorizado') && card.req_decision && onFinalizeRequest
                         ? (e) => { e.stopPropagation(); onFinalizeRequest(card) }
                         : undefined}
                     />
