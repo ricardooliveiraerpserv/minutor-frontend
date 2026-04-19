@@ -1034,10 +1034,19 @@ function KanbanContent() {
   const isConsultor = userRole === 'consultor'
   const isCliente   = userRole === 'cliente'
 
+  const colIsClientVisible = (colId: string): boolean =>
+    DEMAND_COLS.find(c => c.id === colId)?.clientVisible ?? false
+
   // Returns whether drag/drop is allowed for a given column id
-  const colCanInteract = (colId: string): boolean => {
+  const colCanDrag = (colId: string): boolean => {
     if (isConsultor) return false
-    if (isCliente) return DEMAND_COLS.find(c => c.id === colId)?.clientVisible ?? false
+    if (isCliente) return true   // clients can pick up any demand card
+    return true
+  }
+
+  const colCanDrop = (colId: string): boolean => {
+    if (isConsultor) return false
+    if (isCliente) return colIsClientVisible(colId)  // clients can only drop on [C] columns
     return true
   }
 
@@ -1061,11 +1070,7 @@ function KanbanContent() {
   useEffect(() => { load() }, [load])
 
   // Compute visible columns based on role
-  const visibleDemandCols = isConsultor
-    ? []
-    : isCliente
-    ? DEMAND_COLS.filter(c => c.clientVisible)
-    : DEMAND_COLS
+  const visibleDemandCols = isConsultor ? [] : DEMAND_COLS
 
   const showTransition = !isConsultor && !isCliente
   const visibleProjectCols = PROJECT_COLS
@@ -1089,8 +1094,8 @@ function KanbanContent() {
     const toCol   = destination.droppableId
     const fromCol = source.droppableId
 
-    // Client can only move within/between [C] columns
-    if (isCliente && (!colCanInteract(fromCol) || !colCanInteract(toCol))) return
+    // Client can only DROP on [C] columns
+    if (isCliente && !colIsClientVisible(toCol)) return
 
     const [cardType, rawId] = draggableId.split('-')
     const cardId = Number(rawId)
@@ -1281,8 +1286,8 @@ function KanbanContent() {
                   contractCards={contractsInCol(col.id)}
                   projectCards={[]}
                   requestCards={col.id === 'backlog' ? requestCards : []}
-                  canDrag={colCanInteract(col.id)}
-                  canDrop={colCanInteract(col.id)}
+                  canDrag={colCanDrag(col.id)}
+                  canDrop={colCanDrop(col.id)}
                   onContractClick={setSelectedContract}
                   onProjectClick={setSelectedProject}
                   onRequestClick={setSelectedRequest}
@@ -1297,8 +1302,8 @@ function KanbanContent() {
                     col={TRANSITION_COL}
                     contractCards={contractsInCol('inicio_autorizado')}
                     projectCards={[]}
-                    canDrag={colCanInteract('inicio_autorizado')}
-                    canDrop={colCanInteract('inicio_autorizado')}
+                    canDrag={colCanDrag('inicio_autorizado')}
+                    canDrop={colCanDrop('inicio_autorizado')}
                     onContractClick={card => {
                       if (card.kanban_status === 'inicio_autorizado' && !card.project_id) {
                         setGenerateTarget(card)
