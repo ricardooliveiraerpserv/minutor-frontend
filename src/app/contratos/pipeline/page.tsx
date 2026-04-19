@@ -74,7 +74,7 @@ interface RequestCard {
   cenario_desejado?: string
   status: string
   kanban_column: string
-  req_decision?: 'novo_contrato' | 'contrato_existente'
+  req_decision?: 'novo_projeto' | 'subprojeto'
   linked_contract_id?: number
   linked_coordinator_id?: number
   created_at: string
@@ -680,52 +680,44 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone }: {
   onClose: () => void
   onDone: (updatedCard: RequestCard) => void
 }) {
-  const [step, setStep] = useState<'decision' | 'novo_contrato' | 'contrato_existente'>('decision')
+  const [step, setStep] = useState<'decision' | 'novo_projeto' | 'subprojeto'>('decision')
   const [loading, setLoading] = useState(false)
-  const [contracts, setContracts] = useState<{ id: number; customer_name: string; project_name?: string; code?: string }[]>([])
-  const [contractsLoading, setContractsLoading] = useState(false)
+  const [projects, setProjects] = useState<{ id: number; name: string; code?: string }[]>([])
+  const [projectsLoading, setProjectsLoading] = useState(false)
 
-  // "Novo Contrato" form state
+  // "Novo Projeto" form state
   const [categoria, setCategoria]               = useState<'projeto' | 'sustentacao'>('projeto')
   const [horasContratadas, setHorasContratadas] = useState('')
   const [tipoFaturamento, setTipoFaturamento]   = useState('')
   const [valorProjeto, setValorProjeto]         = useState('')
 
-  // "Contrato Existente" state
-  const [selectedContractId, setSelectedContractId]     = useState<number | null>(null)
+  // "Subprojeto" state
+  const [selectedProjectId, setSelectedProjectId]       = useState<number | null>(null)
   const [selectedCoordinatorId, setSelectedCoordinatorId] = useState<number | null>(null)
 
   useEffect(() => {
-    if (step === 'contrato_existente' && contracts.length === 0) {
-      setContractsLoading(true)
-      api.get<{ data: { id: number; customer?: { name: string }; project_name?: string; code?: string }[] }>('/contracts')
-        .then(r => {
-          const list = (Array.isArray(r) ? r : (r as any).data ?? [])
-          setContracts(list.map((c: any) => ({
-            id: c.id,
-            customer_name: c.customer?.name ?? c.customer_name ?? '—',
-            project_name: c.project_name,
-            code: c.code,
-          })))
-        })
-        .catch(() => toast.error('Erro ao carregar contratos'))
-        .finally(() => setContractsLoading(false))
+    if (step === 'subprojeto' && projects.length === 0) {
+      setProjectsLoading(true)
+      api.get<{ hasNext: boolean; items: { id: number; name: string; code?: string }[] }>('/projects?minimal=true&per_page=200')
+        .then(r => setProjects((r as any).items ?? []))
+        .catch(() => toast.error('Erro ao carregar projetos'))
+        .finally(() => setProjectsLoading(false))
     }
   }, [step])
 
-  const submitNovoContrato = async () => {
+  const submitNovoProjeto = async () => {
     if (!horasContratadas) { toast.error('Informe as horas contratadas'); return }
     setLoading(true)
     try {
       const res = await api.post<{ ok: boolean; linked_contract_id: number }>(`/contract-requests/${card.id}/plan-decision`, {
-        decision: 'novo_contrato',
+        decision: 'novo_projeto',
         categoria,
         horas_contratadas: Number(horasContratadas),
         tipo_faturamento: tipoFaturamento || undefined,
         valor_projeto: valorProjeto ? Number(valorProjeto) : undefined,
       })
-      toast.success('Novo contrato criado e requisição movida para Início Autorizado')
-      onDone({ ...card, kanban_column: 'req_inicio_autorizado', req_decision: 'novo_contrato', linked_contract_id: res.linked_contract_id })
+      toast.success('Novo projeto criado e requisição movida para Início Autorizado')
+      onDone({ ...card, kanban_column: 'req_inicio_autorizado', req_decision: 'novo_projeto', linked_contract_id: res.linked_contract_id })
       onClose()
     } catch (e: any) {
       toast.error(e?.message ?? 'Erro ao processar')
@@ -734,17 +726,17 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone }: {
     }
   }
 
-  const submitContratoExistente = async () => {
-    if (!selectedContractId) { toast.error('Selecione um contrato'); return }
+  const submitSubprojeto = async () => {
+    if (!selectedProjectId) { toast.error('Selecione um projeto'); return }
     setLoading(true)
     try {
-      const res = await api.post<{ ok: boolean; linked_contract_id: number }>(`/contract-requests/${card.id}/plan-decision`, {
-        decision: 'contrato_existente',
-        contract_id: selectedContractId,
+      await api.post(`/contract-requests/${card.id}/plan-decision`, {
+        decision: 'subprojeto',
+        project_id: selectedProjectId,
         coordinator_id: selectedCoordinatorId ?? undefined,
       })
-      toast.success('Requisição vinculada e movida para Início Autorizado')
-      onDone({ ...card, kanban_column: 'req_inicio_autorizado', req_decision: 'contrato_existente', linked_contract_id: res.linked_contract_id, linked_coordinator_id: selectedCoordinatorId ?? undefined })
+      toast.success('Requisição vinculada ao projeto e movida para Início Autorizado')
+      onDone({ ...card, kanban_column: 'req_inicio_autorizado', req_decision: 'subprojeto', linked_coordinator_id: selectedCoordinatorId ?? undefined })
       onClose()
     } catch (e: any) {
       toast.error(e?.message ?? 'Erro ao processar')
@@ -768,7 +760,7 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone }: {
             </div>
             <div>
               <p className="text-sm font-bold" style={{ color: 'var(--brand-text)' }}>
-                {step === 'decision' ? 'Planejamento' : step === 'novo_contrato' ? 'Novo Contrato' : 'Contrato Existente'}
+                {step === 'decision' ? 'Planejamento' : step === 'novo_projeto' ? 'Novo Projeto' : 'Subprojeto'}
               </p>
               <p className="text-xs" style={{ color: 'var(--brand-subtle)' }}>{card.customer_name}</p>
             </div>
@@ -781,24 +773,24 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone }: {
           <div className="px-6 py-6 space-y-3">
             <p className="text-sm mb-4" style={{ color: 'var(--brand-muted)' }}>Como esta requisição será atendida?</p>
             <button
-              onClick={() => setStep('novo_contrato')}
+              onClick={() => setStep('novo_projeto')}
               className="w-full text-left px-4 py-4 rounded-xl border transition-all hover:border-violet-500/50"
               style={{ background: 'rgba(139,92,246,0.05)', borderColor: 'var(--brand-border)' }}>
-              <p className="font-semibold text-sm" style={{ color: 'var(--brand-text)' }}>Novo Contrato</p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--brand-subtle)' }}>Criar um novo contrato para este cliente</p>
+              <p className="font-semibold text-sm" style={{ color: 'var(--brand-text)' }}>Novo Projeto</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--brand-subtle)' }}>Criar um novo projeto para este cliente</p>
             </button>
             <button
-              onClick={() => setStep('contrato_existente')}
+              onClick={() => setStep('subprojeto')}
               className="w-full text-left px-4 py-4 rounded-xl border transition-all hover:border-violet-500/50"
               style={{ background: 'rgba(139,92,246,0.05)', borderColor: 'var(--brand-border)' }}>
-              <p className="font-semibold text-sm" style={{ color: 'var(--brand-text)' }}>Contrato Existente</p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--brand-subtle)' }}>Vincular a um contrato já existente</p>
+              <p className="font-semibold text-sm" style={{ color: 'var(--brand-text)' }}>Subprojeto</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--brand-subtle)' }}>Vincular a um projeto já existente</p>
             </button>
           </div>
         )}
 
-        {/* Step: Novo Contrato */}
-        {step === 'novo_contrato' && (
+        {/* Step: Novo Projeto */}
+        {step === 'novo_projeto' && (
           <div className="px-6 py-5 space-y-4">
             <div>
               <label className="block text-xs font-semibold mb-1.5" style={labelStyle}>CATEGORIA</label>
@@ -834,27 +826,27 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone }: {
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => setStep('decision')} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--brand-muted)' }}>Voltar</button>
-              <button onClick={submitNovoContrato} disabled={loading}
+              <button onClick={submitNovoProjeto} disabled={loading}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
                 style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>
-                {loading ? 'Criando...' : 'Criar Contrato'}
+                {loading ? 'Criando...' : 'Criar Projeto'}
               </button>
             </div>
           </div>
         )}
 
-        {/* Step: Contrato Existente */}
-        {step === 'contrato_existente' && (
+        {/* Step: Subprojeto */}
+        {step === 'subprojeto' && (
           <div className="px-6 py-5 space-y-4">
             <div>
-              <label className="block text-xs font-semibold mb-1.5" style={labelStyle}>CONTRATO *</label>
-              {contractsLoading
+              <label className="block text-xs font-semibold mb-1.5" style={labelStyle}>PROJETO *</label>
+              {projectsLoading
                 ? <p className="text-xs py-2" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p>
-                : <select value={selectedContractId ?? ''} onChange={e => setSelectedContractId(e.target.value ? Number(e.target.value) : null)}
+                : <select value={selectedProjectId ?? ''} onChange={e => setSelectedProjectId(e.target.value ? Number(e.target.value) : null)}
                     className="w-full rounded-lg px-3 py-2 text-sm" style={inputStyle}>
-                    <option value="">Selecionar contrato...</option>
-                    {contracts.map(c => (
-                      <option key={c.id} value={c.id}>{c.customer_name}{c.project_name ? ` — ${c.project_name}` : ''}</option>
+                    <option value="">Selecionar projeto...</option>
+                    {projects.map(p => (
+                      <option key={p.id} value={p.id}>{p.code ? `[${p.code}] ` : ''}{p.name}</option>
                     ))}
                   </select>
               }
@@ -871,7 +863,7 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone }: {
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => setStep('decision')} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--brand-muted)' }}>Voltar</button>
-              <button onClick={submitContratoExistente} disabled={loading || !selectedContractId}
+              <button onClick={submitSubprojeto} disabled={loading || !selectedProjectId}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
                 style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>
                 {loading ? 'Vinculando...' : 'Vincular e Avançar'}
