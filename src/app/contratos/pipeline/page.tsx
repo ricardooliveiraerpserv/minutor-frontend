@@ -1,13 +1,13 @@
 'use client'
 
 import { AppLayout } from '@/components/layout/app-layout'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
-import { List, Plus, ExternalLink, AlertCircle, Clock, ChevronRight, Rocket, Layers, FolderKanban, MessageSquare } from 'lucide-react'
+import { List, Plus, ExternalLink, AlertCircle, Clock, ChevronRight, Rocket, Layers, FolderKanban, MessageSquare, Send } from 'lucide-react'
 import { ProjectMessages } from '@/components/shared/ProjectMessages'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -599,6 +599,166 @@ function ProjectDetailModal({ card, onClose, userRole }: { card: ProjectCard; on
   )
 }
 
+// ─── Request Detail Modal ─────────────────────────────────────────────────────
+
+interface ReqMsg { id: number; message: string; author?: { id: number; name: string }; created_at: string }
+
+function RequestDetailModal({ card, onClose }: { card: RequestCard; onClose: () => void }) {
+  const [tab, setTab]         = useState<'details' | 'comments'>('details')
+  const [msgs, setMsgs]       = useState<ReqMsg[]>([])
+  const [msgsLoaded, setMsgsLoaded] = useState(false)
+  const [input, setInput]     = useState('')
+  const [sending, setSending] = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (tab === 'comments' && !msgsLoaded) {
+      api.get<ReqMsg[]>(`/contract-requests/${card.id}/messages`)
+        .then(r => { setMsgs(Array.isArray(r) ? r : []); setMsgsLoaded(true) })
+        .catch(() => toast.error('Erro ao carregar comentários'))
+    }
+  }, [tab, card.id, msgsLoaded])
+
+  useEffect(() => {
+    if (tab === 'comments') bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [msgs, tab])
+
+  const handleSend = async () => {
+    const text = input.trim()
+    if (!text || sending) return
+    setSending(true)
+    try {
+      const msg = await api.post<ReqMsg>(`/contract-requests/${card.id}/messages`, { message: text })
+      setMsgs(prev => [...prev, msg])
+      setInput('')
+    } catch { toast.error('Erro ao enviar comentário') }
+    finally { setSending(false) }
+  }
+
+  const tipoLabel = card.tipo_necessidade === 'outro' && card.tipo_necessidade_outro
+    ? card.tipo_necessidade_outro
+    : (TIPO_NECESSIDADE_LABEL[card.tipo_necessidade] ?? card.tipo_necessidade)
+  const urgColor = URGENCIA_COLOR[card.nivel_urgencia] ?? '#64748b'
+  const statusMap: Record<string, string> = { pendente: 'Pendente', em_analise: 'Em Análise', aprovado: 'Aprovado', recusado: 'Recusado' }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
+      <div className="w-full max-w-xl rounded-2xl overflow-hidden flex flex-col" style={{ background: 'var(--brand-surface)', border: '1px solid rgba(139,92,246,0.35)', maxHeight: '85vh' }}>
+        {/* Header */}
+        <div className="px-6 py-4 border-b shrink-0" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-base font-bold" style={{ color: 'var(--brand-text)' }}>{card.customer_name}</p>
+              <p className="text-sm" style={{ color: '#a78bfa' }}>{card.area_requisitante}</p>
+            </div>
+            <span className="text-xs px-2 py-1 rounded-full font-semibold shrink-0" style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
+              Requisição
+            </span>
+          </div>
+          {/* Tabs */}
+          <div className="flex gap-1 mt-3">
+            <button onClick={() => setTab('details')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              style={tab === 'details'
+                ? { background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }
+                : { color: 'var(--brand-subtle)', border: '1px solid transparent' }}>
+              <ExternalLink size={11} /> Detalhes
+            </button>
+            <button onClick={() => setTab('comments')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              style={tab === 'comments'
+                ? { background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }
+                : { color: 'var(--brand-subtle)', border: '1px solid transparent' }}>
+              <MessageSquare size={11} /> Comentários {msgs.length > 0 && `(${msgs.length})`}
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        {tab === 'details' ? (
+          <>
+            <div className="px-6 py-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                {([
+                  ['Tipo de Necessidade', tipoLabel],
+                  ['Urgência', URGENCIA_LABEL[card.nivel_urgencia] ?? card.nivel_urgencia],
+                  ['Status', statusMap[card.status] ?? card.status],
+                  ['Data', new Date(card.created_at).toLocaleDateString('pt-BR')],
+                ] as [string, string][]).map(([label, value]) => (
+                  <div key={label}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{label}</p>
+                    <p className="text-sm" style={{ color: label === 'Urgência' ? urgColor : 'var(--brand-text)' }}>{value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t shrink-0" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
+              <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--brand-muted)' }}>Fechar</button>
+              <button onClick={() => { onClose(); window.location.href = '/portal-cliente/requisicoes' }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+                style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>
+                Ver todas as requisições
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col flex-1 min-h-0">
+            {/* Feed */}
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+              {!msgsLoaded && (
+                <p className="text-center text-xs py-8" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p>
+              )}
+              {msgsLoaded && msgs.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-10 gap-1">
+                  <MessageSquare size={24} style={{ color: 'var(--brand-subtle)', opacity: 0.4 }} />
+                  <p className="text-xs" style={{ color: 'var(--brand-subtle)' }}>Nenhum comentário ainda</p>
+                </div>
+              )}
+              {msgs.map(msg => (
+                <div key={msg.id} className="flex gap-2.5 items-start">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+                    style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>
+                    {(msg.author?.name ?? '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2 mb-0.5">
+                      <span className="text-xs font-semibold" style={{ color: '#FAFAFA' }}>{msg.author?.name ?? 'Usuário'}</span>
+                      <span className="text-[10px]" style={{ color: 'var(--brand-muted)' }}>
+                        {new Date(msg.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="text-sm leading-relaxed break-words" style={{ color: '#D4D4D8' }}>{msg.message}</p>
+                  </div>
+                </div>
+              ))}
+              <div ref={bottomRef} />
+            </div>
+            {/* Input */}
+            <div className="px-4 pb-4 pt-2 border-t shrink-0" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
+              <div className="flex gap-2 items-end">
+                <textarea
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+                  placeholder="Escreva um comentário..."
+                  rows={2}
+                  className="flex-1 resize-none rounded-lg px-3 py-2 text-sm outline-none"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.25)', color: '#FAFAFA' }}
+                />
+                <button onClick={handleSend} disabled={!input.trim() || sending}
+                  className="flex items-center justify-center w-9 h-9 rounded-lg transition-all shrink-0 disabled:opacity-40"
+                  style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>
+                  <Send size={15} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Column Component ─────────────────────────────────────────────────────────
 
 function KanbanColumn({
@@ -1048,44 +1208,7 @@ function KanbanContent() {
         <ProjectDetailModal card={selectedProject} onClose={() => setSelectedProject(null)} userRole={userRole} />
       )}
       {selectedRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
-          <div className="w-full max-w-lg rounded-2xl overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid rgba(139,92,246,0.35)' }}>
-            <div className="px-6 py-5 border-b flex items-start justify-between gap-3" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
-              <div>
-                <p className="text-base font-bold" style={{ color: 'var(--brand-text)' }}>{selectedRequest.customer_name}</p>
-                <p className="text-sm" style={{ color: '#a78bfa' }}>{selectedRequest.area_requisitante}</p>
-              </div>
-              <span className="text-xs px-2 py-1 rounded-full font-semibold shrink-0" style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
-                Requisição Pendente
-              </span>
-            </div>
-            <div className="px-6 py-4 space-y-3">
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                {([
-                  ['Tipo de Necessidade', selectedRequest.tipo_necessidade === 'outro' && selectedRequest.tipo_necessidade_outro
-                    ? selectedRequest.tipo_necessidade_outro
-                    : (TIPO_NECESSIDADE_LABEL[selectedRequest.tipo_necessidade] ?? selectedRequest.tipo_necessidade)],
-                  ['Urgência', URGENCIA_LABEL[selectedRequest.nivel_urgencia] ?? selectedRequest.nivel_urgencia],
-                  ['Status', selectedRequest.status === 'pendente' ? 'Pendente' : selectedRequest.status === 'em_analise' ? 'Em Análise' : selectedRequest.status],
-                  ['Data', new Date(selectedRequest.created_at).toLocaleDateString('pt-BR')],
-                ] as [string, string][]).map(([label, value]) => (
-                  <div key={label}>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{label}</p>
-                    <p className="text-sm" style={{ color: 'var(--brand-text)' }}>{value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 px-6 py-4 border-t" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
-              <button onClick={() => setSelectedRequest(null)} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--brand-muted)' }}>Fechar</button>
-              <button onClick={() => { setSelectedRequest(null); window.location.href = '/portal-cliente/requisicoes' }}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
-                style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>
-                Ver todas as requisições
-              </button>
-            </div>
-          </div>
-        </div>
+        <RequestDetailModal card={selectedRequest} onClose={() => setSelectedRequest(null)} />
       )}
       {generateTarget && (
         <GenerateProjectModal
