@@ -799,6 +799,14 @@ function RequestDetailModal({ card, onClose }: { card: RequestCard; onClose: () 
           </>
         ) : (
           <div className="flex flex-col flex-1 min-h-0">
+            {/* Back button */}
+            <div className="px-4 pt-3 shrink-0">
+              <button onClick={() => setTab('details')}
+                className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-colors hover:bg-white/10"
+                style={{ color: 'var(--brand-subtle)' }}>
+                <ChevronRight size={12} className="rotate-180" /> Voltar aos detalhes
+              </button>
+            </div>
             {/* Feed */}
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
               {!msgsLoaded && (
