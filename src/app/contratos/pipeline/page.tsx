@@ -7,7 +7,7 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
-import { List, Plus, ExternalLink, AlertCircle, Clock, ChevronRight, Rocket, Layers, FolderKanban, MessageSquare, Send } from 'lucide-react'
+import { List, Plus, ExternalLink, AlertCircle, Clock, ChevronRight, Rocket, Layers, FolderKanban, MessageSquare, Send, Paperclip, X, Download } from 'lucide-react'
 import { ProjectMessages } from '@/components/shared/ProjectMessages'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -601,21 +601,33 @@ function ProjectDetailModal({ card, onClose, userRole }: { card: ProjectCard; on
 
 // ─── Request Detail Modal ─────────────────────────────────────────────────────
 
-interface ReqMsg { id: number; message: string; author?: { id: number; name: string }; created_at: string }
+interface ReqAttachment { id: number; original_name: string; file_path: string; file_size: number; mime_type?: string }
+interface ReqMsg { id: number; message: string; author?: { id: number; name: string }; created_at: string; attachments?: ReqAttachment[] }
+interface MentionUser { id: number; name: string }
 
 function RequestDetailModal({ card, onClose }: { card: RequestCard; onClose: () => void }) {
-  const [tab, setTab]         = useState<'details' | 'comments'>('details')
-  const [msgs, setMsgs]       = useState<ReqMsg[]>([])
+  const [tab, setTab]               = useState<'details' | 'comments'>('details')
+  const [msgs, setMsgs]             = useState<ReqMsg[]>([])
   const [msgsLoaded, setMsgsLoaded] = useState(false)
-  const [input, setInput]     = useState('')
-  const [sending, setSending] = useState(false)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const [input, setInput]           = useState('')
+  const [sending, setSending]       = useState(false)
+  const [files, setFiles]           = useState<File[]>([])
+  const [mentionUsers, setMentionUsers] = useState<MentionUser[]>([])
+  const [mentionQuery, setMentionQuery] = useState('')
+  const [showMentions, setShowMentions] = useState(false)
+  const [mentionStart, setMentionStart] = useState(-1)
+  const bottomRef   = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (tab === 'comments' && !msgsLoaded) {
       api.get<ReqMsg[]>(`/contract-requests/${card.id}/messages`)
         .then(r => { setMsgs(Array.isArray(r) ? r : []); setMsgsLoaded(true) })
         .catch(() => toast.error('Erro ao carregar comentários'))
+      api.get<MentionUser[]>(`/contract-requests/${card.id}/mentionable-users`)
+        .then(r => setMentionUsers(Array.isArray(r) ? r : []))
+        .catch(() => {})
     }
   }, [tab, card.id, msgsLoaded])
 
@@ -623,16 +635,71 @@ function RequestDetailModal({ card, onClose }: { card: RequestCard; onClose: () 
     if (tab === 'comments') bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [msgs, tab])
 
+  const handleInputChange = (val: string) => {
+    setInput(val)
+    const cursor = textareaRef.current?.selectionStart ?? val.length
+    const before = val.slice(0, cursor)
+    const match  = before.match(/@(\w*)$/)
+    if (match) {
+      setMentionStart(cursor - match[0].length)
+      setMentionQuery(match[1].toLowerCase())
+      setShowMentions(true)
+    } else {
+      setShowMentions(false)
+    }
+  }
+
+  const insertMention = (user: MentionUser) => {
+    const before = input.slice(0, mentionStart)
+    const after  = input.slice(textareaRef.current?.selectionStart ?? input.length)
+    const next   = `${before}@${user.name} ${after}`
+    setInput(next)
+    setShowMentions(false)
+    setTimeout(() => textareaRef.current?.focus(), 0)
+  }
+
+  const filteredMentions = mentionUsers.filter(u =>
+    u.name.toLowerCase().includes(mentionQuery)
+  )
+
   const handleSend = async () => {
     const text = input.trim()
-    if (!text || sending) return
+    if ((!text && files.length === 0) || sending) return
     setSending(true)
     try {
-      const msg = await api.post<ReqMsg>(`/contract-requests/${card.id}/messages`, { message: text })
+      const token = localStorage.getItem('minutor_token') ?? ''
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'https://minutor-backend.onrender.com/api/v1'
+      const fd = new FormData()
+      fd.append('message', text)
+      files.forEach(f => fd.append('files[]', f))
+      const res = await fetch(`${baseUrl}/contract-requests/${card.id}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      })
+      if (!res.ok) throw new Error()
+      const msg: ReqMsg = await res.json()
       setMsgs(prev => [...prev, msg])
       setInput('')
+      setFiles([])
     } catch { toast.error('Erro ao enviar comentário') }
     finally { setSending(false) }
+  }
+
+  const downloadAttachment = async (msgId: number, att: ReqAttachment) => {
+    try {
+      const token = localStorage.getItem('minutor_token') ?? ''
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'https://minutor-backend.onrender.com/api/v1'
+      const res = await fetch(`${baseUrl}/req-messages/${msgId}/attachments/${att.id}/download`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error()
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href = url; a.download = att.original_name; a.click()
+      URL.revokeObjectURL(url)
+    } catch { toast.error('Erro ao baixar arquivo') }
   }
 
   const tipoLabel = card.tipo_necessidade === 'outro' && card.tipo_necessidade_outro
@@ -728,6 +795,21 @@ function RequestDetailModal({ card, onClose }: { card: RequestCard; onClose: () 
                       </span>
                     </div>
                     <p className="text-sm leading-relaxed break-words" style={{ color: '#D4D4D8' }}>{msg.message}</p>
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        {msg.attachments.map(att => (
+                          <button
+                            key={att.id}
+                            onClick={() => downloadAttachment(msg.id, att)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] transition-opacity hover:opacity-80"
+                            style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}
+                          >
+                            <Download size={10} />
+                            <span className="max-w-[140px] truncate">{att.original_name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -735,22 +817,72 @@ function RequestDetailModal({ card, onClose }: { card: RequestCard; onClose: () 
             </div>
             {/* Input */}
             <div className="px-4 pb-4 pt-2 border-t shrink-0" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
-              <div className="flex gap-2 items-end">
-                <textarea
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-                  placeholder="Escreva um comentário..."
-                  rows={2}
-                  className="flex-1 resize-none rounded-lg px-3 py-2 text-sm outline-none"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.25)', color: '#FAFAFA' }}
-                />
-                <button onClick={handleSend} disabled={!input.trim() || sending}
-                  className="flex items-center justify-center w-9 h-9 rounded-lg transition-all shrink-0 disabled:opacity-40"
-                  style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>
-                  <Send size={15} />
-                </button>
+              {/* File chips */}
+              {files.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {files.map((f, i) => (
+                    <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px]"
+                      style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}>
+                      {f.name}
+                      <button onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}><X size={10} /></button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {/* Mention dropdown */}
+              <div className="relative">
+                {showMentions && filteredMentions.length > 0 && (
+                  <div className="absolute bottom-full left-0 mb-1 w-56 rounded-lg overflow-hidden shadow-lg z-10"
+                    style={{ background: 'var(--brand-bg)', border: '1px solid rgba(139,92,246,0.3)' }}>
+                    {filteredMentions.map(u => (
+                      <button key={u.id} onClick={() => insertMention(u)}
+                        className="w-full text-left px-3 py-2 text-sm hover:opacity-80 transition-opacity"
+                        style={{ color: '#FAFAFA' }}>
+                        <span className="text-[#a78bfa] font-semibold">@</span>{u.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2 items-end">
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={e => handleInputChange(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Escape') { setShowMentions(false); return }
+                      if (e.key === 'Enter' && !e.shiftKey && !showMentions) { e.preventDefault(); handleSend() }
+                    }}
+                    placeholder="Escreva um comentário... Use @ para mencionar"
+                    rows={2}
+                    className="flex-1 resize-none rounded-lg px-3 py-2 text-sm outline-none"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.25)', color: '#FAFAFA' }}
+                  />
+                  <div className="flex flex-col gap-1 shrink-0">
+                    <button onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center justify-center w-9 h-9 rounded-lg transition-all"
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.2)', color: 'var(--brand-subtle)' }}
+                      title="Anexar arquivo">
+                      <Paperclip size={14} />
+                    </button>
+                    <button onClick={handleSend} disabled={(!input.trim() && files.length === 0) || sending}
+                      className="flex items-center justify-center w-9 h-9 rounded-lg transition-all disabled:opacity-40"
+                      style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>
+                      <Send size={15} />
+                    </button>
+                  </div>
+                </div>
               </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={e => {
+                  const picked = Array.from(e.target.files ?? [])
+                  setFiles(prev => [...prev, ...picked].slice(0, 10))
+                  e.target.value = ''
+                }}
+              />
             </div>
           </div>
         )}
