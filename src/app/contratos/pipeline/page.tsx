@@ -106,9 +106,9 @@ const DEMAND_COLS: Column[] = [
   { id: 'em_validacao',        label: 'Em Validação',     phase: 'demand', clientVisible: true },
   { id: 'em_revisao',          label: 'Em Revisão',       phase: 'demand' },
   { id: 'aprovado',            label: 'Aprovado',         phase: 'demand', clientVisible: true },
-  { id: 'req_planejamento',    label: 'Planejamento',     phase: 'demand' },
-  { id: 'req_inicio_autorizado', label: 'Início Autorizado', phase: 'demand' },
-  { id: 'req_em_andamento',    label: 'Em Andamento',     phase: 'demand' },
+  { id: 'req_planejamento',      label: 'Planejamento (Req.)',      phase: 'demand' },
+  { id: 'req_inicio_autorizado', label: 'Aguardando Início (Req.)', phase: 'demand' },
+  { id: 'req_em_andamento',      label: 'Em Execução (Req.)',       phase: 'demand' },
 ]
 
 const REQ_ONLY_COLS = new Set(['req_planejamento', 'req_inicio_autorizado', 'req_em_andamento'])
