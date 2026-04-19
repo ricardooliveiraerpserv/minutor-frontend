@@ -684,6 +684,7 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone }: {
   const [loading, setLoading] = useState(false)
   const [projects, setProjects] = useState<{ id: number; name: string; code?: string }[]>([])
   const [projectsLoading, setProjectsLoading] = useState(false)
+  const [projectSearch, setProjectSearch] = useState('')
 
   // "Novo Projeto" form state
   const [categoria, setCategoria]               = useState<'projeto' | 'sustentacao'>('projeto')
@@ -698,7 +699,9 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone }: {
   useEffect(() => {
     if (step === 'subprojeto' && projects.length === 0) {
       setProjectsLoading(true)
-      api.get<{ hasNext: boolean; items: { id: number; name: string; code?: string }[] }>('/projects?minimal=true&per_page=200')
+      api.get<{ hasNext: boolean; items: { id: number; name: string; code?: string }[] }>(
+        `/projects?minimal=true&per_page=200&customer_id=${card.customer_id}`
+      )
         .then(r => setProjects((r as any).items ?? []))
         .catch(() => toast.error('Erro ao carregar projetos'))
         .finally(() => setProjectsLoading(false))
@@ -842,13 +845,44 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone }: {
               <label className="block text-xs font-semibold mb-1.5" style={labelStyle}>PROJETO *</label>
               {projectsLoading
                 ? <p className="text-xs py-2" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p>
-                : <select value={selectedProjectId ?? ''} onChange={e => setSelectedProjectId(e.target.value ? Number(e.target.value) : null)}
-                    className="w-full rounded-lg px-3 py-2 text-sm" style={inputStyle}>
-                    <option value="">Selecionar projeto...</option>
-                    {projects.map(p => (
-                      <option key={p.id} value={p.id}>{p.code ? `[${p.code}] ` : ''}{p.name}</option>
-                    ))}
-                  </select>
+                : <>
+                    <input
+                      type="text"
+                      value={projectSearch}
+                      onChange={e => setProjectSearch(e.target.value)}
+                      placeholder="Buscar projeto..."
+                      className="w-full rounded-lg px-3 py-2 text-sm mb-2"
+                      style={inputStyle}
+                    />
+                    <div className="rounded-lg overflow-y-auto max-h-48" style={{ border: '1px solid var(--brand-border)' }}>
+                      {projects
+                        .filter(p => {
+                          const q = projectSearch.toLowerCase()
+                          return !q || p.name.toLowerCase().includes(q) || (p.code ?? '').toLowerCase().includes(q)
+                        })
+                        .map(p => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setSelectedProjectId(p.id)}
+                            className="w-full text-left px-3 py-2 text-sm transition-colors"
+                            style={{
+                              background: selectedProjectId === p.id ? 'rgba(139,92,246,0.2)' : 'transparent',
+                              color: selectedProjectId === p.id ? '#a78bfa' : 'var(--brand-text)',
+                              borderBottom: '1px solid var(--brand-border)',
+                            }}>
+                            {p.code ? <span className="font-mono text-xs mr-1.5" style={{ color: 'var(--brand-subtle)' }}>[{p.code}]</span> : null}
+                            {p.name}
+                          </button>
+                        ))}
+                      {projects.filter(p => {
+                        const q = projectSearch.toLowerCase()
+                        return !q || p.name.toLowerCase().includes(q) || (p.code ?? '').toLowerCase().includes(q)
+                      }).length === 0 && (
+                        <p className="px-3 py-3 text-xs text-center" style={{ color: 'var(--brand-subtle)' }}>Nenhum projeto encontrado</p>
+                      )}
+                    </div>
+                  </>
               }
             </div>
             <div>
