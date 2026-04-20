@@ -156,9 +156,11 @@ const COL_TO_PROJECT_STATUS: Record<string, string> = {
   col_encerrado: 'finished',
 }
 
+const PRONTO_COLOR = '#eab308'
+
 const FIXED_COLUMNS: Column[] = [
-  { id: 'novo',  label: 'Novo Contrato',       type: 'fixed', emoji: '🆕' },
-  { id: 'pronto', label: 'Pronto para Iniciar', type: 'fixed', emoji: '✅' },
+  { id: 'novo',   label: 'Novo Contrato',       type: 'fixed', emoji: '🆕' },
+  { id: 'pronto', label: 'Pronto para Iniciar', type: 'fixed', emoji: '🚀', color: PRONTO_COLOR },
 ]
 
 const SUST_COLOR   = '#f97316'
@@ -665,7 +667,7 @@ function ProjectInlineEditModal({ project, onClose, onSaved }: { project: Projec
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-      <div className="flex flex-col rounded-2xl w-full max-w-2xl max-h-[90vh]" style={{ background: 'var(--brand-surface)', border: '1px solid rgba(0,245,255,0.25)' }}>
+      <div className="flex flex-col rounded-2xl w-full max-w-4xl max-h-[90vh]" style={{ background: 'var(--brand-surface)', border: '1px solid rgba(0,245,255,0.25)' }}>
         <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: 'var(--brand-border)' }}>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>{project.code}</p>
@@ -674,39 +676,68 @@ function ProjectInlineEditModal({ project, onClose, onSaved }: { project: Projec
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"><X size={16} style={{ color: 'var(--brand-muted)' }} /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          <div className="space-y-3">
-            <div>
-              <label style={labelStyle}>Nome do Projeto *</label>
-              <input value={form.name} onChange={setF('name')} style={inputStyle} placeholder="Nome do projeto" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+          {/* Identificação */}
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Identificação</p>
+            <div className="space-y-3">
               <div>
-                <label style={labelStyle}>Status</label>
-                <select value={form.status} onChange={setF('status')} style={inputStyle}>
-                  {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                <label style={labelStyle}>Nome do Projeto *</label>
+                <input value={form.name} onChange={setF('name')} style={inputStyle} placeholder="Nome do projeto" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label style={labelStyle}>Status</label>
+                  <select value={form.status} onChange={setF('status')} style={inputStyle}>
+                    {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Data de Início</label>
+                  <input type="date" value={form.start_date} onChange={setF('start_date')} style={inputStyle} />
+                </div>
               </div>
               <div>
-                <label style={labelStyle}>Data de Início</label>
-                <input type="date" value={form.start_date} onChange={setF('start_date')} style={inputStyle} />
+                <label style={labelStyle}>Data de Conclusão</label>
+                <input type="date" value={form.expected_end_date} onChange={setF('expected_end_date')} style={inputStyle} />
               </div>
-            </div>
-            <div>
-              <label style={labelStyle}>Data de Conclusão</label>
-              <input type="date" value={form.expected_end_date} onChange={setF('expected_end_date')} style={inputStyle} />
-            </div>
-            <div>
-              <label style={labelStyle}>Descrição</label>
-              <textarea value={form.description} onChange={setF('description')} style={{ ...inputStyle, resize: 'vertical', minHeight: '80px' }} placeholder="Descrição do projeto" />
+              <div>
+                <label style={labelStyle}>Descrição</label>
+                <textarea value={form.description} onChange={setF('description')} style={{ ...inputStyle, resize: 'vertical', minHeight: '80px' }} placeholder="Descrição do projeto" />
+              </div>
             </div>
           </div>
+
+          {/* Financeiro */}
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Financeiro</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div><label style={labelStyle}>Valor do Projeto (R$)</label><input type="number" value={form.project_value} onChange={setF('project_value')} style={inputStyle} placeholder="0.00" step="0.01" /></div>
               <div><label style={labelStyle}>Valor da Hora (R$)</label><input type="number" value={form.hourly_rate} onChange={setF('hourly_rate')} style={inputStyle} placeholder="0.00" step="0.01" /></div>
               <div><label style={labelStyle}>Hora Adicional (R$)</label><input type="number" value={form.additional_hourly_rate} onChange={setF('additional_hourly_rate')} style={inputStyle} placeholder="0.00" step="0.01" /></div>
-              <div><label style={labelStyle}>Horas Contratadas</label><input type="number" value={form.sold_hours} onChange={setF('sold_hours')} style={inputStyle} placeholder="0" /></div>
+            </div>
+          </div>
+
+          {/* Horas */}
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Horas</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label style={labelStyle}>Horas Contratadas</label><input type="number" value={form.sold_hours} onChange={setF('sold_hours')} style={inputStyle} placeholder="0" step="1" /></div>
+              <div><label style={labelStyle}>Saldo Inicial de Horas</label><input type="number" value={form.initial_hours_balance} onChange={setF('initial_hours_balance')} style={inputStyle} placeholder="0" step="1" /></div>
+            </div>
+            <div className="flex items-center gap-3 mt-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--brand-border)' }}>
+              <button
+                type="button"
+                onClick={() => setForm(prev => ({ ...prev, allow_negative_balance: !prev.allow_negative_balance }))}
+                className="relative w-10 h-5 rounded-full transition-colors shrink-0"
+                style={{ background: form.allow_negative_balance ? '#22c55e' : 'rgba(255,255,255,0.1)' }}
+              >
+                <span className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform"
+                  style={{ transform: form.allow_negative_balance ? 'translateX(20px)' : 'translateX(0)' }} />
+              </button>
+              <div>
+                <p className="text-xs font-semibold" style={{ color: 'var(--brand-text)' }}>Permitir Saldo Negativo</p>
+                <p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>Permite que o projeto continue mesmo sem saldo de horas</p>
+              </div>
             </div>
           </div>
         </div>
@@ -1238,6 +1269,7 @@ function KanbanContent() {
                 {columns.map((col, colIdx) => {
                   const isCoord        = col.type === 'coordinator'
                   const isStatusCol    = col.type === 'project_status'
+                  const isPronto       = col.id === 'pronto'
                   const contractCards  = isStatusCol ? [] : contractsInCol(col.id)
                   const activeProjects = isCoord ? activeProjectsInCoordCol(col.coordinatorId!) : []
                   const statusProjects = isStatusCol ? projectsInStatusCol(col.id) : []
@@ -1252,15 +1284,17 @@ function KanbanContent() {
                                    (isCoord && prevCol?.type === 'fixed')
 
                   const borderColor = isStatusCol ? `${col.color}30`
-                    : isSust   ? `${col.color}35`
-                    : isBizify ? `${BIZIFY_COLOR}35`
-                    : isCoord  ? 'rgba(0,245,255,0.15)'
+                    : isSust    ? `${col.color}35`
+                    : isBizify  ? `${BIZIFY_COLOR}35`
+                    : isCoord   ? 'rgba(0,245,255,0.15)'
+                    : isPronto  ? `${PRONTO_COLOR}40`
                     : 'var(--brand-border)'
 
                   const headerColor = isStatusCol ? col.color!
-                    : isSust   ? col.color!
-                    : isBizify ? BIZIFY_COLOR
-                    : isCoord  ? 'var(--brand-primary)'
+                    : isSust    ? col.color!
+                    : isBizify  ? BIZIFY_COLOR
+                    : isCoord   ? 'var(--brand-primary)'
+                    : isPronto  ? PRONTO_COLOR
                     : 'var(--brand-text)'
 
                   return (
@@ -1278,6 +1312,7 @@ function KanbanContent() {
                           : isSust   ? `${col.color}04`
                           : isBizify ? `${BIZIFY_COLOR}04`
                           : isCoord  ? 'rgba(0,245,255,0.02)'
+                          : isPronto ? `${PRONTO_COLOR}05`
                           : 'rgba(255,255,255,0.02)',
                         border: `1px solid ${borderColor}`,
                       }}>
@@ -1317,6 +1352,11 @@ function KanbanContent() {
                                 Arraste para coordenador alocar
                               </p>
                             </>
+                          )}
+                          {isPronto && (
+                            <p className="text-[10px] mt-1" style={{ color: PRONTO_COLOR, opacity: 0.75 }}>
+                              Aguardando geração de projeto
+                            </p>
                           )}
                           {isCoord && (
                             <p className="text-[10px] mt-1" style={{ color: 'var(--brand-subtle)' }}>
