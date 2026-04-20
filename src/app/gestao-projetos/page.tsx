@@ -988,7 +988,10 @@ export default function GestaoProjetosPage() {
   const filtered = useMemo(() => {
     return projects.filter(p => {
       if (filterContractType && p.contract_type_display !== filterContractType) return false
-      if (filterServiceType && String((p as any).service_type_id) !== filterServiceType) return false
+      if (filterServiceType) {
+        const stId = (p as any).service_type_id ?? (p as any).service_type?.id
+        if (String(stId) !== filterServiceType) return false
+      }
       if (statusFilter && p.status !== statusFilter) return false
       if (clienteFilter && String(p.customer_id) !== clienteFilter) return false
       if (saudeFilter) {
@@ -1007,7 +1010,7 @@ export default function GestaoProjetosPage() {
       }
       return true
     })
-  }, [projects, search, statusFilter, clienteFilter, saudeFilter, filterContractType])
+  }, [projects, search, statusFilter, clienteFilter, saudeFilter, filterContractType, filterServiceType])
 
   const toggleTree = (row: TreeRow) => {
     setRows(prev => {
