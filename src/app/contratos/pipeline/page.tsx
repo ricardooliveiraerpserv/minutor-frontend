@@ -670,12 +670,13 @@ function ProjectDetailModal({ card, onClose, userRole }: { card: ProjectCard; on
 
 // ─── Plan Decision Modal ──────────────────────────────────────────────────────
 
-function PlanDecisionModal({ card, coordinators, onClose, onDone, onNovoProjeto }: {
+function PlanDecisionModal({ card, coordinators, onClose, onDone, onNovoProjeto, onSubprojeto }: {
   card: RequestCard
   coordinators: Coordinator[]
   onClose: () => void
   onDone: (updatedCard: RequestCard) => void
   onNovoProjeto: () => void
+  onSubprojeto: (projectId: number) => void
 }) {
   const [step, setStep] = useState<'decision' | 'novo_projeto' | 'subprojeto'>('decision')
   const [loading, setLoading] = useState(false)
@@ -743,23 +744,9 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone, onNovoProjeto 
     }
   }
 
-  const submitSubprojeto = async () => {
+  const handleSubprojetoAvancar = () => {
     if (!selectedProjectId) { toast.error('Selecione um projeto'); return }
-    setLoading(true)
-    try {
-      await api.post(`/contract-requests/${card.id}/plan-decision`, {
-        decision: 'subprojeto',
-        project_id: selectedProjectId,
-        coordinator_id: selectedCoordinatorId ?? undefined,
-      })
-      toast.success('Requisição vinculada ao projeto — Início Autorizado')
-      onDone({ ...card, kanban_column: 'inicio_autorizado', req_decision: 'subprojeto', linked_coordinator_id: selectedCoordinatorId ?? undefined })
-      onClose()
-    } catch (e: any) {
-      toast.error(e?.message ?? 'Erro ao processar')
-    } finally {
-      setLoading(false)
-    }
+    onSubprojeto(selectedProjectId)
   }
 
   const inputStyle = { background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }
@@ -924,22 +911,12 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone, onNovoProjeto 
                   </>
               }
             </div>
-            <div>
-              <label className="block text-xs font-semibold mb-1.5" style={labelStyle}>COORDENADOR</label>
-              <select value={selectedCoordinatorId ?? ''} onChange={e => setSelectedCoordinatorId(e.target.value ? Number(e.target.value) : null)}
-                className="w-full rounded-lg px-3 py-2 text-sm" style={inputStyle}>
-                <option value="">Sem coordenador por agora</option>
-                {coordinators.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => setStep('decision')} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--brand-muted)' }}>Voltar</button>
-              <button onClick={submitSubprojeto} disabled={loading || !selectedProjectId}
+              <button onClick={handleSubprojetoAvancar} disabled={!selectedProjectId}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
                 style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>
-                {loading ? 'Vinculando...' : 'Vincular e Avançar'}
+                Avançar →
               </button>
             </div>
           </div>
@@ -1553,6 +1530,7 @@ function KanbanContent() {
   const [selectedRequest,      setSelectedRequest]      = useState<RequestCard | null>(null)
   const [planDecisionCard,     setPlanDecisionCard]     = useState<RequestCard | null>(null)
   const [contractCreateForReq, setContractCreateForReq] = useState<RequestCard | null>(null)
+  const [subprojetoForReq, setSubprojetoForReq] = useState<{ card: RequestCard; projectId: number } | null>(null)
   const [finalizeCard,         setFinalizeCard]         = useState<RequestCard | null>(null)
 
   const [selectedContract, setSelectedContract] = useState<ContractCard | null>(null)
@@ -1696,7 +1674,7 @@ function KanbanContent() {
       if (!reqCard) return
 
       // Dropped on Aguardando Início → open decision modal
-      if (toCol === 'req_inicio_autorizado' && !reqCard.req_decision) {
+      if (toCol === 'req_inicio_autorizado') {
         setPlanDecisionCard(reqCard)
         return
       }
@@ -1855,7 +1833,7 @@ function KanbanContent() {
                   onContractClick={setSelectedContract}
                   onProjectClick={setSelectedProject}
                   onRequestClick={card =>
-                    card.kanban_column === 'req_inicio_autorizado' && !card.req_decision
+                    card.kanban_column === 'req_inicio_autorizado'
                       ? setPlanDecisionCard(card)
                       : setSelectedRequest(card)
                   }
@@ -1935,6 +1913,11 @@ function KanbanContent() {
             setPlanDecisionCard(null)
             setContractCreateForReq(card)
           }}
+          onSubprojeto={(projectId) => {
+            const card = planDecisionCard
+            setPlanDecisionCard(null)
+            setSubprojetoForReq({ card, projectId })
+          }}
         />
       )}
       {contractCreateForReq && (
@@ -1960,6 +1943,33 @@ function KanbanContent() {
               ))
             } catch (e: any) {
               toast.error(e?.message ?? 'Erro ao vincular requisição')
+            }
+          }}
+        />
+      )}
+      {subprojetoForReq && (
+        <ContractCreateModal
+          initialCustomerId={subprojetoForReq.card.customer_id}
+          initialProjectName={subprojetoForReq.card.project_name}
+          customerReadOnly
+          title="Subprojeto — Novo Contrato"
+          onClose={() => setSubprojetoForReq(null)}
+          onSuccess={async (contractId) => {
+            const { card, projectId } = subprojetoForReq
+            setSubprojetoForReq(null)
+            try {
+              const res = await api.post<{ ok: boolean; linked_contract_id: number }>(
+                `/contract-requests/${card.id}/plan-decision`,
+                { decision: 'subprojeto', project_id: projectId, contract_id: contractId }
+              )
+              toast.success('Subprojeto criado — requisição em Início Autorizado')
+              setRequestCards(prev => prev.map(r =>
+                r.id === card.id
+                  ? { ...r, kanban_column: 'inicio_autorizado', req_decision: 'subprojeto', linked_contract_id: res.linked_contract_id }
+                  : r
+              ))
+            } catch (e: any) {
+              toast.error(e?.message ?? 'Erro ao vincular subprojeto')
             }
           }}
         />
