@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { Project, PaginatedResponse, HourContribution } from '@/types'
 import { formatBRL } from '@/lib/format'
 import { toast } from 'sonner'
-import { Layers, Search, ChevronDown, ChevronRight, Users, TrendingUp, Clock, BarChart2, AlertTriangle, DollarSign, X, UserCheck, Pencil, Trash2, Plus, Edit2, MessageCircle, Eye } from 'lucide-react'
+import { Layers, Search, ChevronDown, ChevronRight, Users, TrendingUp, Clock, BarChart2, AlertTriangle, DollarSign, X, UserCheck, Pencil, Trash2, Plus, Edit2, MessageCircle, Eye, Check } from 'lucide-react'
 import { ProjectMessages } from '@/components/shared/ProjectMessages'
 import { PageHeader } from '@/components/ds'
 import { RowMenu } from '@/components/ui/row-menu'
@@ -475,6 +475,202 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, canEdit, canCha
   )
 }
 
+// ─── Project Edit Form ────────────────────────────────────────────────────────
+
+interface ProjectEditForm {
+  name: string; description: string; status: string
+  start_date: string; expected_end_date: string
+  sold_hours: string; project_value: string
+  hourly_rate: string; additional_hourly_rate: string
+  initial_hours_balance: string; allow_negative_balance: boolean
+}
+
+function ProjectInlineEditModal({ project, onClose, onSaved }: { project: ProjectFull; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState<ProjectEditForm>({
+    name:                   project.name ?? '',
+    description:            project.description ?? '',
+    status:                 project.status ?? 'awaiting_start',
+    start_date:             project.start_date?.slice(0, 10) ?? '',
+    expected_end_date:      (project as any).expected_end_date?.slice(0, 10) ?? '',
+    sold_hours:             String(project.sold_hours ?? ''),
+    project_value:          String(project.project_value ?? ''),
+    hourly_rate:            String(project.hourly_rate ?? ''),
+    additional_hourly_rate: String(project.additional_hourly_rate ?? ''),
+    initial_hours_balance:  String(project.initial_hours_balance ?? ''),
+    allow_negative_balance: false,
+  })
+  const [saving, setSaving] = useState(false)
+  const [allCoordinators, setAllCoordinators] = useState<{ id: number; name: string }[]>([])
+  const [allConsultants2,  setAllConsultants2]  = useState<{ id: number; name: string }[]>([])
+  const [selCoordIds,     setSelCoordIds]     = useState<Set<number>>(new Set((project.coordinators ?? []).map(c => c.id)))
+  const [selConsultIds,   setSelConsultIds]   = useState<Set<number>>(new Set((project.consultants  ?? []).map(c => c.id)))
+  const [teamSearch2,     setTeamSearch2]     = useState('')
+  const [teamTab2,        setTeamTab2]        = useState<'coord' | 'consult'>('coord')
+
+  useEffect(() => {
+    Promise.all([
+      api.get<any>('/users?type=coordenador&pageSize=200'),
+      api.get<any>('/users?type=consultor&pageSize=200'),
+    ]).then(([coords, consults]) => {
+      setAllCoordinators(coords?.items ?? coords?.data ?? [])
+      setAllConsultants2(consults?.items ?? consults?.data ?? [])
+    }).catch(() => {})
+  }, [])
+
+  const toggleCoord   = (id: number) => setSelCoordIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleConsult = (id: number) => setSelConsultIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const setF = (key: keyof ProjectEditForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setForm(prev => ({ ...prev, [key]: e.target.value }))
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { toast.error('Nome obrigatório'); return }
+    setSaving(true)
+    try {
+      const payload: Record<string, unknown> = {
+        name: form.name.trim(), description: form.description || null, status: form.status,
+        start_date: form.start_date || null, expected_end_date: form.expected_end_date || null,
+        allow_negative_balance: form.allow_negative_balance,
+        coordinator_ids: Array.from(selCoordIds),
+        consultant_ids:  Array.from(selConsultIds),
+      }
+      if (form.sold_hours !== '')             payload.sold_hours             = Number(form.sold_hours)
+      if (form.project_value !== '')          payload.project_value          = Number(form.project_value)
+      if (form.hourly_rate !== '')            payload.hourly_rate            = Number(form.hourly_rate)
+      if (form.additional_hourly_rate !== '') payload.additional_hourly_rate = Number(form.additional_hourly_rate)
+      if (form.initial_hours_balance !== '')  payload.initial_hours_balance  = Number(form.initial_hours_balance)
+      await api.put(`/projects/${project.id}`, payload)
+      toast.success('Projeto atualizado')
+      onSaved()
+    } catch { toast.error('Erro ao salvar projeto') }
+    finally { setSaving(false) }
+  }
+
+  const iStyle: React.CSSProperties = { width: '100%', background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', borderRadius: '0.625rem', padding: '0.5rem 0.75rem', fontSize: '0.8125rem', color: 'var(--brand-text)', outline: 'none' }
+  const lStyle: React.CSSProperties = { fontSize: '0.625rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--brand-subtle)', marginBottom: '0.375rem', display: 'block' }
+  const STATUS_OPTS = [
+    { value: 'awaiting_start', label: 'Aguardando Início' },
+    { value: 'started',        label: 'Em Andamento' },
+    { value: 'paused',         label: 'Pausado' },
+    { value: 'finished',       label: 'Encerrado' },
+    { value: 'cancelled',      label: 'Cancelado' },
+  ]
+  const filteredCoords   = allCoordinators.filter(c => c.name.toLowerCase().includes(teamSearch2.toLowerCase()))
+  const filteredConsults = allConsultants2.filter(c => c.name.toLowerCase().includes(teamSearch2.toLowerCase()))
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+      <div className="flex flex-col rounded-2xl w-full max-w-5xl max-h-[92vh]" style={{ background: 'var(--brand-surface)', border: '1px solid rgba(0,245,255,0.25)' }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: 'var(--brand-border)' }}>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>{project.code}</p>
+            <h3 className="text-base font-bold" style={{ color: 'var(--brand-text)' }}>Editar Projeto</h3>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"><X size={16} style={{ color: 'var(--brand-muted)' }} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-5">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Identificação</p>
+                <div className="space-y-3">
+                  <div><label style={lStyle}>Nome do Projeto *</label><input value={form.name} onChange={setF('name')} style={iStyle} placeholder="Nome do projeto" /></div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><label style={lStyle}>Status</label><select value={form.status} onChange={setF('status')} style={iStyle}>{STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                    <div><label style={lStyle}>Data de Início</label><input type="date" value={form.start_date} onChange={setF('start_date')} style={iStyle} /></div>
+                  </div>
+                  <div><label style={lStyle}>Data de Conclusão</label><input type="date" value={form.expected_end_date} onChange={setF('expected_end_date')} style={iStyle} /></div>
+                  <div><label style={lStyle}>Descrição</label><textarea value={form.description} onChange={setF('description')} style={{ ...iStyle, resize: 'vertical', minHeight: '80px' }} placeholder="Descrição do projeto" /></div>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Financeiro</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label style={lStyle}>Valor do Projeto (R$)</label><input type="number" value={form.project_value} onChange={setF('project_value')} style={iStyle} placeholder="0.00" step="0.01" /></div>
+                  <div><label style={lStyle}>Valor da Hora (R$)</label><input type="number" value={form.hourly_rate} onChange={setF('hourly_rate')} style={iStyle} placeholder="0.00" step="0.01" /></div>
+                  <div><label style={lStyle}>Hora Adicional (R$)</label><input type="number" value={form.additional_hourly_rate} onChange={setF('additional_hourly_rate')} style={iStyle} placeholder="0.00" step="0.01" /></div>
+                  <div><label style={lStyle}>Horas Contratadas</label><input type="number" value={form.sold_hours} onChange={setF('sold_hours')} style={iStyle} placeholder="0" step="1" /></div>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Horas</p>
+                <div><label style={lStyle}>Saldo Inicial de Horas</label><input type="number" value={form.initial_hours_balance} onChange={setF('initial_hours_balance')} style={iStyle} placeholder="0" step="1" /></div>
+                <div className="flex items-center gap-3 mt-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--brand-border)' }}>
+                  <button type="button" onClick={() => setForm(prev => ({ ...prev, allow_negative_balance: !prev.allow_negative_balance }))}
+                    className="relative w-10 h-5 rounded-full transition-colors shrink-0"
+                    style={{ background: form.allow_negative_balance ? '#22c55e' : 'rgba(255,255,255,0.1)' }}>
+                    <span className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform" style={{ transform: form.allow_negative_balance ? 'translateX(20px)' : 'translateX(0)' }} />
+                  </button>
+                  <div>
+                    <p className="text-xs font-semibold" style={{ color: 'var(--brand-text)' }}>Permitir Saldo Negativo</p>
+                    <p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>Projeto continua mesmo sem saldo de horas</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col" style={{ minHeight: 0 }}>
+              <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Equipe Alocada</p>
+              <div className="flex gap-1 mb-3 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+                {([['coord', 'Coordenadores', selCoordIds.size], ['consult', 'Consultores', selConsultIds.size]] as const).map(([id, label, count]) => (
+                  <button key={id} onClick={() => { setTeamTab2(id); setTeamSearch2('') }}
+                    className="px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap"
+                    style={{ color: teamTab2 === id ? '#00F5FF' : 'var(--brand-subtle)', borderBottom: teamTab2 === id ? '2px solid #00F5FF' : '2px solid transparent', marginBottom: '-1px' }}>
+                    {label} {count > 0 && <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px]" style={{ background: 'rgba(0,245,255,0.12)', color: '#00F5FF' }}>{count}</span>}
+                  </button>
+                ))}
+              </div>
+              <input value={teamSearch2} onChange={e => setTeamSearch2(e.target.value)}
+                placeholder={teamTab2 === 'coord' ? 'Buscar coordenador...' : 'Buscar consultor...'}
+                className="w-full text-xs px-3 py-2 rounded-xl outline-none mb-2"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }} />
+              <div className="flex-1 overflow-y-auto space-y-1 rounded-xl p-2" style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--brand-border)', maxHeight: 320 }}>
+                {teamTab2 === 'coord' && filteredCoords.map(c => (
+                  <button key={c.id} onClick={() => toggleCoord(c.id)}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-white/5"
+                    style={{ background: selCoordIds.has(c.id) ? 'rgba(0,245,255,0.06)' : 'transparent', border: `1px solid ${selCoordIds.has(c.id) ? 'rgba(0,245,255,0.2)' : 'transparent'}` }}>
+                    <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: selCoordIds.has(c.id) ? 'rgba(0,245,255,0.2)' : 'rgba(255,255,255,0.06)', border: '1px solid var(--brand-border)' }}>
+                      {selCoordIds.has(c.id) && <Check size={10} style={{ color: '#00F5FF' }} />}
+                    </div>
+                    <span className="text-xs" style={{ color: selCoordIds.has(c.id) ? '#00F5FF' : 'var(--brand-text)' }}>{c.name}</span>
+                  </button>
+                ))}
+                {teamTab2 === 'consult' && filteredConsults.map(c => (
+                  <button key={c.id} onClick={() => toggleConsult(c.id)}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-white/5"
+                    style={{ background: selConsultIds.has(c.id) ? 'rgba(139,92,246,0.06)' : 'transparent', border: `1px solid ${selConsultIds.has(c.id) ? 'rgba(139,92,246,0.25)' : 'transparent'}` }}>
+                    <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: selConsultIds.has(c.id) ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.06)', border: '1px solid var(--brand-border)' }}>
+                      {selConsultIds.has(c.id) && <Check size={10} style={{ color: '#a78bfa' }} />}
+                    </div>
+                    <span className="text-xs" style={{ color: selConsultIds.has(c.id) ? '#a78bfa' : 'var(--brand-text)' }}>{c.name}</span>
+                  </button>
+                ))}
+                {teamTab2 === 'coord' && filteredCoords.length === 0 && <p className="text-xs text-center py-4" style={{ color: 'var(--brand-subtle)' }}>Nenhum coordenador encontrado</p>}
+                {teamTab2 === 'consult' && filteredConsults.length === 0 && <p className="text-xs text-center py-4" style={{ color: 'var(--brand-subtle)' }}>Nenhum consultor encontrado</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t shrink-0" style={{ borderColor: 'var(--brand-border)' }}>
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-white/5 transition-colors" style={{ color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}>Cancelar</button>
+          <button onClick={handleSave} disabled={saving} className="px-5 py-2 rounded-xl text-sm font-semibold" style={{ background: saving ? 'rgba(0,245,255,0.05)' : 'rgba(0,245,255,0.1)', color: '#00F5FF', border: '1px solid rgba(0,245,255,0.3)', opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Salvando...' : 'Salvar Alterações'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ProjectEditByIdModal({ projectId, onClose, onSaved }: { projectId: number; onClose: () => void; onSaved: () => void }) {
+  const [p, setP] = useState<ProjectFull | null>(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    api.get<ProjectFull>(`/projects/${projectId}`).then(setP).catch(() => toast.error('Erro ao carregar projeto')).finally(() => setLoading(false))
+  }, [projectId])
+  if (loading) return <div className="fixed inset-0 z-[70] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)' }}><p className="text-sm animate-pulse" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p></div>
+  if (!p) return null
+  return <ProjectInlineEditModal project={p} onClose={onClose} onSaved={onSaved} />
+}
+
 // ─── Página ───────────────────────────────────────────────────────────────────
 
 export default function GestaoProjetosPage() {
@@ -488,6 +684,7 @@ export default function GestaoProjetosPage() {
 
   const [projects, setProjects]   = useState<ProjectWithTeam[]>([])
   const [loading, setLoading]     = useState(true)
+  const [refreshKey, setRefreshKey] = useState(0)
   const [search, setSearch]       = useState('')
   const [statusFilter, setStatus] = useState('')
   const [clienteFilter, setCliente] = useState('')
@@ -511,6 +708,9 @@ export default function GestaoProjetosPage() {
   const [teamTab, setTeamTab]                 = useState<'consultores' | 'grupos'>('consultores')
   const [consultantGroups, setConsultantGroups] = useState<{ id: number; name: string }[]>([])
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<number>>(new Set())
+
+  // Modal de edição de projeto
+  const [editProjectId, setEditProjectId] = useState<number | null>(null)
 
   // Modal de alteração de status
   const [statusModal, setStatusModal] = useState<{ open: boolean; project: ProjectWithTeam | null; newStatus: string }>({ open: false, project: null, newStatus: '' })
@@ -571,7 +771,7 @@ export default function GestaoProjetosPage() {
       })
       .catch(() => toast.error('Erro ao carregar projetos'))
       .finally(() => setLoading(false))
-  }, [multiContratual, filterContractType])
+  }, [multiContratual, filterContractType, refreshKey])
 
   const clientes = useMemo(() => {
     const seen = new Set<string>()
@@ -987,7 +1187,7 @@ export default function GestaoProjetosPage() {
                       onMenuAction={handleMenuAction}
                       canEdit={canEdit}
                       canChangeStatus={canChangeStatus}
-                      onEdit={p => router.push(`/projects?editId=${p.id}`)}
+                      onEdit={p => setEditProjectId(p.id)}
                       onChangeStatus={p => setStatusModal({ open: true, project: p, newStatus: p.status ?? '' })}
                       hasUnread={unreadProjectIds.has(project.id)}
                       treeRow={tr}
@@ -1412,7 +1612,7 @@ export default function GestaoProjetosPage() {
                   <button onClick={() => { setViewProject(null); setViewProjectFull(null); router.push(`/expenses?project_id=${base.id}`) }} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}><BarChart2 size={11} /> Despesas</button>
                   <button onClick={() => { setViewProject(null); setMessagesProject(base) }} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}><MessageCircle size={11} /> Mensagens</button>
                   {canEdit && (
-                    <button onClick={() => { setViewProject(null); router.push(`/projects?editId=${p.id}`) }} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors" style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.2)' }}><Edit2 size={11} /> Editar</button>
+                    <button onClick={() => { setViewProject(null); setEditProjectId(p.id) }} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors" style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.2)' }}><Edit2 size={11} /> Editar</button>
                   )}
                   <button onClick={() => { setViewProject(null); setViewProjectFull(null) }} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"><X size={16} style={{ color: 'var(--brand-muted)' }} /></button>
                 </div>
@@ -1598,6 +1798,15 @@ export default function GestaoProjetosPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Modal de Edição de Projeto ── */}
+      {editProjectId && (
+        <ProjectEditByIdModal
+          projectId={editProjectId}
+          onClose={() => setEditProjectId(null)}
+          onSaved={() => { setEditProjectId(null); setRefreshKey(k => k + 1) }}
+        />
       )}
 
     </AppLayout>
