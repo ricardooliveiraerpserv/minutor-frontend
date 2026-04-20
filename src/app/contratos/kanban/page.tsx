@@ -1207,7 +1207,6 @@ function KanbanContent() {
     ? [
         FIXED_COLUMNS.find(c => c.id === 'pronto')!,
         ...SUSTENTACAO_COLS,
-        BIZIFY_COL,
       ]
     : [
         ...FIXED_COLUMNS,
