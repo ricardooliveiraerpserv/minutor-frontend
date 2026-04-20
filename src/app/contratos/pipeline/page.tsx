@@ -605,13 +605,33 @@ function ProjectDetailModal({ card, onClose, userRole }: { card: ProjectCard; on
   const [reqData, setReqData]     = useState<ContractRequestDetail | null>(null)
   const [reqLoading, setReqLoading] = useState(false)
   const [reqLoaded, setReqLoaded]   = useState(false)
+  const [showProjectView, setShowProjectView] = useState(false)
 
   useEffect(() => {
     if (tab === 'log' && !logsLoaded) {
       setLogsLoading(true)
-      api.get<KanbanLogEntry[]>(`/projects/${card.id}/kanban-logs`)
-        .then(r => { setLogs(Array.isArray(r) ? r : []); setLogsLoaded(true) })
-        .catch(() => {})
+      const fetches: Promise<KanbanLogEntry[]>[] = [
+        api.get<KanbanLogEntry[]>(`/projects/${card.id}/kanban-logs`)
+          .then(r => (Array.isArray(r) ? r : []).map(l => ({ ...l, source: 'project' as const }))),
+      ]
+      if (card.contract_request_id) {
+        fetches.push(
+          api.get<KanbanLogEntry[]>(`/contract-requests/${card.contract_request_id}/kanban-logs`)
+            .then(r => (Array.isArray(r) ? r : []).map(l => ({ ...l, source: 'req' as const }))).catch(() => [])
+        )
+      }
+      if (card.contract_id) {
+        fetches.push(
+          api.get<KanbanLogEntry[]>(`/contracts/${card.contract_id}/kanban-logs`)
+            .then(r => (Array.isArray(r) ? r : []).map(l => ({ ...l, source: 'contract' as const }))).catch(() => [])
+        )
+      }
+      Promise.all(fetches)
+        .then(results => {
+          const combined = ([] as KanbanLogEntry[]).concat(...results)
+          setLogs(combined)
+          setLogsLoaded(true)
+        })
         .finally(() => setLogsLoading(false))
     }
     if (tab === 'req' && !reqLoaded && card.contract_request_id) {
@@ -638,6 +658,7 @@ function ProjectDetailModal({ card, onClose, userRole }: { card: ProjectCard; on
   ] as const
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
       <div className="w-full max-w-2xl rounded-2xl overflow-hidden flex flex-col" style={{ background: 'var(--brand-surface)', border: '1px solid rgba(99,102,241,0.3)', maxHeight: '90vh' }}>
         {/* Header */}
@@ -799,10 +820,10 @@ function ProjectDetailModal({ card, onClose, userRole }: { card: ProjectCard; on
             <div className="flex justify-end gap-3 px-6 py-4 border-t shrink-0" style={{ borderColor: 'rgba(99,102,241,0.2)' }}>
               <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--brand-muted)' }}>Fechar</button>
               {userRole !== 'cliente' && (
-                <button onClick={() => { window.location.href = '/projects' }}
+                <button onClick={() => setShowProjectView(true)}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
                   style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.35)' }}>
-                  <ExternalLink size={13} /> Ver Projeto
+                  <ExternalLink size={13} /> Visualizar Projeto
                 </button>
               )}
             </div>
@@ -814,6 +835,8 @@ function ProjectDetailModal({ card, onClose, userRole }: { card: ProjectCard; on
         )}
       </div>
     </div>
+    {showProjectView && <ProjectViewModal projectId={card.id} onClose={() => setShowProjectView(false)} />}
+    </>
   )
 }
 
@@ -1150,18 +1173,32 @@ interface ReqAttachment { id: number; original_name: string; file_path: string; 
 interface ReqMsg { id: number; message: string; author?: { id: number; name: string }; created_at: string; attachments?: ReqAttachment[] }
 interface MentionUser { id: number; name: string }
 
-interface KanbanLogEntry { id: number; from_column?: string; to_column?: string; from_status?: string; to_status?: string; moved_by: string; created_at: string }
+interface KanbanLogEntry {
+  id: number
+  source?: 'req' | 'contract' | 'project'
+  from_column?: string; to_column?: string
+  from_status?: string; to_status?: string
+  moved_by: string; created_at: string
+}
+
+const COL_LABEL: Record<string, string> = {
+  backlog: 'Backlog', novo_projeto: 'Novo Projeto', em_planejamento: 'Em Planejamento',
+  em_validacao: 'Em Validação', em_revisao: 'Em Revisão', aprovado: 'Aprovado',
+  inicio_autorizado: 'Início Autorizado', req_planejamento: 'Planejamento (Req.)',
+  req_inicio_autorizado: 'Aguardando Início (Req.)', req_em_andamento: 'Em Andamento (Req.)',
+  awaiting_start: 'Aguardando Início', started: 'Em Andamento',
+  liberado_para_testes: 'Lib. p/ Testes', paused: 'Pausado',
+  finished: 'Encerrado', cancelled: 'Cancelado',
+}
+
+const SOURCE_META: Record<string, { label: string; color: string; bg: string }> = {
+  req:      { label: 'Requisição', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+  contract: { label: 'Contrato',   color: '#818cf8', bg: 'rgba(129,140,248,0.12)' },
+  project:  { label: 'Projeto',    color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+}
 
 function KanbanLogTab({ logs, loading }: { logs: KanbanLogEntry[]; loading: boolean }) {
-  const colLabel: Record<string, string> = {
-    backlog: 'Backlog', novo_projeto: 'Novo Projeto', em_planejamento: 'Em Planejamento',
-    em_validacao: 'Em Validação', em_revisao: 'Em Revisão', aprovado: 'Aprovado',
-    inicio_autorizado: 'Início Autorizado', req_planejamento: 'Planejamento',
-    req_inicio_autorizado: 'Aguardando Início', req_em_andamento: 'Em Andamento',
-    awaiting_start: 'Aguardando Início', started: 'Em Andamento', liberado_para_testes: 'Lib. p/ Testes',
-    paused: 'Pausado', finished: 'Encerrado', cancelled: 'Cancelado',
-  }
-  const label = (v?: string) => v ? (colLabel[v] ?? v) : '—'
+  const label = (v?: string) => v ? (COL_LABEL[v] ?? v) : '—'
 
   if (loading) return <p className="text-center text-xs py-8" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p>
   if (logs.length === 0) return (
@@ -1170,24 +1207,271 @@ function KanbanLogTab({ logs, loading }: { logs: KanbanLogEntry[]; loading: bool
       <p className="text-xs" style={{ color: 'var(--brand-subtle)' }}>Nenhuma movimentação registrada</p>
     </div>
   )
+
+  const sorted = [...logs].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+
   return (
-    <div className="space-y-2 px-6 py-4">
-      {logs.map(l => (
-        <div key={l.id} className="flex items-start gap-3 py-2 border-b last:border-0" style={{ borderColor: 'rgba(139,92,246,0.1)' }}>
-          <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: '#a78bfa' }} />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm" style={{ color: 'var(--brand-text)' }}>
-              {(l.from_column ?? l.from_status) == null
-                ? <span style={{ color: '#22c55e' }}>Incluído em <span style={{ color: '#a78bfa' }}>{label(l.to_column ?? l.to_status)}</span></span>
-                : <><span style={{ color: 'var(--brand-subtle)' }}>{label(l.from_column ?? l.from_status)}</span>{' → '}<span style={{ color: '#a78bfa' }}>{label(l.to_column ?? l.to_status)}</span></>
-              }
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--brand-subtle)' }}>
-              {l.moved_by} · {new Date(l.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
-            </p>
-          </div>
+    <div className="px-6 py-4">
+      <div className="relative">
+        {/* Linha vertical da timeline */}
+        <div className="absolute left-3 top-0 bottom-0 w-px" style={{ background: 'rgba(139,92,246,0.2)' }} />
+        <div className="space-y-0">
+          {sorted.map((l, i) => {
+            const src = l.source ? SOURCE_META[l.source] : SOURCE_META.project
+            const from = l.from_column ?? l.from_status
+            const to   = l.to_column ?? l.to_status
+            const isFirst = from == null
+            return (
+              <div key={`${l.id}-${l.source}`} className="flex items-start gap-4 pb-5">
+                {/* Dot */}
+                <div className="relative z-10 w-6 h-6 shrink-0 rounded-full flex items-center justify-center mt-0.5"
+                  style={{ background: isFirst ? 'rgba(34,197,94,0.15)' : src.bg, border: `1px solid ${isFirst ? '#22c55e' : src.color}` }}>
+                  <div className="w-2 h-2 rounded-full" style={{ background: isFirst ? '#22c55e' : src.color }} />
+                </div>
+                {/* Content */}
+                <div className="flex-1 min-w-0 pt-0.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium" style={{ color: 'var(--brand-text)' }}>
+                        {isFirst
+                          ? <span style={{ color: '#22c55e' }}>Criado em <strong>{label(to)}</strong></span>
+                          : <><span style={{ color: 'var(--brand-muted)' }}>{label(from)}</span><span style={{ color: 'var(--brand-subtle)' }}> → </span><strong style={{ color: 'var(--brand-text)' }}>{label(to)}</strong></>
+                        }
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--brand-subtle)' }}>
+                        {l.moved_by} · {new Date(l.created_at).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })}
+                      </p>
+                    </div>
+                    {l.source && (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0"
+                        style={{ background: src.bg, color: src.color }}>
+                        {src.label}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
-      ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── ProjectViewModal (completo, inline no pipeline) ──────────────────────────
+
+interface ProjectFull {
+  id: number; name: string; code: string; status: string; status_display?: string
+  customer?: { id: number; name: string }
+  description?: string | null; start_date?: string | null
+  project_value?: number | null; hourly_rate?: number | null
+  additional_hourly_rate?: number | null; initial_cost?: number | null
+  initial_hours_balance?: number | null; sold_hours?: number | null
+  hour_contribution?: number; exceeded_hour_contribution?: number | null
+  consultant_hours?: number | null; coordinator_hours?: number | null
+  save_erpserv?: number | null; total_available_hours?: number | null
+  total_project_value?: number | null; weighted_hourly_rate?: number | null
+  general_hours_balance?: number | null; consumed_hours?: number | null
+  balance_percentage?: number | null; total_contributions_hours?: number | null
+  contract_type_display?: string; contract_type?: { id: number; name: string } | null
+  service_type?: { id: number; name: string } | null
+  parent_project?: { id: number; name: string; code: string } | null
+  coordinators?: { id: number; name: string; email: string }[]
+  consultants?: { id: number; name: string; email: string }[]
+  approvers?: { id: number; name: string; email: string }[]
+}
+
+function ProjectViewModal({ projectId, onClose }: { projectId: number; onClose: () => void }) {
+  const [p, setP] = useState<ProjectFull | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    api.get<ProjectFull>(`/projects/${projectId}`)
+      .then(r => setP(r))
+      .catch(() => toast.error('Erro ao carregar projeto'))
+      .finally(() => setLoading(false))
+  }, [projectId])
+
+  const fmt = (n: number | null | undefined, dec = 0) =>
+    n == null ? '—' : n.toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec })
+  const fmtDate = (d?: string | null) => d ? d.slice(0,10).split('-').reverse().join('/') : '—'
+  const fmtBRL  = (v?: number | null) => v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
+
+  const healthColor = (pct: number) => pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#22c55e'
+
+  const statusColors: Record<string, { background: string; color: string }> = {
+    awaiting_start: { background: 'rgba(139,92,246,0.12)', color: '#8B5CF6' },
+    started:        { background: 'rgba(0,245,255,0.10)',   color: '#00F5FF' },
+    paused:         { background: 'rgba(245,158,11,0.12)',  color: '#F59E0B' },
+    cancelled:      { background: 'rgba(239,68,68,0.12)',   color: '#EF4444' },
+    finished:       { background: 'rgba(161,161,170,0.12)', color: '#71717A' },
+  }
+  const statusLabel: Record<string, string> = {
+    awaiting_start: 'Aguardando Início', started: 'Em Andamento',
+    paused: 'Pausado', cancelled: 'Cancelado', finished: 'Encerrado',
+  }
+
+  const Row = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="flex items-start justify-between py-2 border-b last:border-0" style={{ borderColor: 'var(--brand-border)' }}>
+      <span className="text-xs shrink-0 w-40" style={{ color: 'var(--brand-subtle)' }}>{label}</span>
+      <span className="text-xs font-semibold text-right" style={{ color: 'var(--brand-text)' }}>{value ?? '—'}</span>
+    </div>
+  )
+
+  const consumed = p?.consumed_hours ?? 0
+  const totalAvail = p?.total_available_hours ?? ((p?.sold_hours ?? 0) + (p?.hour_contribution ?? 0))
+  const pct = totalAvail > 0 ? (consumed / totalAvail) * 100 : 0
+  const bar = healthColor(pct)
+  const sc = p ? (statusColors[p.status] ?? statusColors.awaiting_start) : statusColors.awaiting_start
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.85)' }}>
+      <div className="flex flex-col rounded-2xl w-full max-w-3xl max-h-[92vh]" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: 'var(--brand-border)' }}>
+          {loading || !p ? (
+            <p className="text-sm animate-pulse" style={{ color: 'var(--brand-subtle)' }}>Carregando projeto...</p>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="w-1.5 h-12 rounded-full" style={{ background: bar }} />
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>{p.code}</p>
+                <h2 className="text-lg font-bold" style={{ color: 'var(--brand-text)' }}>{p.name}</h2>
+                {p.customer?.name && <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>{p.customer.name}</p>}
+              </div>
+            </div>
+          )}
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"><X size={16} style={{ color: 'var(--brand-muted)' }} /></button>
+        </div>
+
+        {/* Status strip */}
+        {p && (
+          <div className="flex items-center gap-3 px-6 py-2.5 border-b shrink-0 flex-wrap" style={{ borderColor: 'var(--brand-border)', background: 'rgba(0,0,0,0.2)' }}>
+            <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={sc}>{p.status_display ?? statusLabel[p.status] ?? p.status}</span>
+            {(p.contract_type_display ?? p.contract_type?.name) && <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--brand-muted)' }}>{p.contract_type_display ?? p.contract_type?.name}</span>}
+            {p.service_type?.name && <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--brand-muted)' }}>{p.service_type.name}</span>}
+          </div>
+        )}
+
+        {/* Body */}
+        {!loading && p ? (
+          <div className="flex-1 overflow-y-auto">
+            <div className="grid grid-cols-2 divide-x" style={{ borderColor: 'var(--brand-border)' }}>
+              {/* Coluna esquerda */}
+              <div className="p-5 space-y-5">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--brand-subtle)' }}>Identificação</p>
+                  <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
+                    <div className="divide-y" style={{ borderColor: 'var(--brand-border)' }}>
+                      <Row label="Código" value={<span className="font-mono">{p.code}</span>} />
+                      <Row label="Cliente" value={p.customer?.name} />
+                      <Row label="Serviço" value={p.service_type?.name} />
+                      <Row label="Contrato" value={p.contract_type_display ?? p.contract_type?.name} />
+                      {p.parent_project && <Row label="Projeto Pai" value={`${p.parent_project.name} (${p.parent_project.code})`} />}
+                      <Row label="Data de Início" value={fmtDate(p.start_date)} />
+                    </div>
+                  </div>
+                </div>
+                {p.description && (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--brand-subtle)' }}>Descrição</p>
+                    <div className="rounded-xl p-3 text-xs leading-relaxed" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--brand-border)', color: 'var(--brand-muted)' }}>{p.description}</div>
+                  </div>
+                )}
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--brand-subtle)' }}>Financeiro</p>
+                  <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
+                    <div className="divide-y" style={{ borderColor: 'var(--brand-border)' }}>
+                      <Row label="Valor do Projeto" value={<span style={{ color: '#00F5FF' }}>{fmtBRL(p.project_value)}</span>} />
+                      {p.total_project_value != null && p.total_project_value !== p.project_value && <Row label="Valor Total (aportes)" value={<span style={{ color: '#00F5FF' }}>{fmtBRL(p.total_project_value)}</span>} />}
+                      <Row label="Valor da Hora" value={fmtBRL(p.hourly_rate)} />
+                      {p.weighted_hourly_rate != null && <Row label="Taxa Média Ponderada" value={fmtBRL(p.weighted_hourly_rate)} />}
+                      <Row label="Hora Adicional" value={fmtBRL(p.additional_hourly_rate)} />
+                      <Row label="Custo Inicial" value={fmtBRL(p.initial_cost)} />
+                      {p.save_erpserv != null && p.save_erpserv > 0 && <Row label="Save ERPSERV" value={fmtBRL(p.save_erpserv)} />}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {/* Coluna direita */}
+              <div className="p-5 space-y-5">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--brand-subtle)' }}>Horas</p>
+                  <div className="rounded-xl p-4 mb-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--brand-border)' }}>
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      {[
+                        { label: 'Vendidas',   value: fmt(p.sold_hours) + 'h',              color: 'var(--brand-text)' },
+                        { label: 'Consumidas', value: fmt(consumed, 1) + 'h',               color: 'var(--brand-muted)' },
+                        { label: 'Saldo',      value: fmt(p.general_hours_balance, 1) + 'h', color: (p.general_hours_balance ?? 0) < 0 ? '#ef4444' : '#22c55e' },
+                      ].map(it => (
+                        <div key={it.label} className="text-center">
+                          <p className="text-[10px] mb-1" style={{ color: 'var(--brand-subtle)' }}>{it.label}</p>
+                          <p className="text-base font-bold tabular-nums" style={{ color: it.color }}>{it.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="w-full h-2 rounded-full overflow-hidden mb-1" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                      <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: bar }} />
+                    </div>
+                    <div className="flex justify-between text-[10px]" style={{ color: bar }}>
+                      <span>{totalAvail > 0 ? `${Math.round(pct)}% consumido` : 'Sem horas'}</span>
+                      <span>{fmt(totalAvail, 1)}h disponíveis</span>
+                    </div>
+                  </div>
+                  <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
+                    <div className="divide-y" style={{ borderColor: 'var(--brand-border)' }}>
+                      {p.sold_hours != null && <Row label="Horas Contratadas" value={`${p.sold_hours}h`} />}
+                      {(p.hour_contribution ?? 0) > 0 && <Row label="Aporte Inicial" value={`${p.hour_contribution}h`} />}
+                      {(p.total_contributions_hours ?? 0) > 0 && <Row label="Total Aportes" value={`${fmt(p.total_contributions_hours, 1)}h`} />}
+                      {p.exceeded_hour_contribution != null && <Row label="Aporte Excedido" value={`${p.exceeded_hour_contribution}h`} />}
+                      {p.consultant_hours != null && <Row label="Horas Consultores" value={`${p.consultant_hours}h`} />}
+                      {p.coordinator_hours != null && <Row label="Horas Coordenadores" value={`${p.coordinator_hours}h`} />}
+                      {p.initial_hours_balance != null && <Row label="Saldo Inicial" value={`${p.initial_hours_balance}h`} />}
+                      <Row label="% Consumido" value={<span style={{ color: bar }}>{totalAvail > 0 ? `${Math.round(pct)}%` : '—'}</span>} />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--brand-subtle)' }}>Equipe</p>
+                  <div className="rounded-xl p-3 space-y-3" style={{ border: '1px solid var(--brand-border)' }}>
+                    {(p.coordinators?.length ?? 0) > 0 && (
+                      <div>
+                        <p className="text-[10px] mb-1.5" style={{ color: 'var(--brand-subtle)' }}>Coordenadores</p>
+                        <div className="flex flex-wrap gap-1.5">{p.coordinators!.map(u => <span key={u.id} className="text-xs px-2.5 py-1 rounded-lg font-medium" style={{ background: 'rgba(0,245,255,0.08)', color: '#00F5FF' }}>{u.name}</span>)}</div>
+                      </div>
+                    )}
+                    {(p.consultants?.length ?? 0) > 0 && (
+                      <div>
+                        <p className="text-[10px] mb-1.5" style={{ color: 'var(--brand-subtle)' }}>Consultores</p>
+                        <div className="flex flex-wrap gap-1.5">{p.consultants!.map(u => <span key={u.id} className="text-xs px-2.5 py-1 rounded-lg font-medium" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--brand-muted)' }}>{u.name}</span>)}</div>
+                      </div>
+                    )}
+                    {(p.approvers?.length ?? 0) > 0 && (
+                      <div>
+                        <p className="text-[10px] mb-1.5" style={{ color: 'var(--brand-subtle)' }}>Aprovadores</p>
+                        <div className="flex flex-wrap gap-1.5">{p.approvers!.map(u => <span key={u.id} className="text-xs px-2.5 py-1 rounded-lg font-medium" style={{ background: 'rgba(139,92,246,0.10)', color: '#8B5CF6' }}>{u.name}</span>)}</div>
+                      </div>
+                    )}
+                    {(p.coordinators?.length ?? 0) === 0 && (p.consultants?.length ?? 0) === 0 && (
+                      <p className="text-xs text-center py-2" style={{ color: 'var(--brand-subtle)' }}>Sem equipe cadastrada</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : loading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-sm animate-pulse" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p>
+          </div>
+        ) : null}
+
+        <div className="flex justify-end px-6 py-3 shrink-0" style={{ borderTop: '1px solid var(--brand-border)' }}>
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-white/5 transition-colors" style={{ color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}>Fechar</button>
+        </div>
+      </div>
     </div>
   )
 }
