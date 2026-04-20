@@ -7,7 +7,7 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
-import { List, Plus, ExternalLink, AlertCircle, Clock, ChevronRight, Rocket, Layers, FolderKanban, MessageSquare, Send, Paperclip, X, Download } from 'lucide-react'
+import { List, Plus, ExternalLink, AlertCircle, AlertTriangle, Clock, ChevronRight, Rocket, Layers, FolderKanban, MessageSquare, Send, Paperclip, X, Download } from 'lucide-react'
 import { ProjectMessages } from '@/components/shared/ProjectMessages'
 import { ContractCreateModal } from '@/components/shared/ContractCreateModal'
 
@@ -870,6 +870,9 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone, onNovoProjeto,
   // "Subprojeto" state
   const [selectedProjectId, setSelectedProjectId]       = useState<number | null>(null)
   const [selectedCoordinatorId, setSelectedCoordinatorId] = useState<number | null>(null)
+  const [parentBalance, setParentBalance]               = useState<{ balance: number; allow_negative: boolean } | null>(null)
+  const [parentBalanceLoading, setParentBalanceLoading] = useState(false)
+  const [confirmNegative, setConfirmNegative]           = useState(false)
 
   useEffect(() => {
     if (step === 'novo_projeto' && serviceTypes.length === 0) {
@@ -916,8 +919,29 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone, onNovoProjeto,
     }
   }
 
+  const selectProject = (id: number) => {
+    setSelectedProjectId(id)
+    setParentBalance(null)
+    setParentBalanceLoading(true)
+    api.get<{ general_hours_balance?: number; allow_negative_balance?: boolean; total_available_hours?: number; sold_hours?: number; consumed_hours?: number }>(`/projects/${id}`)
+      .then(r => {
+        const balance = r.general_hours_balance ?? ((r.sold_hours ?? 0) - (r.consumed_hours ?? 0))
+        setParentBalance({ balance, allow_negative: r.allow_negative_balance ?? false })
+      })
+      .catch(() => {})
+      .finally(() => setParentBalanceLoading(false))
+  }
+
   const handleSubprojetoAvancar = () => {
     if (!selectedProjectId) { toast.error('Selecione um projeto'); return }
+    if (parentBalance && parentBalance.balance <= 0) {
+      if (!parentBalance.allow_negative) {
+        toast.error('Saldo insuficiente: este projeto não permite saldo negativo e já está zerado.')
+        return
+      }
+      setConfirmNegative(true)
+      return
+    }
     onSubprojeto(selectedProjectId)
   }
 
@@ -925,6 +949,7 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone, onNovoProjeto,
   const labelStyle = { color: 'var(--brand-subtle)' }
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
       <div className="w-full max-w-lg rounded-2xl overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
 
@@ -1062,7 +1087,7 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone, onNovoProjeto,
                           <button
                             key={p.id}
                             type="button"
-                            onClick={() => setSelectedProjectId(p.id)}
+                            onClick={() => selectProject(p.id)}
                             className="w-full text-left px-3 py-2 text-sm transition-colors"
                             style={{
                               background: selectedProjectId === p.id ? 'rgba(139,92,246,0.2)' : 'transparent',
@@ -1083,9 +1108,46 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone, onNovoProjeto,
                   </>
               }
             </div>
+
+            {/* Painel de saldo do projeto selecionado */}
+            {selectedProjectId && (
+              <div className="rounded-xl p-3" style={{
+                background: parentBalance
+                  ? parentBalance.balance > 0 ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.08)'
+                  : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${parentBalance
+                  ? parentBalance.balance > 0 ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.35)'
+                  : 'var(--brand-border)'}`,
+              }}>
+                {parentBalanceLoading ? (
+                  <p className="text-xs animate-pulse" style={{ color: 'var(--brand-subtle)' }}>Verificando saldo...</p>
+                ) : parentBalance ? (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5"
+                        style={{ color: parentBalance.balance > 0 ? '#86efac' : '#fca5a5' }}>
+                        Saldo do Projeto Pai
+                      </p>
+                      <p className="text-lg font-bold tabular-nums"
+                        style={{ color: parentBalance.balance > 0 ? '#22c55e' : '#ef4444' }}>
+                        {parentBalance.balance > 0 ? '' : ''}{parentBalance.balance.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}h
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>Saldo negativo</p>
+                      <p className="text-xs font-semibold"
+                        style={{ color: parentBalance.allow_negative ? '#f59e0b' : '#ef4444' }}>
+                        {parentBalance.allow_negative ? 'Permitido' : 'Bloqueado'}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => setStep('decision')} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--brand-muted)' }}>Voltar</button>
-              <button onClick={handleSubprojetoAvancar} disabled={!selectedProjectId}
+              <button onClick={handleSubprojetoAvancar} disabled={!selectedProjectId || parentBalanceLoading}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
                 style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>
                 Avançar →
@@ -1095,6 +1157,38 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone, onNovoProjeto,
         )}
       </div>
     </div>
+    {/* Modal de confirmação: saldo negativo permitido */}
+    {confirmNegative && selectedProjectId && parentBalance && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+        <div className="rounded-2xl w-full max-w-sm p-6 text-center" style={{ background: 'var(--brand-surface)', border: '1px solid rgba(239,68,68,0.4)' }}>
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
+            style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
+            <AlertTriangle size={22} style={{ color: '#ef4444' }} />
+          </div>
+          <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--brand-text)' }}>Saldo Negativo</h3>
+          <p className="text-xs mb-4" style={{ color: 'var(--brand-muted)' }}>
+            O projeto pai possui saldo de{' '}
+            <strong style={{ color: '#ef4444' }}>
+              {parentBalance.balance.toLocaleString('pt-BR', { minimumFractionDigits: 1 })}h
+            </strong>.{' '}
+            Criar este subprojeto irá aumentar o saldo devedor. Deseja continuar?
+          </p>
+          <div className="flex gap-2 justify-center">
+            <button onClick={() => setConfirmNegative(false)}
+              className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-white/5 transition-colors"
+              style={{ color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}>
+              Cancelar
+            </button>
+            <button onClick={() => { setConfirmNegative(false); onSubprojeto(selectedProjectId) }}
+              className="px-4 py-2 rounded-xl text-sm font-bold transition-colors"
+              style={{ background: 'rgba(239,68,68,0.2)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.4)' }}>
+              Sim, continuar
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 
