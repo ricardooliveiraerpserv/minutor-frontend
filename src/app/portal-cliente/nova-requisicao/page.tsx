@@ -95,7 +95,7 @@ function SectionTitle({ number, title }: { number: string; title: string }) {
 
 // ─── Success Screen ───────────────────────────────────────────────────────────
 
-function SuccessScreen({ onNew, onList }: { onNew: () => void; onList: () => void }) {
+function SuccessScreen({ onNew, onList, onClose }: { onNew: () => void; onList: () => void; onClose: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-6 py-20">
       <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)' }}>
@@ -107,7 +107,11 @@ function SuccessScreen({ onNew, onList }: { onNew: () => void; onList: () => voi
           Sua necessidade foi registrada e será analisada pela nossa equipe. Você receberá um retorno em breve.
         </p>
       </div>
-      <div className="flex gap-3">
+      <div className="flex gap-3 flex-wrap justify-center">
+        <button onClick={onClose} className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-opacity hover:opacity-80"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--brand-border)', color: 'var(--brand-subtle)' }}>
+          Fechar
+        </button>
         <button onClick={onNew} className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-opacity hover:opacity-80"
           style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--brand-border)', color: 'var(--brand-muted)' }}>
           Nova Requisição
@@ -186,7 +190,7 @@ function NovaRequisicaoContent() {
         </div>
 
         {submitted ? (
-          <SuccessScreen onNew={resetForm} onList={() => router.push('/portal-cliente/requisicoes')} />
+          <SuccessScreen onNew={resetForm} onList={() => router.push('/portal-cliente/requisicoes')} onClose={() => router.back()} />
         ) : (
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-2xl mx-auto px-6 py-8 space-y-8">
@@ -196,12 +200,12 @@ function NovaRequisicaoContent() {
                 <SectionTitle number="1" title="Identificação da Requisição" />
                 <div className="space-y-4">
                   <div>
-                    <Label required>Área Requisitante</Label>
-                    <Input value={form.area_requisitante} onChange={set('area_requisitante')} placeholder="Ex: Financeiro, RH, TI..." />
-                  </div>
-                  <div>
                     <Label>Nome do Projeto</Label>
                     <Input value={form.project_name} onChange={set('project_name')} placeholder="Ex: Implantação SIGAFIN, Migração ERP..." />
+                  </div>
+                  <div>
+                    <Label required>Área Requisitante</Label>
+                    <Input value={form.area_requisitante} onChange={set('area_requisitante')} placeholder="Ex: Financeiro, RH, TI..." />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
