@@ -34,6 +34,7 @@ interface ContractCard {
   project_status?: string
   is_complete: boolean
   created_at: string
+  sustentacao_column?: string | null
 }
 
 interface ProjectCard {
@@ -55,11 +56,12 @@ interface Coordinator { id: number; name: string }
 interface Column {
   id: string
   label: string
-  type: 'fixed' | 'coordinator' | 'project_status'
+  type: 'fixed' | 'coordinator' | 'project_status' | 'sustentacao'
   coordinatorId?: number
   emoji?: string
   projectStatus?: string
   color?: string
+  sustentacaoValidator?: (card: ContractCard) => boolean
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -94,13 +96,30 @@ const COL_TO_PROJECT_STATUS: Record<string, string> = {
 }
 
 const FIXED_COLUMNS: Column[] = [
-  { id: 'novo',            label: 'Novo Contrato',       type: 'fixed', emoji: '🆕' },
-  { id: 'pronto',          label: 'Pronto para Iniciar', type: 'fixed', emoji: '✅' },
+  { id: 'novo',  label: 'Novo Contrato',       type: 'fixed', emoji: '🆕' },
+  { id: 'pronto', label: 'Pronto para Iniciar', type: 'fixed', emoji: '✅' },
 ]
 
-const SUSTENTACAO_COL: Column = {
-  id: 'sustentacao_auto', label: 'Sustentação / Cloud', type: 'fixed', emoji: '⚙️', color: '#f59e0b',
-}
+const SUST_COLOR = '#f97316'
+
+const SUSTENTACAO_COLS: Column[] = [
+  {
+    id: 'sust_bh_fixo',   label: 'BH Fixo',        type: 'sustentacao', emoji: '🔒', color: SUST_COLOR,
+    sustentacaoValidator: (c) => c.categoria === 'sustentacao' && c.tipo_faturamento === 'banco_horas_fixo',
+  },
+  {
+    id: 'sust_bh_mensal', label: 'BH Mensal',       type: 'sustentacao', emoji: '📅', color: SUST_COLOR,
+    sustentacaoValidator: (c) => c.categoria === 'sustentacao' && c.tipo_faturamento === 'banco_horas_mensal',
+  },
+  {
+    id: 'sust_cloud',     label: 'Cloud',            type: 'sustentacao', emoji: '☁️', color: '#38bdf8',
+    sustentacaoValidator: (c) => !!(c.service_type?.toLowerCase().includes('cloud')),
+  },
+  {
+    id: 'sust_bizify',    label: 'Bizify',           type: 'sustentacao', emoji: '⚡', color: '#a78bfa',
+    sustentacaoValidator: (c) => c.categoria === 'sustentacao',
+  },
+]
 
 const STATUS_PROJECT_COLUMNS: Column[] = [
   { id: 'col_pausado',   label: 'Pausado',   type: 'project_status', projectStatus: 'paused',    color: '#f97316' },
@@ -330,12 +349,16 @@ function KanbanContent() {
   const router = useRouter()
   const { user } = useAuth()
 
-  const [demandCards,          setDemandCards]          = useState<ContractCard[]>([])
-  const [projectCards,         setProjectCards]         = useState<ProjectCard[]>([])
-  const [coordinators,         setCoordinators]         = useState<Coordinator[]>([])
-  const [sustentacaoAutoCards, setSustentacaoAutoCards] = useState<ContractCard[]>([])
-  const [loading,              setLoading]              = useState(true)
-  const [selected,             setSelected]             = useState<ContractCard | null>(null)
+  type SustGroups = Record<string, ContractCard[]>
+
+  const [demandCards,       setDemandCards]       = useState<ContractCard[]>([])
+  const [projectCards,      setProjectCards]       = useState<ProjectCard[]>([])
+  const [coordinators,      setCoordinators]       = useState<Coordinator[]>([])
+  const [sustGroups,        setSustGroups]         = useState<SustGroups>({
+    sust_bh_fixo: [], sust_bh_mensal: [], sust_cloud: [], sust_bizify: [],
+  })
+  const [loading,           setLoading]            = useState(true)
+  const [selected,          setSelected]           = useState<ContractCard | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -344,17 +367,25 @@ function KanbanContent() {
       setDemandCards(r.demand_cards ?? r.contracts ?? [])
       setProjectCards(r.project_cards ?? [])
       setCoordinators(r.coordinators ?? [])
-      setSustentacaoAutoCards(r.sustentacao_auto_cards ?? [])
+      setSustGroups({
+        sust_bh_fixo:   r.sustentacao_groups?.sust_bh_fixo   ?? [],
+        sust_bh_mensal: r.sustentacao_groups?.sust_bh_mensal ?? [],
+        sust_cloud:     r.sustentacao_groups?.sust_cloud     ?? [],
+        sust_bizify:    r.sustentacao_groups?.sust_bizify    ?? [],
+      })
     } catch { toast.error('Erro ao carregar kanban') }
     finally   { setLoading(false) }
   }, [])
 
   useEffect(() => { load() }, [load])
 
-  // Column list: fixed + sustentacao auto + coordinator + project status
+  const isSustAdmin = user?.type === 'admin' ||
+    (user?.type === 'coordenador' && (user as any).coordinator_type === 'sustentacao')
+
+  // Column list: fixed + sustentacao group + coordinator + project status
   const columns: Column[] = [
     ...FIXED_COLUMNS,
-    ...(sustentacaoAutoCards.length > 0 ? [SUSTENTACAO_COL] : []),
+    ...SUSTENTACAO_COLS,
     ...coordinators.map(c => ({
       id:            `coordinator:${c.id}`,
       label:         c.name,
@@ -367,7 +398,7 @@ function KanbanContent() {
 
   // Contract cards per column
   const contractsInCol = (colId: string): ContractCard[] => {
-    if (colId === 'sustentacao_auto') return sustentacaoAutoCards
+    if (colId.startsWith('sust_')) return sustGroups[colId] ?? []
     return demandCards
       .filter(c => contractColumnId(c) === colId)
       .sort((a, b) => a.kanban_order - b.kanban_order)
@@ -391,48 +422,81 @@ function KanbanContent() {
     if (!destination) return
     if (source.droppableId === destination.droppableId && source.index === destination.index) return
 
-    const toCol = destination.droppableId
+    const toCol    = destination.droppableId
+    const fromCol  = source.droppableId
     const [cardType, rawId] = draggableId.split('-')
-    const cardId = Number(rawId)
-
-    // Block drops back into the auto-sustentacao column
-    if (toCol === 'sustentacao_auto') return
+    const cardId   = Number(rawId)
 
     // ── Moving a contract card ──
     if (cardType === 'contract') {
-      const card = [...demandCards, ...sustentacaoAutoCards].find(c => c.id === cardId)
+      const allSustCards = Object.values(sustGroups).flat()
+      const card = [...demandCards, ...allSustCards].find(c => c.id === cardId)
       if (!card) return
 
-      // Moving to a coordinator column → generate or assign project
-      if (toCol.startsWith('coordinator:')) {
+      // ── From sustentação column to coordinator → allocate
+      if (fromCol.startsWith('sust_') && toCol.startsWith('coordinator:')) {
+        if (!isSustAdmin) { toast.error('Apenas admin ou coordenador de sustentação pode alocar.'); return }
+        if (!card.is_complete) { toast.error('Contrato incompleto.'); return }
         const coordId = Number(toCol.split(':')[1])
-        if (!card.is_complete) {
-          toast.error('Contrato incompleto — preencha todos os campos antes de alocar.')
+        setSustGroups(prev => {
+          const next = { ...prev }
+          next[fromCol] = prev[fromCol].filter(c => c.id !== cardId)
+          return next
+        })
+        try {
+          await api.patch(`/contracts/${cardId}/kanban-move`, {
+            to_column: `coordinator:${coordId}`, coordinator_id: coordId, order: destination.index,
+          })
+          await load()
+          toast.success('🚀 Projeto gerado automaticamente!')
+        } catch (e: any) { toast.error(e?.message ?? 'Erro ao alocar'); load() }
+        return
+      }
+
+      // ── Between sustentação columns
+      if (toCol.startsWith('sust_')) {
+        if (!isSustAdmin) { toast.error('Apenas admin ou coordenador de sustentação pode mover.'); return }
+        const destCol = SUSTENTACAO_COLS.find(c => c.id === toCol)
+        if (!destCol?.sustentacaoValidator?.(card)) {
+          toast.error('Tipo de contrato incompatível com esta coluna.')
           return
         }
+        // Optimistic
+        setSustGroups(prev => {
+          const next = { ...prev }
+          if (fromCol.startsWith('sust_')) next[fromCol] = prev[fromCol].filter(c => c.id !== cardId)
+          next[toCol] = [...(prev[toCol] ?? []), { ...card, sustentacao_column: toCol }]
+          return next
+        })
+        try {
+          await api.patch(`/contracts/${cardId}/sustentacao-move`, { to_column: toCol })
+        } catch (e: any) { toast.error(e?.message ?? 'Erro ao mover'); load() }
+        return
+      }
+
+      // ── Moving to a coordinator column from demand
+      if (toCol.startsWith('coordinator:')) {
+        const coordId = Number(toCol.split(':')[1])
+        if (!card.is_complete) { toast.error('Contrato incompleto — preencha todos os campos antes de alocar.'); return }
         const wasNew = !card.project_id
-        // Optimistic update: remove from auto list if it came from there
-        setSustentacaoAutoCards(prev => prev.filter(c => c.id !== cardId))
         setDemandCards(prev => prev.map(c =>
           c.id === cardId ? { ...c, kanban_status: 'alocado', kanban_coordinator_id: coordId } : c
         ))
         try {
           await api.patch(`/contracts/${cardId}/kanban-move`, {
-            to_column:      `coordinator:${coordId}`,
-            coordinator_id: coordId,
-            order:          destination.index,
+            to_column: `coordinator:${coordId}`, coordinator_id: coordId, order: destination.index,
           })
           await load()
           if (wasNew) toast.success('🚀 Projeto gerado automaticamente!')
           else toast.success('Coordenador atualizado')
-        } catch (e: any) {
-          toast.error(e?.message ?? 'Erro ao alocar contrato')
-          load()
-        }
+        } catch (e: any) { toast.error(e?.message ?? 'Erro ao alocar contrato'); load() }
         return
       }
 
-      // Moving between fixed columns (novo ↔ pronto)
+      // ── Block drops of sustentação cards into demand/fixed columns
+      if (fromCol.startsWith('sust_')) return
+
+      // ── Moving between fixed columns (novo ↔ pronto)
       const toKanbanStatus = toCol === 'pronto' ? 'aprovado' : 'backlog'
       setDemandCards(prev => prev.map(c =>
         c.id === cardId ? { ...c, kanban_status: toKanbanStatus, kanban_order: destination.index } : c
@@ -440,10 +504,7 @@ function KanbanContent() {
       try {
         await api.patch(`/contracts/${cardId}/kanban-move`, { to_column: toKanbanStatus, order: destination.index })
         toast.success('Card movido')
-      } catch (e: any) {
-        toast.error(e?.message ?? 'Erro ao mover card')
-        load()
-      }
+      } catch (e: any) { toast.error(e?.message ?? 'Erro ao mover card'); load() }
       return
     }
 
@@ -451,15 +512,11 @@ function KanbanContent() {
     if (cardType === 'project') {
       const newStatus = COL_TO_PROJECT_STATUS[toCol]
       if (!newStatus) return
-
       setProjectCards(prev => prev.map(p => p.id === cardId ? { ...p, status: newStatus } : p))
       try {
         await api.patch(`/projects/${cardId}/kanban-move`, { status: newStatus })
         toast.success('Projeto atualizado')
-      } catch (e: any) {
-        toast.error(e?.message ?? 'Erro ao mover projeto')
-        load()
-      }
+      } catch (e: any) { toast.error(e?.message ?? 'Erro ao mover projeto'); load() }
     }
   }
 
@@ -496,6 +553,7 @@ function KanbanContent() {
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" />Incompleto</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" />Pronto</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />Projeto Ativo</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full inline-block" style={{ background: SUST_COLOR }} />Sustentação</span>
           <span className="ml-auto flex items-center gap-1.5"><Users size={11} />Colunas de coordenador geram projeto automaticamente</span>
         </div>
 
@@ -518,21 +576,23 @@ function KanbanContent() {
 
                   // Visual separator before first status col
                   const prevCol     = columns[colIdx - 1]
-                  const showSep     = isStatusCol && prevCol?.type !== 'project_status'
-                  const isSustAuto  = col.id === 'sustentacao_auto'
+                  const showSep     = (isStatusCol && prevCol?.type !== 'project_status') ||
+                                      (col.type === 'sustentacao' && prevCol?.type !== 'sustentacao') ||
+                                      (isCoord && prevCol?.type === 'sustentacao')
+                  const isSust      = col.type === 'sustentacao'
 
                   const borderColor = isStatusCol
                     ? `${col.color}30`
-                    : isSustAuto
-                    ? 'rgba(245,158,11,0.3)'
+                    : isSust
+                    ? `${col.color}35`
                     : isCoord
                     ? 'rgba(0,245,255,0.15)'
                     : 'var(--brand-border)'
 
                   const headerColor = isStatusCol
                     ? col.color!
-                    : isSustAuto
-                    ? '#f59e0b'
+                    : isSust
+                    ? col.color!
                     : isCoord
                     ? 'var(--brand-primary)'
                     : 'var(--brand-text)'
@@ -542,7 +602,7 @@ function KanbanContent() {
                       {/* Separator */}
                       {showSep && (
                         <div className="self-stretch w-px shrink-0 mt-1"
-                          style={{ background: 'var(--brand-border)', opacity: 0.4 }} />
+                          style={{ background: isSust ? SUST_COLOR : 'var(--brand-border)', opacity: isSust ? 0.5 : 0.4 }} />
                       )}
 
                       {/* Column */}
@@ -550,8 +610,8 @@ function KanbanContent() {
                         width: 264,
                         background: isStatusCol
                           ? `${col.color}05`
-                          : isSustAuto
-                          ? 'rgba(245,158,11,0.03)'
+                          : isSust
+                          ? `${col.color}04`
                           : isCoord
                           ? 'rgba(0,245,255,0.02)'
                           : 'rgba(255,255,255,0.02)',
@@ -572,10 +632,16 @@ function KanbanContent() {
                               {totalCards}
                             </span>
                           </div>
-                          {isSustAuto && (
-                            <p className="text-[10px] mt-1" style={{ color: '#f59e0b', opacity: 0.7 }}>
-                              Aparecem automaticamente — arraste para alocar
-                            </p>
+                          {isSust && (
+                            <>
+                              <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm"
+                                style={{ background: `${SUST_COLOR}15`, color: SUST_COLOR, letterSpacing: '0.1em' }}>
+                                SUSTENTAÇÃO
+                              </span>
+                              <p className="text-[10px] mt-0.5" style={{ color: col.color, opacity: 0.65 }}>
+                                Arraste entre colunas ou para coordenador
+                              </p>
+                            </>
                           )}
                           {isCoord && (
                             <p className="text-[10px] mt-1" style={{ color: 'var(--brand-subtle)' }}>
@@ -587,7 +653,10 @@ function KanbanContent() {
                         {/* Cards */}
                         <Droppable
                           droppableId={col.id}
-                          isDropDisabled={isSustAuto || (isStatusCol && !['col_pausado', 'col_cancelado', 'col_encerrado'].includes(col.id))}
+                          isDropDisabled={
+                            (isSust && !isSustAdmin) ||
+                            (isStatusCol && !['col_pausado', 'col_cancelado', 'col_encerrado'].includes(col.id))
+                          }
                         >
                           {(prov, snap) => (
                             <div
@@ -597,7 +666,7 @@ function KanbanContent() {
                               style={{
                                 minHeight: 80,
                                 background: snap.isDraggingOver
-                                  ? isStatusCol ? `${col.color}08` : isCoord ? 'rgba(0,245,255,0.05)' : 'rgba(255,255,255,0.03)'
+                                  ? isStatusCol ? `${col.color}08` : isSust ? `${col.color}08` : isCoord ? 'rgba(0,245,255,0.05)' : 'rgba(255,255,255,0.03)'
                                   : 'transparent',
                               }}
                             >
@@ -613,7 +682,7 @@ function KanbanContent() {
                               {prov.placeholder}
                               {totalCards === 0 && !snap.isDraggingOver && (
                                 <p className="text-center text-xs py-6" style={{ color: 'var(--brand-subtle)' }}>
-                                  {isCoord ? 'Nenhum projeto alocado' : 'Vazio'}
+                                  {isCoord ? 'Nenhum projeto alocado' : isSust ? 'Sem contratos nesta categoria' : 'Vazio'}
                                 </p>
                               )}
                             </div>
