@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { Project, PaginatedResponse, HourContribution } from '@/types'
 import { formatBRL } from '@/lib/format'
 import { toast } from 'sonner'
-import { Layers, Search, ChevronDown, ChevronRight, Users, TrendingUp, Clock, BarChart2, AlertTriangle, DollarSign, X, UserCheck, Pencil, Trash2, Plus, Edit2, MessageCircle } from 'lucide-react'
+import { Layers, Search, ChevronDown, ChevronRight, Users, TrendingUp, Clock, BarChart2, AlertTriangle, DollarSign, X, UserCheck, Pencil, Trash2, Plus, Edit2, MessageCircle, Eye } from 'lucide-react'
 import { ProjectMessages } from '@/components/shared/ProjectMessages'
 import { PageHeader } from '@/components/ds'
 import { RowMenu } from '@/components/ui/row-menu'
@@ -205,7 +205,7 @@ interface ProjectRowProps {
   project: ProjectWithTeam
   expanded: boolean
   onToggle: () => void
-  onMenuAction: (action: 'costs' | 'timesheets' | 'expenses' | 'team' | 'aportes' | 'messages', project: ProjectWithTeam) => void
+  onMenuAction: (action: 'view' | 'costs' | 'timesheets' | 'expenses' | 'team' | 'aportes' | 'messages', project: ProjectWithTeam) => void
   canEdit?: boolean
   canChangeStatus?: boolean
   onEdit?: (project: ProjectWithTeam) => void
@@ -272,6 +272,7 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, canEdit, canCha
         <td className="py-2 pl-2 pr-1" style={{ width: 60 }} onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-1">
             <RowMenu items={[
+              { label: 'Visualizar', icon: <Eye size={12} />, onClick: () => onMenuAction('view', project) },
               ...(canEdit ? [{ label: 'Editar', icon: <Edit2 size={12} />, onClick: () => onEdit?.(project) }] : []),
               ...(canChangeStatus ? [{ label: 'Alterar Status', icon: <Layers size={12} />, onClick: () => onChangeStatus?.(project) }] : []),
               { label: 'Custo',             icon: <DollarSign  size={12} />, onClick: () => onMenuAction('costs',      project) },
@@ -697,6 +698,7 @@ export default function GestaoProjetosPage() {
     } catch { toast.error('Erro ao excluir aporte') }
   }
 
+  const [viewProject, setViewProject] = useState<ProjectWithTeam | null>(null)
   const [messagesProject, setMessagesProject] = useState<ProjectWithTeam | null>(null)
 
   // Auto-open messages modal when ?messages=PROJECT_ID is in URL
@@ -709,7 +711,8 @@ export default function GestaoProjetosPage() {
     window.history.replaceState({}, '', window.location.pathname)
   }, [projects])
 
-  const handleMenuAction = async (action: 'costs' | 'timesheets' | 'expenses' | 'team' | 'aportes' | 'messages', project: ProjectWithTeam) => {
+  const handleMenuAction = async (action: 'view' | 'costs' | 'timesheets' | 'expenses' | 'team' | 'aportes' | 'messages', project: ProjectWithTeam) => {
+    if (action === 'view')     { setViewProject(project); return }
     if (action === 'messages') { setMessagesProject(project); return }
     if (action === 'timesheets') { router.push(`/timesheets?project_id=${project.id}`); return }
     if (action === 'expenses')   { router.push(`/expenses?project_id=${project.id}`);   return }
@@ -1330,6 +1333,118 @@ export default function GestaoProjetosPage() {
           </div>
         </div>
       )}
+
+      {/* ── Modal de Visualização ── */}
+      {viewProject && (() => {
+        const p = viewProject
+        const consumed = p.consumed_hours ?? (p.total_logged_minutes != null ? p.total_logged_minutes / 60 : 0)
+        const pct = p.sold_hours ? (consumed / p.sold_hours) * 100 : 0
+        const color = healthColor(pct)
+        const hs = healthStyles[color]
+        const statusLabel: Record<string, string> = {
+          active: 'Ativo', started: 'Em Andamento', awaiting_start: 'Aguardando Início',
+          paused: 'Pausado', finished: 'Finalizado', cancelled: 'Cancelado',
+        }
+        const field = (label: string, value: React.ReactNode) => (
+          <div className="flex items-start justify-between py-2.5 border-b last:border-0" style={{ borderColor: 'var(--brand-border)' }}>
+            <span className="text-xs font-medium shrink-0" style={{ color: 'var(--brand-subtle)' }}>{label}</span>
+            <span className="text-xs font-semibold text-right ml-4" style={{ color: 'var(--brand-text)' }}>{value ?? '—'}</span>
+          </div>
+        )
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
+            <div className="flex flex-col rounded-2xl w-full max-w-lg max-h-[90vh]" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: 'var(--brand-border)' }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-10 rounded-full" style={{ background: hs.bar }} />
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>{p.code}</p>
+                    <h2 className="text-base font-bold" style={{ color: 'var(--brand-text)' }}>{p.name}</h2>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {canEdit && (
+                    <button onClick={() => { setViewProject(null); router.push(`/projects?editId=${p.id}`) }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                      style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.2)' }}>
+                      <Edit2 size={11} /> Editar
+                    </button>
+                  )}
+                  <button onClick={() => setViewProject(null)} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"><X size={16} style={{ color: 'var(--brand-muted)' }} /></button>
+                </div>
+              </div>
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+                {/* Informações gerais */}
+                <div className="rounded-xl p-4" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Informações Gerais</p>
+                  {field('Cliente', p.customer?.name)}
+                  {field('Tipo de Contrato', p.contract_type_display)}
+                  {field('Status', (
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold"
+                      style={{
+                        background: p.status === 'started' ? 'rgba(0,245,255,0.10)' : p.status === 'paused' ? 'rgba(245,158,11,0.12)' : p.status === 'cancelled' ? 'rgba(239,68,68,0.12)' : p.status === 'finished' ? 'rgba(161,161,170,0.12)' : 'rgba(139,92,246,0.12)',
+                        color: p.status === 'started' ? '#00F5FF' : p.status === 'paused' ? '#F59E0B' : p.status === 'cancelled' ? '#EF4444' : p.status === 'finished' ? '#71717A' : '#8B5CF6',
+                      }}>
+                      {p.status_display ?? statusLabel[p.status] ?? p.status}
+                    </span>
+                  ))}
+                </div>
+                {/* Horas */}
+                <div className="rounded-xl p-4" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Horas</p>
+                  <div className="grid grid-cols-3 gap-4 mb-3">
+                    {[
+                      { label: 'Vendidas', value: fmt(p.sold_hours) + 'h', color: 'var(--brand-text)' },
+                      { label: 'Consumidas', value: fmt(consumed, 1) + 'h', color: 'var(--brand-muted)' },
+                      { label: 'Saldo', value: fmt(p.general_hours_balance, 1) + 'h', color: (p.general_hours_balance ?? 0) < 0 ? '#ef4444' : '#22c55e' },
+                    ].map(it => (
+                      <div key={it.label} className="text-center">
+                        <p className="text-[10px] mb-1" style={{ color: 'var(--brand-subtle)' }}>{it.label}</p>
+                        <p className="text-sm font-bold tabular-nums" style={{ color: it.color }}>{it.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: hs.bar }} />
+                  </div>
+                  <p className="text-[10px] text-right mt-1 tabular-nums" style={{ color: hs.text }}>{p.sold_hours ? `${Math.round(pct)}% consumido` : '—'}</p>
+                </div>
+                {/* Equipe */}
+                {((p.coordinators?.length ?? 0) > 0 || (p.consultants?.length ?? 0) > 0) && (
+                  <div className="rounded-xl p-4" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Equipe</p>
+                    {(p.coordinators?.length ?? 0) > 0 && (
+                      <div className="mb-3">
+                        <p className="text-[10px] mb-1.5" style={{ color: 'var(--brand-subtle)' }}>Coordenadores</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {p.coordinators!.map(u => (
+                            <span key={u.id} className="text-xs px-2.5 py-1 rounded-lg font-medium" style={{ background: 'rgba(0,245,255,0.08)', color: '#00F5FF' }}>{u.name}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {(p.consultants?.length ?? 0) > 0 && (
+                      <div>
+                        <p className="text-[10px] mb-1.5" style={{ color: 'var(--brand-subtle)' }}>Consultores</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {p.consultants!.map(u => (
+                            <span key={u.id} className="text-xs px-2.5 py-1 rounded-lg font-medium" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--brand-muted)' }}>{u.name}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end px-6 py-4 shrink-0" style={{ borderTop: '1px solid var(--brand-border)' }}>
+                <button onClick={() => setViewProject(null)} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-white/5 transition-colors" style={{ color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}>Fechar</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Modal de Mensagens ── */}
       {messagesProject && (
