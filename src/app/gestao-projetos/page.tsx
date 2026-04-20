@@ -482,43 +482,90 @@ interface ProjectEditForm {
   start_date: string; expected_end_date: string
   sold_hours: string; project_value: string
   hourly_rate: string; additional_hourly_rate: string
-  initial_hours_balance: string; allow_negative_balance: boolean
+  initial_hours_balance: string; initial_cost: string
+  consultant_hours: string; coordinator_hours: string
+  parent_project_id: string
+  service_type_id: string; contract_type_id: string
+  tipo_faturamento: string; tipo_alocacao: string
+  condicao_pagamento: string; vendedor_id: string
+  cobra_despesa_cliente: boolean
+  observacoes_contrato: string
+  max_expense_per_consultant: string
+  timesheet_retroactive_limit_days: string
+  allow_manual_timesheets: boolean; allow_negative_balance: boolean
+  coordinator_ids: number[]; consultant_ids: number[]; consultant_group_ids: number[]
 }
 
 function ProjectInlineEditModal({ project, onClose, onSaved }: { project: ProjectFull; onClose: () => void; onSaved: () => void }) {
+  const d = project as any
   const [form, setForm] = useState<ProjectEditForm>({
-    name:                   project.name ?? '',
-    description:            project.description ?? '',
-    status:                 project.status ?? 'awaiting_start',
-    start_date:             project.start_date?.slice(0, 10) ?? '',
-    expected_end_date:      (project as any).expected_end_date?.slice(0, 10) ?? '',
-    sold_hours:             String(project.sold_hours ?? ''),
-    project_value:          String(project.project_value ?? ''),
-    hourly_rate:            String(project.hourly_rate ?? ''),
-    additional_hourly_rate: String(project.additional_hourly_rate ?? ''),
-    initial_hours_balance:  String(project.initial_hours_balance ?? ''),
-    allow_negative_balance: false,
+    name:                            d.name ?? '',
+    description:                     d.description ?? '',
+    status:                          d.status ?? 'awaiting_start',
+    start_date:                      d.start_date?.slice(0, 10) ?? '',
+    expected_end_date:               d.expected_end_date?.slice(0, 10) ?? '',
+    sold_hours:                      d.sold_hours != null ? String(d.sold_hours) : '',
+    project_value:                   d.project_value != null ? String(d.project_value) : '',
+    hourly_rate:                     d.hourly_rate != null ? String(d.hourly_rate) : '',
+    additional_hourly_rate:          d.additional_hourly_rate != null ? String(d.additional_hourly_rate) : '',
+    initial_hours_balance:           d.initial_hours_balance != null ? String(d.initial_hours_balance) : '',
+    initial_cost:                    d.initial_cost != null ? String(d.initial_cost) : '',
+    consultant_hours:                d.consultant_hours != null ? String(d.consultant_hours) : '',
+    coordinator_hours:               d.coordinator_hours != null ? String(d.coordinator_hours) : '',
+    parent_project_id:               d.parent_project_id ? String(d.parent_project_id) : '',
+    service_type_id:                 d.service_type_id ? String(d.service_type_id) : (d.service_type?.id ? String(d.service_type.id) : ''),
+    contract_type_id:                d.contract_type_id ? String(d.contract_type_id) : (d.contract_type?.id ? String(d.contract_type.id) : ''),
+    tipo_faturamento:                d.tipo_faturamento ?? '',
+    tipo_alocacao:                   d.tipo_alocacao ?? '',
+    condicao_pagamento:              d.condicao_pagamento ?? '',
+    vendedor_id:                     d.vendedor_id ? String(d.vendedor_id) : '',
+    cobra_despesa_cliente:           d.cobra_despesa_cliente ?? false,
+    observacoes_contrato:            d.observacoes_contrato ?? '',
+    max_expense_per_consultant:      d.max_expense_per_consultant != null ? String(d.max_expense_per_consultant) : '',
+    timesheet_retroactive_limit_days: d.timesheet_retroactive_limit_days != null ? String(d.timesheet_retroactive_limit_days) : '',
+    allow_manual_timesheets:         d.allow_manual_timesheets ?? true,
+    allow_negative_balance:          d.allow_negative_balance ?? false,
+    coordinator_ids:                 (d.coordinators ?? d.approvers ?? []).map((c: any) => c.id),
+    consultant_ids:                  (d.consultants ?? []).map((c: any) => c.id),
+    consultant_group_ids:            (d.consultant_groups ?? []).map((g: any) => g.id),
   })
   const [saving, setSaving] = useState(false)
-  const [allCoordinators, setAllCoordinators] = useState<{ id: number; name: string }[]>([])
-  const [allConsultants2,  setAllConsultants2]  = useState<{ id: number; name: string }[]>([])
-  const [selCoordIds,     setSelCoordIds]     = useState<Set<number>>(new Set((project.coordinators ?? []).map(c => c.id)))
-  const [selConsultIds,   setSelConsultIds]   = useState<Set<number>>(new Set((project.consultants  ?? []).map(c => c.id)))
-  const [teamSearch2,     setTeamSearch2]     = useState('')
-  const [teamTab2,        setTeamTab2]        = useState<'coord' | 'consult'>('coord')
+
+  const [optServiceTypes,    setOptServiceTypes]    = useState<{id:number;name:string}[]>([])
+  const [optContractTypes,   setOptContractTypes]   = useState<{id:number;name:string}[]>([])
+  const [optCoordinators,    setOptCoordinators]    = useState<{id:number;name:string}[]>([])
+  const [optConsultants,     setOptConsultants]     = useState<{id:number;name:string}[]>([])
+  const [optGroups,          setOptGroups]          = useState<{id:number;name:string}[]>([])
+  const [optParentProjects,  setOptParentProjects]  = useState<{id:number;name:string}[]>([])
+  const [teamSearch,         setTeamSearch]         = useState('')
+  const [teamTab,            setTeamTab]            = useState<'coord'|'consult'|'group'>('coord')
 
   useEffect(() => {
-    Promise.all([
+    const items = (r: any) => Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
+    Promise.allSettled([
+      api.get<any>('/service-types?pageSize=100'),
+      api.get<any>('/contract-types?pageSize=100'),
       api.get<any>('/users?type=coordenador&pageSize=200'),
       api.get<any>('/users?type=consultor&pageSize=200'),
-    ]).then(([coords, consults]) => {
-      setAllCoordinators(coords?.items ?? coords?.data ?? [])
-      setAllConsultants2(consults?.items ?? consults?.data ?? [])
-    }).catch(() => {})
+      api.get<any>('/consultant-groups?pageSize=100&active=1'),
+    ]).then(([st, ct, coords, consults, grps]) => {
+      if (st.status === 'fulfilled')      setOptServiceTypes(items(st.value))
+      if (ct.status === 'fulfilled')      setOptContractTypes(items(ct.value))
+      if (coords.status === 'fulfilled')  setOptCoordinators(items(coords.value))
+      if (consults.status === 'fulfilled') setOptConsultants(items(consults.value))
+      if (grps.status === 'fulfilled')    setOptGroups(items(grps.value))
+    })
+    const customerId = d.customer_id
+    if (customerId) {
+      const qs = new URLSearchParams({ pageSize: '200', parent_projects_only: 'true', customer_id: String(customerId), exclude_id: String(project.id) })
+      api.get<any>(`/projects?${qs}`).then(r => {
+        const list = items(r)
+        setOptParentProjects(list.map((p: any) => ({ id: p.id, name: `${p.code} - ${p.name}` })))
+      }).catch(() => {})
+    }
   }, [])
 
-  const toggleCoord   = (id: number) => setSelCoordIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const toggleConsult = (id: number) => setSelConsultIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleId = (ids: number[], id: number) => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]
   const setF = (key: keyof ProjectEditForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm(prev => ({ ...prev, [key]: e.target.value }))
 
@@ -527,17 +574,36 @@ function ProjectInlineEditModal({ project, onClose, onSaved }: { project: Projec
     setSaving(true)
     try {
       const payload: Record<string, unknown> = {
-        name: form.name.trim(), description: form.description || null, status: form.status,
-        start_date: form.start_date || null, expected_end_date: form.expected_end_date || null,
-        allow_negative_balance: form.allow_negative_balance,
-        coordinator_ids: Array.from(selCoordIds),
-        consultant_ids:  Array.from(selConsultIds),
+        name: form.name.trim(),
+        description:          form.description || null,
+        status:               form.status,
+        start_date:           form.start_date || null,
+        expected_end_date:    form.expected_end_date || null,
+        allow_manual_timesheets: form.allow_manual_timesheets,
+        allow_negative_balance:  form.allow_negative_balance,
+        cobra_despesa_cliente:   form.cobra_despesa_cliente,
+        observacoes_contrato: form.observacoes_contrato || null,
+        condicao_pagamento:   form.condicao_pagamento || null,
+        coordinator_ids:      form.coordinator_ids,
+        consultant_ids:       form.consultant_ids,
+        consultant_group_ids: form.consultant_group_ids,
       }
-      if (form.sold_hours !== '')             payload.sold_hours             = Number(form.sold_hours)
-      if (form.project_value !== '')          payload.project_value          = Number(form.project_value)
-      if (form.hourly_rate !== '')            payload.hourly_rate            = Number(form.hourly_rate)
-      if (form.additional_hourly_rate !== '') payload.additional_hourly_rate = Number(form.additional_hourly_rate)
-      if (form.initial_hours_balance !== '')  payload.initial_hours_balance  = Number(form.initial_hours_balance)
+      if (form.service_type_id)              payload.service_type_id              = Number(form.service_type_id)
+      if (form.contract_type_id)             payload.contract_type_id             = Number(form.contract_type_id)
+      if (form.parent_project_id)            payload.parent_project_id            = Number(form.parent_project_id)
+      if (form.vendedor_id)                  payload.vendedor_id                  = Number(form.vendedor_id)
+      if (form.tipo_faturamento)             payload.tipo_faturamento             = form.tipo_faturamento
+      if (form.tipo_alocacao)                payload.tipo_alocacao                = form.tipo_alocacao
+      if (form.project_value !== '')         payload.project_value                = Number(form.project_value)
+      if (form.hourly_rate !== '')           payload.hourly_rate                  = Number(form.hourly_rate)
+      if (form.additional_hourly_rate !== '') payload.additional_hourly_rate      = Number(form.additional_hourly_rate)
+      if (form.sold_hours !== '')            payload.sold_hours                   = Number(form.sold_hours)
+      if (form.consultant_hours !== '')      payload.consultant_hours             = Number(form.consultant_hours)
+      if (form.coordinator_hours !== '')     payload.coordinator_hours            = Number(form.coordinator_hours)
+      if (form.initial_hours_balance !== '') payload.initial_hours_balance        = Number(form.initial_hours_balance)
+      if (form.initial_cost !== '')          payload.initial_cost                 = Number(form.initial_cost)
+      if (form.max_expense_per_consultant !== '') payload.max_expense_per_consultant = Number(form.max_expense_per_consultant)
+      if (form.timesheet_retroactive_limit_days !== '') payload.timesheet_retroactive_limit_days = Number(form.timesheet_retroactive_limit_days)
       await api.put(`/projects/${project.id}`, payload)
       toast.success('Projeto atualizado')
       onSaved()
@@ -547,6 +613,20 @@ function ProjectInlineEditModal({ project, onClose, onSaved }: { project: Projec
 
   const iStyle: React.CSSProperties = { width: '100%', background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', borderRadius: '0.625rem', padding: '0.5rem 0.75rem', fontSize: '0.8125rem', color: 'var(--brand-text)', outline: 'none' }
   const lStyle: React.CSSProperties = { fontSize: '0.625rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--brand-subtle)', marginBottom: '0.375rem', display: 'block' }
+  const SecTitle = ({ children }: { children: React.ReactNode }) => (
+    <p className="text-[10px] font-semibold uppercase tracking-wider pt-3 pb-2" style={{ color: 'var(--brand-subtle)', borderTop: '1px solid var(--brand-border)' }}>{children}</p>
+  )
+  const Toggle2 = ({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) => (
+    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--brand-border)' }}>
+      <button type="button" onClick={() => onChange(!checked)}
+        className="relative w-10 h-5 rounded-full transition-colors shrink-0"
+        style={{ background: checked ? '#22c55e' : 'rgba(255,255,255,0.1)' }}>
+        <span className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform" style={{ transform: checked ? 'translateX(20px)' : 'translateX(0)' }} />
+      </button>
+      <span className="text-xs" style={{ color: 'var(--brand-text)' }}>{label}</span>
+    </div>
+  )
+
   const STATUS_OPTS = [
     { value: 'awaiting_start', label: 'Aguardando Início' },
     { value: 'started',        label: 'Em Andamento' },
@@ -554,101 +634,213 @@ function ProjectInlineEditModal({ project, onClose, onSaved }: { project: Projec
     { value: 'finished',       label: 'Encerrado' },
     { value: 'cancelled',      label: 'Cancelado' },
   ]
-  const filteredCoords   = allCoordinators.filter(c => c.name.toLowerCase().includes(teamSearch2.toLowerCase()))
-  const filteredConsults = allConsultants2.filter(c => c.name.toLowerCase().includes(teamSearch2.toLowerCase()))
+
+  const filteredCoords   = optCoordinators.filter(c => c.name.toLowerCase().includes(teamSearch.toLowerCase()))
+  const filteredConsults = optConsultants.filter(c => c.name.toLowerCase().includes(teamSearch.toLowerCase()))
+  const filteredGroups   = optGroups.filter(g => g.name.toLowerCase().includes(teamSearch.toLowerCase()))
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-      <div className="flex flex-col rounded-2xl w-full max-w-5xl max-h-[92vh]" style={{ background: 'var(--brand-surface)', border: '1px solid rgba(0,245,255,0.25)' }}>
+      <div className="flex flex-col rounded-2xl w-full max-w-5xl max-h-[94vh]" style={{ background: 'var(--brand-surface)', border: '1px solid rgba(0,245,255,0.25)' }}>
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: 'var(--brand-border)' }}>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>{project.code}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>{d.code}</p>
             <h3 className="text-base font-bold" style={{ color: 'var(--brand-text)' }}>Editar Projeto</h3>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"><X size={16} style={{ color: 'var(--brand-muted)' }} /></button>
         </div>
+
+        {/* Body */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-5">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Identificação</p>
-                <div className="space-y-3">
-                  <div><label style={lStyle}>Nome do Projeto *</label><input value={form.name} onChange={setF('name')} style={iStyle} placeholder="Nome do projeto" /></div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div><label style={lStyle}>Status</label><select value={form.status} onChange={setF('status')} style={iStyle}>{STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
-                    <div><label style={lStyle}>Data de Início</label><input type="date" value={form.start_date} onChange={setF('start_date')} style={iStyle} /></div>
-                  </div>
-                  <div><label style={lStyle}>Data de Conclusão</label><input type="date" value={form.expected_end_date} onChange={setF('expected_end_date')} style={iStyle} /></div>
-                  <div><label style={lStyle}>Descrição</label><textarea value={form.description} onChange={setF('description')} style={{ ...iStyle, resize: 'vertical', minHeight: '80px' }} placeholder="Descrição do projeto" /></div>
+
+            {/* ── Coluna Esquerda ── */}
+            <div className="space-y-3">
+
+              {/* Identificação */}
+              <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--brand-subtle)' }}>Identificação</p>
+              <div><label style={lStyle}>Nome do Projeto *</label><input value={form.name} onChange={setF('name')} style={iStyle} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label style={lStyle}>Status</label>
+                  <select value={form.status} onChange={setF('status')} style={iStyle}>
+                    {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div><label style={lStyle}>Data de Início</label><input type="date" value={form.start_date} onChange={setF('start_date')} style={iStyle} /></div>
+              </div>
+              <div><label style={lStyle}>Data de Conclusão</label><input type="date" value={form.expected_end_date} onChange={setF('expected_end_date')} style={iStyle} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label style={lStyle}>Tipo de Contrato</label>
+                  <select value={form.contract_type_id} onChange={setF('contract_type_id')} style={iStyle}>
+                    <option value="">Selecione...</option>
+                    {optContractTypes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={lStyle}>Tipo de Serviço</label>
+                  <select value={form.service_type_id} onChange={setF('service_type_id')} style={iStyle}>
+                    <option value="">Selecione...</option>
+                    {optServiceTypes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
                 </div>
               </div>
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Financeiro</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label style={lStyle}>Valor do Projeto (R$)</label><input type="number" value={form.project_value} onChange={setF('project_value')} style={iStyle} placeholder="0.00" step="0.01" /></div>
-                  <div><label style={lStyle}>Valor da Hora (R$)</label><input type="number" value={form.hourly_rate} onChange={setF('hourly_rate')} style={iStyle} placeholder="0.00" step="0.01" /></div>
-                  <div><label style={lStyle}>Hora Adicional (R$)</label><input type="number" value={form.additional_hourly_rate} onChange={setF('additional_hourly_rate')} style={iStyle} placeholder="0.00" step="0.01" /></div>
-                  <div><label style={lStyle}>Horas Contratadas</label><input type="number" value={form.sold_hours} onChange={setF('sold_hours')} style={iStyle} placeholder="0" step="1" /></div>
+                <label style={lStyle}>Projeto Pai (Subprojeto)</label>
+                <select value={form.parent_project_id} onChange={setF('parent_project_id')} style={iStyle}>
+                  <option value="">Nenhum</option>
+                  {optParentProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div><label style={lStyle}>Descrição</label><textarea value={form.description} onChange={setF('description')} style={{ ...iStyle, resize: 'vertical', minHeight: '64px' }} /></div>
+
+              {/* Financeiro */}
+              <SecTitle>Financeiro</SecTitle>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label style={lStyle}>Valor do Projeto (R$)</label><input type="number" value={form.project_value} onChange={setF('project_value')} style={iStyle} placeholder="0.00" step="0.01" /></div>
+                <div><label style={lStyle}>Valor da Hora (R$)</label><input type="number" value={form.hourly_rate} onChange={setF('hourly_rate')} style={iStyle} placeholder="0.00" step="0.01" /></div>
+                <div><label style={lStyle}>Hora Adicional (R$)</label><input type="number" value={form.additional_hourly_rate} onChange={setF('additional_hourly_rate')} style={iStyle} placeholder="0.00" step="0.01" /></div>
+                <div><label style={lStyle}>Horas Contratadas</label><input type="number" value={form.sold_hours} onChange={setF('sold_hours')} style={iStyle} placeholder="0" step="1" /></div>
+                <div><label style={lStyle}>% Horas Coordenador</label><input type="number" value={form.coordinator_hours} onChange={setF('coordinator_hours')} style={iStyle} placeholder="0" step="1" min="0" max="100" /></div>
+                <div><label style={lStyle}>Horas Consultor</label><input type="number" value={form.consultant_hours} onChange={setF('consultant_hours')} style={iStyle} placeholder="0" step="1" /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 rounded-xl p-3" style={{ border: '1px solid var(--brand-border)', background: 'rgba(255,255,255,0.02)' }}>
+                <div><label style={{ ...lStyle, marginBottom: 0 }}>Histórico do sistema anterior</label></div>
+                <div />
+                <div><label style={lStyle}>Saldo Inicial de Horas</label><input type="number" value={form.initial_hours_balance} onChange={setF('initial_hours_balance')} style={iStyle} placeholder="0" step="0.5" /></div>
+                <div><label style={lStyle}>Custo Inicial (R$)</label><input type="number" value={form.initial_cost} onChange={setF('initial_cost')} style={iStyle} placeholder="0.00" step="0.01" /></div>
+              </div>
+
+              {/* Comercial */}
+              <SecTitle>Informações Comerciais</SecTitle>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label style={lStyle}>Tipo de Faturamento</label>
+                  <select value={form.tipo_faturamento} onChange={setF('tipo_faturamento')} style={iStyle}>
+                    <option value="">Não definido</option>
+                    <option value="on_demand">On Demand</option>
+                    <option value="banco_horas_mensal">Banco de Horas Mensal</option>
+                    <option value="banco_horas_fixo">Banco de Horas Fixo</option>
+                    <option value="por_servico">Por Serviço</option>
+                    <option value="saas">SaaS</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={lStyle}>Tipo de Alocação</label>
+                  <select value={form.tipo_alocacao} onChange={setF('tipo_alocacao')} style={iStyle}>
+                    <option value="">Não definido</option>
+                    <option value="remoto">Remoto</option>
+                    <option value="presencial">Presencial</option>
+                    <option value="ambos">Ambos</option>
+                  </select>
+                </div>
+                <div><label style={lStyle}>Condição de Pagamento</label><input value={form.condicao_pagamento} onChange={setF('condicao_pagamento')} style={iStyle} placeholder="Ex: 30/60/90 dias" /></div>
+                <div>
+                  <label style={lStyle}>Vendedor</label>
+                  <select value={form.vendedor_id} onChange={setF('vendedor_id')} style={iStyle}>
+                    <option value="">Não definido</option>
+                    {optConsultants.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
                 </div>
               </div>
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Horas</p>
-                <div><label style={lStyle}>Saldo Inicial de Horas</label><input type="number" value={form.initial_hours_balance} onChange={setF('initial_hours_balance')} style={iStyle} placeholder="0" step="1" /></div>
-                <div className="flex items-center gap-3 mt-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--brand-border)' }}>
-                  <button type="button" onClick={() => setForm(prev => ({ ...prev, allow_negative_balance: !prev.allow_negative_balance }))}
-                    className="relative w-10 h-5 rounded-full transition-colors shrink-0"
-                    style={{ background: form.allow_negative_balance ? '#22c55e' : 'rgba(255,255,255,0.1)' }}>
-                    <span className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform" style={{ transform: form.allow_negative_balance ? 'translateX(20px)' : 'translateX(0)' }} />
-                  </button>
-                  <div>
-                    <p className="text-xs font-semibold" style={{ color: 'var(--brand-text)' }}>Permitir Saldo Negativo</p>
-                    <p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>Projeto continua mesmo sem saldo de horas</p>
-                  </div>
+              <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--brand-border)' }}
+                onClick={() => setForm(p => ({ ...p, cobra_despesa_cliente: !p.cobra_despesa_cliente }))}>
+                <div className="w-4 h-4 rounded flex items-center justify-center shrink-0"
+                  style={{ background: form.cobra_despesa_cliente ? '#00F5FF' : 'transparent', border: `1px solid ${form.cobra_despesa_cliente ? '#00F5FF' : 'var(--brand-border)'}` }}>
+                  {form.cobra_despesa_cliente && <Check size={9} style={{ color: '#0A0A0B' }} />}
+                </div>
+                <span className="text-xs" style={{ color: 'var(--brand-text)' }}>Cobra despesa do cliente</span>
+              </div>
+              <div><label style={lStyle}>Observações do Contrato</label><textarea value={form.observacoes_contrato} onChange={setF('observacoes_contrato')} style={{ ...iStyle, resize: 'vertical', minHeight: '56px' }} placeholder="Observações, termos especiais..." /></div>
+
+              {/* Política de Despesas + Apontamentos */}
+              <SecTitle>Política de Despesas e Apontamentos</SecTitle>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label style={lStyle}>Valor Máx. por Consultor (R$)</label>
+                  <input type="number" value={form.max_expense_per_consultant} onChange={setF('max_expense_per_consultant')} style={iStyle} placeholder="Ilimitado" min="0" step="0.01" />
+                  <p className="text-[10px] mt-1" style={{ color: 'var(--brand-subtle)' }}>Vazio = ilimitado</p>
+                </div>
+                <div>
+                  <label style={lStyle}>Prazo para Lançamento (dias)</label>
+                  <input type="number" value={form.timesheet_retroactive_limit_days} onChange={setF('timesheet_retroactive_limit_days')} style={iStyle} placeholder="Padrão global" min="0" max="365" />
                 </div>
               </div>
+              <Toggle2 checked={form.allow_manual_timesheets} onChange={v => setForm(p => ({ ...p, allow_manual_timesheets: v }))} label="Apontamentos manuais permitidos" />
+              <Toggle2 checked={form.allow_negative_balance} onChange={v => setForm(p => ({ ...p, allow_negative_balance: v }))} label="Permitir saldo negativo de horas" />
             </div>
-            <div className="flex flex-col" style={{ minHeight: 0 }}>
+
+            {/* ── Coluna Direita — Equipe ── */}
+            <div className="flex flex-col">
               <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Equipe Alocada</p>
               <div className="flex gap-1 mb-3 border-b" style={{ borderColor: 'var(--brand-border)' }}>
-                {([['coord', 'Coordenadores', selCoordIds.size], ['consult', 'Consultores', selConsultIds.size]] as const).map(([id, label, count]) => (
-                  <button key={id} onClick={() => { setTeamTab2(id); setTeamSearch2('') }}
+                {([
+                  ['coord',   'Coordenadores', form.coordinator_ids.length],
+                  ['consult', 'Consultores',   form.consultant_ids.length],
+                  ['group',   'Grupos',         form.consultant_group_ids.length],
+                ] as const).map(([id, label, count]) => (
+                  <button key={id} onClick={() => { setTeamTab(id); setTeamSearch('') }}
                     className="px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap"
-                    style={{ color: teamTab2 === id ? '#00F5FF' : 'var(--brand-subtle)', borderBottom: teamTab2 === id ? '2px solid #00F5FF' : '2px solid transparent', marginBottom: '-1px' }}>
-                    {label} {count > 0 && <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px]" style={{ background: 'rgba(0,245,255,0.12)', color: '#00F5FF' }}>{count}</span>}
+                    style={{ color: teamTab === id ? '#00F5FF' : 'var(--brand-subtle)', borderBottom: teamTab === id ? '2px solid #00F5FF' : '2px solid transparent', marginBottom: '-1px' }}>
+                    {label}{count > 0 && <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px]" style={{ background: 'rgba(0,245,255,0.12)', color: '#00F5FF' }}>{count}</span>}
                   </button>
                 ))}
               </div>
-              <input value={teamSearch2} onChange={e => setTeamSearch2(e.target.value)}
-                placeholder={teamTab2 === 'coord' ? 'Buscar coordenador...' : 'Buscar consultor...'}
+              <input value={teamSearch} onChange={e => setTeamSearch(e.target.value)}
+                placeholder="Buscar..."
                 className="w-full text-xs px-3 py-2 rounded-xl outline-none mb-2"
                 style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }} />
-              <div className="flex-1 overflow-y-auto space-y-1 rounded-xl p-2" style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--brand-border)', maxHeight: 320 }}>
-                {teamTab2 === 'coord' && filteredCoords.map(c => (
-                  <button key={c.id} onClick={() => toggleCoord(c.id)}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-white/5"
-                    style={{ background: selCoordIds.has(c.id) ? 'rgba(0,245,255,0.06)' : 'transparent', border: `1px solid ${selCoordIds.has(c.id) ? 'rgba(0,245,255,0.2)' : 'transparent'}` }}>
-                    <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: selCoordIds.has(c.id) ? 'rgba(0,245,255,0.2)' : 'rgba(255,255,255,0.06)', border: '1px solid var(--brand-border)' }}>
-                      {selCoordIds.has(c.id) && <Check size={10} style={{ color: '#00F5FF' }} />}
-                    </div>
-                    <span className="text-xs" style={{ color: selCoordIds.has(c.id) ? '#00F5FF' : 'var(--brand-text)' }}>{c.name}</span>
-                  </button>
-                ))}
-                {teamTab2 === 'consult' && filteredConsults.map(c => (
-                  <button key={c.id} onClick={() => toggleConsult(c.id)}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-white/5"
-                    style={{ background: selConsultIds.has(c.id) ? 'rgba(139,92,246,0.06)' : 'transparent', border: `1px solid ${selConsultIds.has(c.id) ? 'rgba(139,92,246,0.25)' : 'transparent'}` }}>
-                    <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: selConsultIds.has(c.id) ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.06)', border: '1px solid var(--brand-border)' }}>
-                      {selConsultIds.has(c.id) && <Check size={10} style={{ color: '#a78bfa' }} />}
-                    </div>
-                    <span className="text-xs" style={{ color: selConsultIds.has(c.id) ? '#a78bfa' : 'var(--brand-text)' }}>{c.name}</span>
-                  </button>
-                ))}
-                {teamTab2 === 'coord' && filteredCoords.length === 0 && <p className="text-xs text-center py-4" style={{ color: 'var(--brand-subtle)' }}>Nenhum coordenador encontrado</p>}
-                {teamTab2 === 'consult' && filteredConsults.length === 0 && <p className="text-xs text-center py-4" style={{ color: 'var(--brand-subtle)' }}>Nenhum consultor encontrado</p>}
+              <div className="flex-1 overflow-y-auto space-y-1 rounded-xl p-2" style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--brand-border)', maxHeight: 520 }}>
+                {teamTab === 'coord' && filteredCoords.map(c => {
+                  const sel = form.coordinator_ids.includes(c.id)
+                  return (
+                    <button key={c.id} onClick={() => setForm(p => ({ ...p, coordinator_ids: toggleId(p.coordinator_ids, c.id) }))}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-white/5"
+                      style={{ background: sel ? 'rgba(0,245,255,0.06)' : 'transparent', border: `1px solid ${sel ? 'rgba(0,245,255,0.2)' : 'transparent'}` }}>
+                      <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: sel ? 'rgba(0,245,255,0.2)' : 'rgba(255,255,255,0.06)', border: '1px solid var(--brand-border)' }}>
+                        {sel && <Check size={10} style={{ color: '#00F5FF' }} />}
+                      </div>
+                      <span className="text-xs" style={{ color: sel ? '#00F5FF' : 'var(--brand-text)' }}>{c.name}</span>
+                    </button>
+                  )
+                })}
+                {teamTab === 'consult' && filteredConsults.map(c => {
+                  const sel = form.consultant_ids.includes(c.id)
+                  return (
+                    <button key={c.id} onClick={() => setForm(p => ({ ...p, consultant_ids: toggleId(p.consultant_ids, c.id) }))}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-white/5"
+                      style={{ background: sel ? 'rgba(139,92,246,0.06)' : 'transparent', border: `1px solid ${sel ? 'rgba(139,92,246,0.25)' : 'transparent'}` }}>
+                      <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: sel ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.06)', border: '1px solid var(--brand-border)' }}>
+                        {sel && <Check size={10} style={{ color: '#a78bfa' }} />}
+                      </div>
+                      <span className="text-xs" style={{ color: sel ? '#a78bfa' : 'var(--brand-text)' }}>{c.name}</span>
+                    </button>
+                  )
+                })}
+                {teamTab === 'group' && filteredGroups.map(g => {
+                  const sel = form.consultant_group_ids.includes(g.id)
+                  return (
+                    <button key={g.id} onClick={() => setForm(p => ({ ...p, consultant_group_ids: toggleId(p.consultant_group_ids, g.id) }))}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-white/5"
+                      style={{ background: sel ? 'rgba(245,158,11,0.06)' : 'transparent', border: `1px solid ${sel ? 'rgba(245,158,11,0.25)' : 'transparent'}` }}>
+                      <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: sel ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.06)', border: '1px solid var(--brand-border)' }}>
+                        {sel && <Check size={10} style={{ color: '#f59e0b' }} />}
+                      </div>
+                      <span className="text-xs" style={{ color: sel ? '#f59e0b' : 'var(--brand-text)' }}>{g.name}</span>
+                    </button>
+                  )
+                })}
+                {teamTab === 'coord'   && filteredCoords.length   === 0 && <p className="text-xs text-center py-4" style={{ color: 'var(--brand-subtle)' }}>Nenhum resultado</p>}
+                {teamTab === 'consult' && filteredConsults.length === 0 && <p className="text-xs text-center py-4" style={{ color: 'var(--brand-subtle)' }}>Nenhum resultado</p>}
+                {teamTab === 'group'   && filteredGroups.length   === 0 && <p className="text-xs text-center py-4" style={{ color: 'var(--brand-subtle)' }}>Nenhum resultado</p>}
               </div>
             </div>
           </div>
         </div>
+
+        {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t shrink-0" style={{ borderColor: 'var(--brand-border)' }}>
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-white/5 transition-colors" style={{ color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}>Cancelar</button>
           <button onClick={handleSave} disabled={saving} className="px-5 py-2 rounded-xl text-sm font-semibold" style={{ background: saving ? 'rgba(0,245,255,0.05)' : 'rgba(0,245,255,0.1)', color: '#00F5FF', border: '1px solid rgba(0,245,255,0.3)', opacity: saving ? 0.6 : 1 }}>
