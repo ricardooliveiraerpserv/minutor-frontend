@@ -44,6 +44,7 @@ interface ProjectCard {
   card_type: 'project'
   id: number
   contract_id?: number
+  contract_request_id?: number
   customer_name: string
   customer_id: number
   project_name: string
@@ -53,6 +54,30 @@ interface ProjectCard {
   coordinator_ids?: number[]
   coordinators?: string[]
   consultants?: string[]
+}
+
+interface ContractRequestDetail {
+  id: number
+  area_requisitante: string
+  project_name?: string
+  product_owner?: string
+  modulo_tecnologia?: string
+  tipo_necessidade: string
+  tipo_necessidade_outro?: string
+  nivel_urgencia: string
+  descricao?: string
+  cenario_atual?: string
+  cenario_desejado?: string
+  created_at: string
+  createdBy?: { id: number; name: string }
+  customer?: { id: number; name: string }
+  messages?: {
+    id: number
+    message: string
+    created_at: string
+    author?: { id: number; name: string }
+    attachments?: { id: number; original_name: string; file_path: string; file_size: number }[]
+  }[]
 }
 
 type AnyCard = ContractCard | ProjectCard
@@ -573,10 +598,13 @@ function ContractDetailModal({ card, onClose, onGenerate, coordinators, canGener
 }
 
 function ProjectDetailModal({ card, onClose, userRole }: { card: ProjectCard; onClose: () => void; userRole: string }) {
-  const [tab, setTab]             = useState<'details' | 'chat' | 'log'>('details')
+  const [tab, setTab]             = useState<'details' | 'req' | 'chat' | 'log'>('details')
   const [logs, setLogs]           = useState<KanbanLogEntry[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
   const [logsLoaded, setLogsLoaded]   = useState(false)
+  const [reqData, setReqData]     = useState<ContractRequestDetail | null>(null)
+  const [reqLoading, setReqLoading] = useState(false)
+  const [reqLoaded, setReqLoaded]   = useState(false)
 
   useEffect(() => {
     if (tab === 'log' && !logsLoaded) {
@@ -586,17 +614,32 @@ function ProjectDetailModal({ card, onClose, userRole }: { card: ProjectCard; on
         .catch(() => {})
         .finally(() => setLogsLoading(false))
     }
-  }, [tab, card.id, logsLoaded])
+    if (tab === 'req' && !reqLoaded && card.contract_request_id) {
+      setReqLoading(true)
+      api.get<ContractRequestDetail>(`/projects/${card.id}/contract-request`)
+        .then(r => { setReqData(r); setReqLoaded(true) })
+        .catch(() => {})
+        .finally(() => setReqLoading(false))
+    }
+  }, [tab, card.id, logsLoaded, reqLoaded])
 
   const statusColor: Record<string, string> = {
     awaiting_start: '#94a3b8', started: '#22c55e',
     liberado_para_testes: '#f59e0b', finished: '#6366f1', paused: '#ef4444',
   }
   const color = statusColor[card.status] ?? '#94a3b8'
+  const hasReq = !!card.contract_request_id
+
+  const tabs = [
+    { id: 'details', label: 'Detalhes', icon: <ExternalLink size={11} /> },
+    ...(hasReq ? [{ id: 'req', label: 'Requisição', icon: <Layers size={11} /> }] : []),
+    { id: 'chat', label: 'Chat', icon: <MessageSquare size={11} /> },
+    { id: 'log', label: 'Histórico', icon: <Clock size={11} /> },
+  ] as const
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
-      <div className="w-full max-w-2xl rounded-2xl overflow-hidden flex flex-col" style={{ background: 'var(--brand-surface)', border: '1px solid rgba(99,102,241,0.3)', maxHeight: '85vh' }}>
+      <div className="w-full max-w-2xl rounded-2xl overflow-hidden flex flex-col" style={{ background: 'var(--brand-surface)', border: '1px solid rgba(99,102,241,0.3)', maxHeight: '90vh' }}>
         {/* Header */}
         <div className="px-6 py-4 border-b shrink-0" style={{ borderColor: 'rgba(99,102,241,0.2)' }}>
           <div className="flex items-start justify-between gap-3">
@@ -604,22 +647,25 @@ function ProjectDetailModal({ card, onClose, userRole }: { card: ProjectCard; on
               <p className="text-base font-bold" style={{ color: 'var(--brand-text)' }}>{card.project_name}</p>
               <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>{card.customer_name}</p>
             </div>
-            <span className="text-xs px-2 py-1 rounded-full shrink-0 font-semibold" style={{ background: `${color}20`, color }}>
-              {STATUS_LABEL[card.status] ?? card.status}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-2 py-1 rounded-full shrink-0 font-semibold" style={{ background: `${color}20`, color }}>
+                {STATUS_LABEL[card.status] ?? card.status}
+              </span>
+              <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10" style={{ color: 'var(--brand-subtle)' }}><X size={16} /></button>
+            </div>
           </div>
           {/* Tabs */}
           <div className="flex gap-1 mt-3">
-            {(['details', 'chat', 'log'] as const).map(t => (
+            {tabs.map(t => (
               <button
-                key={t}
-                onClick={() => setTab(t)}
+                key={t.id}
+                onClick={() => setTab(t.id as any)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                style={tab === t
+                style={tab === t.id
                   ? { background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)' }
                   : { color: 'var(--brand-subtle)', border: '1px solid transparent' }}
               >
-                {t === 'details' ? <><ExternalLink size={11} /> Detalhes</> : t === 'chat' ? <><MessageSquare size={11} /> Chat</> : <><Clock size={11} /> Histórico</>}
+                {t.icon} {t.label}
               </button>
             ))}
           </div>
@@ -629,6 +675,109 @@ function ProjectDetailModal({ card, onClose, userRole }: { card: ProjectCard; on
         {tab === 'log' ? (
           <div className="flex-1 overflow-y-auto">
             <KanbanLogTab logs={logs} loading={logsLoading} />
+          </div>
+        ) : tab === 'req' ? (
+          <div className="flex-1 overflow-y-auto">
+            {reqLoading ? (
+              <p className="text-center text-xs py-10" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p>
+            ) : reqData ? (
+              <div className="px-6 py-5 space-y-6">
+                {/* Identificação */}
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Identificação</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {([
+                      ['Área Requisitante', reqData.area_requisitante],
+                      ['Nome do Projeto', reqData.project_name || '—'],
+                      ['Product Owner', reqData.product_owner || '—'],
+                      ['Módulo / Tecnologia', reqData.modulo_tecnologia || '—'],
+                      ['Solicitado por', reqData.createdBy?.name || '—'],
+                      ['Data', new Date(reqData.created_at).toLocaleDateString('pt-BR')],
+                    ] as [string, string][]).map(([label, value]) => (
+                      <div key={label}>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>{label}</p>
+                        <p className="text-sm" style={{ color: 'var(--brand-text)' }}>{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tipo + Urgência */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Tipo de Necessidade</p>
+                    <span className="text-xs px-2 py-1 rounded-lg" style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa' }}>
+                      {reqData.tipo_necessidade === 'outro' && reqData.tipo_necessidade_outro
+                        ? reqData.tipo_necessidade_outro
+                        : (TIPO_NECESSIDADE_LABEL[reqData.tipo_necessidade] ?? reqData.tipo_necessidade)}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Urgência</p>
+                    <span className="text-xs px-2 py-1 rounded-full font-semibold" style={{
+                      background: `${URGENCIA_COLOR[reqData.nivel_urgencia] ?? '#64748b'}18`,
+                      color: URGENCIA_COLOR[reqData.nivel_urgencia] ?? '#64748b'
+                    }}>
+                      {URGENCIA_LABEL[reqData.nivel_urgencia] ?? reqData.nivel_urgencia}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Descrição */}
+                {(reqData.descricao || reqData.cenario_atual || reqData.cenario_desejado) && (
+                  <div className="space-y-3">
+                    {reqData.descricao && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Descrição Geral</p>
+                        <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--brand-text)' }}>{reqData.descricao}</p>
+                      </div>
+                    )}
+                    {reqData.cenario_atual && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Cenário Atual</p>
+                        <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--brand-text)' }}>{reqData.cenario_atual}</p>
+                      </div>
+                    )}
+                    {reqData.cenario_desejado && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Cenário Desejado</p>
+                        <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--brand-text)' }}>{reqData.cenario_desejado}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Mensagens */}
+                {reqData.messages && reqData.messages.length > 0 && (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Conversas da Requisição</p>
+                    <div className="space-y-3">
+                      {reqData.messages.map(msg => (
+                        <div key={msg.id} className="rounded-xl p-3" style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)' }}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-semibold" style={{ color: '#a78bfa' }}>{msg.author?.name ?? '—'}</span>
+                            <span className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>{new Date(msg.created_at).toLocaleString('pt-BR')}</span>
+                          </div>
+                          <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--brand-text)' }}>{msg.message}</p>
+                          {msg.attachments && msg.attachments.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {msg.attachments.map(att => (
+                                <span key={att.id} className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg"
+                                  style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa' }}>
+                                  <Paperclip size={9} /> {att.original_name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-center text-xs py-10" style={{ color: 'var(--brand-subtle)' }}>Nenhuma requisição vinculada</p>
+            )}
           </div>
         ) : tab === 'details' ? (
           <>
