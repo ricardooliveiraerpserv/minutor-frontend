@@ -1199,20 +1199,29 @@ function KanbanContent() {
   const isSustAdmin = user?.type === 'admin' ||
     (user?.type === 'coordenador' && (user as any).coordinator_type === 'sustentacao')
 
+  const isSustCoordenador = user?.type === 'coordenador' && (user as any).coordinator_type === 'sustentacao'
+
   // Column list: fixed → coordinators → sustentação group → bizify → project status
-  const columns: Column[] = [
-    ...FIXED_COLUMNS,
-    ...coordinators.map(c => ({
-      id:            `coordinator:${c.id}`,
-      label:         c.name,
-      type:          'coordinator' as const,
-      coordinatorId: c.id,
-      emoji:         '👤',
-    })),
-    ...SUSTENTACAO_COLS,
-    BIZIFY_COL,
-    ...STATUS_PROJECT_COLUMNS,
-  ]
+  // Coordenador de sustentação vê apenas "Pronto para Iniciar" + colunas de sustentação
+  const columns: Column[] = isSustCoordenador
+    ? [
+        FIXED_COLUMNS.find(c => c.id === 'pronto')!,
+        ...SUSTENTACAO_COLS,
+        BIZIFY_COL,
+      ]
+    : [
+        ...FIXED_COLUMNS,
+        ...coordinators.map(c => ({
+          id:            `coordinator:${c.id}`,
+          label:         c.name,
+          type:          'coordinator' as const,
+          coordinatorId: c.id,
+          emoji:         '👤',
+        })),
+        ...SUSTENTACAO_COLS,
+        BIZIFY_COL,
+        ...STATUS_PROJECT_COLUMNS,
+      ]
 
   // Contract cards per column
   const contractsInCol = (colId: string): ContractCard[] => {
