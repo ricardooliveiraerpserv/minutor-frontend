@@ -875,6 +875,8 @@ export default function GestaoProjetosPage() {
   const [saudeFilter, setSaude]   = useState('')
   const [expanded, setExpanded]   = useState<Set<number>>(new Set())
   const [filterContractType, setFilterContractType] = useState('')
+  const [filterServiceType, setFilterServiceType] = useState('')
+  const [serviceTypes, setServiceTypes] = useState<{ id: number; name: string }[]>([])
   const [multiContratual, setMultiContratual] = useState(false)
   const [rows, setRows] = useState<TreeRow[]>([])
 
@@ -908,6 +910,11 @@ export default function GestaoProjetosPage() {
       .then(r => setUnreadProjectIds(new Set(r.project_ids ?? [])))
       .catch(() => {})
   }, [user])
+
+  useEffect(() => {
+    const items = (r: any) => Array.isArray(r?.items) ? r.items : Array.isArray(r?.data) ? r.data : []
+    api.get<any>('/service-types?pageSize=100').then(r => setServiceTypes(items(r))).catch(() => {})
+  }, [])
 
   const PROJECT_STATUSES = [
     { value: 'awaiting_start', label: 'Aguardando Início' },
@@ -981,6 +988,7 @@ export default function GestaoProjetosPage() {
   const filtered = useMemo(() => {
     return projects.filter(p => {
       if (filterContractType && p.contract_type_display !== filterContractType) return false
+      if (filterServiceType && String((p as any).service_type_id) !== filterServiceType) return false
       if (statusFilter && p.status !== statusFilter) return false
       if (clienteFilter && String(p.customer_id) !== clienteFilter) return false
       if (saudeFilter) {
@@ -1277,6 +1285,12 @@ export default function GestaoProjetosPage() {
               { id: 'finished',      name: 'Finalizado' },
               { id: 'cancelled',     name: 'Cancelado' },
             ]}
+          />
+          <SimpleSelect
+            value={filterServiceType}
+            onChange={v => setFilterServiceType(v)}
+            placeholder="Todos os serviços"
+            options={serviceTypes.map(s => ({ id: String(s.id), name: s.name }))}
           />
           {/* Filtro de Saúde — button group colorido */}
           <div className="flex items-center gap-0.5 bg-zinc-800/70 border border-zinc-700/50 rounded-full p-1">
