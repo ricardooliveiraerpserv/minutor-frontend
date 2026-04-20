@@ -650,6 +650,34 @@ function ProjectDetailModal({ card, onClose, userRole }: { card: ProjectCard; on
   const color = statusColor[card.status] ?? '#94a3b8'
   const hasReq = !!card.contract_request_id
 
+  const fetchAttachmentBlob = async (msgId: number, attId: number) => {
+    const token = localStorage.getItem('minutor_token') ?? ''
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'https://minutor-backend.onrender.com/api/v1'
+    const res = await fetch(`${baseUrl}/req-messages/${msgId}/attachments/${attId}/download`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) throw new Error()
+    return res.blob()
+  }
+
+  const downloadReqAttachment = async (msgId: number, att: { id: number; original_name: string }) => {
+    try {
+      const blob = await fetchAttachmentBlob(msgId, att.id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = att.original_name; a.click()
+      URL.revokeObjectURL(url)
+    } catch { toast.error('Erro ao baixar arquivo') }
+  }
+
+  const viewReqAttachment = async (msgId: number, att: { id: number; original_name: string }) => {
+    try {
+      const blob = await fetchAttachmentBlob(msgId, att.id)
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+    } catch { toast.error('Erro ao abrir arquivo') }
+  }
+
   const tabs = [
     { id: 'details', label: 'Detalhes', icon: <ExternalLink size={11} /> },
     ...(hasReq ? [{ id: 'req', label: 'Requisição', icon: <Layers size={11} /> }] : []),
@@ -781,12 +809,31 @@ function ProjectDetailModal({ card, onClose, userRole }: { card: ProjectCard; on
                           </div>
                           <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--brand-text)' }}>{msg.message}</p>
                           {msg.attachments && msg.attachments.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1.5">
+                            <div className="mt-2 flex flex-wrap gap-2">
                               {msg.attachments.map(att => (
-                                <span key={att.id} className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg"
-                                  style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa' }}>
-                                  <Paperclip size={9} /> {att.original_name}
-                                </span>
+                                <div key={att.id} className="flex items-center gap-0 rounded-lg overflow-hidden text-[11px]"
+                                  style={{ border: '1px solid rgba(139,92,246,0.25)', background: 'rgba(139,92,246,0.06)' }}>
+                                  <span className="flex items-center gap-1 px-2 py-1.5" style={{ color: '#a78bfa' }}>
+                                    <Paperclip size={9} />
+                                    <span className="max-w-[160px] truncate">{att.original_name}</span>
+                                  </span>
+                                  <button
+                                    onClick={() => viewReqAttachment(msg.id, att)}
+                                    className="px-2 py-1.5 border-l transition-colors hover:bg-white/5"
+                                    style={{ borderColor: 'rgba(139,92,246,0.25)', color: '#a78bfa' }}
+                                    title="Visualizar"
+                                  >
+                                    <ExternalLink size={10} />
+                                  </button>
+                                  <button
+                                    onClick={() => downloadReqAttachment(msg.id, att)}
+                                    className="px-2 py-1.5 border-l transition-colors hover:bg-white/5"
+                                    style={{ borderColor: 'rgba(139,92,246,0.25)', color: '#a78bfa' }}
+                                    title="Baixar"
+                                  >
+                                    <Download size={10} />
+                                  </button>
+                                </div>
                               ))}
                             </div>
                           )}
@@ -1980,17 +2027,36 @@ function RequestDetailModal({ card, onClose }: { card: RequestCard; onClose: () 
                     </div>
                     <p className="text-sm leading-relaxed break-words" style={{ color: '#D4D4D8' }}>{msg.message}</p>
                     {msg.attachments && msg.attachments.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      <div className="flex flex-wrap gap-2 mt-1.5">
                         {msg.attachments.map(att => (
-                          <button
-                            key={att.id}
-                            onClick={() => downloadAttachment(msg.id, att)}
-                            className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] transition-opacity hover:opacity-80"
-                            style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}
-                          >
-                            <Download size={10} />
-                            <span className="max-w-[140px] truncate">{att.original_name}</span>
-                          </button>
+                          <div key={att.id} className="flex items-center gap-0 rounded-lg overflow-hidden text-[11px]"
+                            style={{ border: '1px solid rgba(139,92,246,0.25)', background: 'rgba(139,92,246,0.06)' }}>
+                            <span className="flex items-center gap-1 px-2 py-1.5" style={{ color: '#a78bfa' }}>
+                              <Paperclip size={9} />
+                              <span className="max-w-[150px] truncate">{att.original_name}</span>
+                            </span>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const token = localStorage.getItem('minutor_token') ?? ''
+                                  const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'https://minutor-backend.onrender.com/api/v1'
+                                  const res = await fetch(`${baseUrl}/req-messages/${msg.id}/attachments/${att.id}/download`, { headers: { Authorization: `Bearer ${token}` } })
+                                  if (!res.ok) throw new Error()
+                                  const blob = await res.blob()
+                                  window.open(URL.createObjectURL(blob), '_blank')
+                                } catch { toast.error('Erro ao abrir arquivo') }
+                              }}
+                              className="px-2 py-1.5 border-l transition-colors hover:bg-white/5"
+                              style={{ borderColor: 'rgba(139,92,246,0.25)', color: '#a78bfa' }}
+                              title="Visualizar"
+                            ><ExternalLink size={10} /></button>
+                            <button
+                              onClick={() => downloadAttachment(msg.id, att)}
+                              className="px-2 py-1.5 border-l transition-colors hover:bg-white/5"
+                              style={{ borderColor: 'rgba(139,92,246,0.25)', color: '#a78bfa' }}
+                              title="Baixar"
+                            ><Download size={10} /></button>
+                          </div>
                         ))}
                       </div>
                     )}
