@@ -1373,6 +1373,10 @@ function KanbanContent() {
 
       // ── Moving to a coordinator column from demand
       if (toCol.startsWith('coordinator:')) {
+        if (card.categoria === 'sustentacao') {
+          toast.error('Contratos de sustentação devem ser movidos para a fila de sustentação (BH Fixo, BH Mensal, On Demand ou Cloud).')
+          return
+        }
         const coordId = Number(toCol.split(':')[1])
         if (!card.is_complete) { toast.error('Contrato incompleto — preencha todos os campos antes de alocar.'); return }
         const wasNew = !card.project_id
