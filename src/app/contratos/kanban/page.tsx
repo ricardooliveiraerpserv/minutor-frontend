@@ -1206,8 +1206,11 @@ function CardDetailModal({ card, onClose, onEditContract }: {
               <p className="text-base font-bold" style={{ color: 'var(--brand-text)' }}>{card.customer_name}</p>
               {card.project_name && <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>{card.project_name}</p>}
             </div>
-            <span className="text-xs font-semibold px-2 py-1 rounded-full shrink-0"
-              style={{ background: badge.bg, color: badge.color }}>{badge.label}</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs font-semibold px-2 py-1 rounded-full"
+                style={{ background: badge.bg, color: badge.color }}>{badge.label}</span>
+              <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 transition-colors" style={{ color: 'var(--brand-subtle)' }}><X size={16} /></button>
+            </div>
           </div>
           <div className="flex gap-1 mt-3">
             <button onClick={() => setTab('details')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style={tabStyle('details')}>

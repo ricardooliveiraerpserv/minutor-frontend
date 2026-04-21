@@ -606,12 +606,15 @@ function ContractDetailModal({ card, onClose, onGenerate, coordinators, canGener
               <p className="text-base font-bold" style={{ color: 'var(--brand-text)' }}>{card.customer_name}</p>
               {card.project_name && <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>{card.project_name}</p>}
             </div>
-            <span className="text-xs px-2 py-1 rounded-full shrink-0 font-semibold"
-              style={card.is_complete
-                ? { background: 'rgba(234,179,8,0.12)', color: '#eab308' }
-                : { background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>
-              {card.is_complete ? 'Completo' : 'Incompleto'}
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs px-2 py-1 rounded-full font-semibold"
+                style={card.is_complete
+                  ? { background: 'rgba(234,179,8,0.12)', color: '#eab308' }
+                  : { background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>
+                {card.is_complete ? 'Completo' : 'Incompleto'}
+              </span>
+              <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 transition-colors" style={{ color: 'var(--brand-subtle)' }}><X size={16} /></button>
+            </div>
           </div>
           <div className="flex gap-1 mt-3">
             <button onClick={() => setTab('details')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style={tabStyle('details')}>
