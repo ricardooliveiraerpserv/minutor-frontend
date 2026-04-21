@@ -1364,14 +1364,9 @@ function KanbanContent() {
         return
       }
 
-      // ── Between sustentação columns
+      // ── Between sustentação columns (or from demand to sustentação)
       if (toCol.startsWith('sust_')) {
         if (!isSustAdmin) { toast.error('Apenas admin ou coordenador de sustentação pode mover.'); return }
-        const destCol = SUSTENTACAO_COLS.find(c => c.id === toCol)
-        if (!destCol?.sustentacaoValidator?.(card)) {
-          toast.error('Tipo de contrato incompatível com esta coluna.')
-          return
-        }
         // Optimistic
         setSustGroups(prev => {
           const next = { ...prev }
@@ -1379,8 +1374,11 @@ function KanbanContent() {
           next[toCol] = [...(prev[toCol] ?? []), { ...card, sustentacao_column: toCol }]
           return next
         })
+        setDemandCards(prev => prev.filter(c => c.id !== cardId))
         try {
           await api.patch(`/contracts/${cardId}/sustentacao-move`, { to_column: toCol })
+          await load()
+          toast.success('Card movido para fila de sustentação')
         } catch (e: any) { toast.error(e?.message ?? 'Erro ao mover'); load() }
         return
       }
