@@ -46,7 +46,7 @@ interface ProjetoOnDemand {
   horas_aprovadas: number
   valor_hora: number
   total_receita: number
-  timesheets?: ApontamentoRow[]
+  apontamentos?: ApontamentoRow[]
 }
 
 interface ProjetoBancoHoras {
@@ -293,7 +293,7 @@ export default function FechamentoClientePage() {
         const withTs = tab === 'on_demand'
         loadPorTipo(withTs)
       } else if (tab === 'on_demand' && porTipo.on_demand.projetos.length > 0
-                 && !porTipo.on_demand.projetos[0].timesheets) {
+                 && !porTipo.on_demand.projetos[0].apontamentos) {
         loadPorTipo(true)
       }
     }
@@ -584,7 +584,7 @@ export default function FechamentoClientePage() {
                                     {formatBRL(p.total_receita)}
                                   </Td>
                                 </Tr>
-                                {expanded && p.timesheets && p.timesheets.map(ts => (
+                                {expanded && p.apontamentos && p.apontamentos.map(ts => (
                                   <Tr key={`ts-${ts.id}`}>
                                     <Td>
                                       <div className="pl-10 flex flex-col gap-0.5">
@@ -608,7 +608,7 @@ export default function FechamentoClientePage() {
                                     <Td right />
                                   </Tr>
                                 ))}
-                                {expanded && !p.timesheets && (
+                                {expanded && !p.apontamentos && (
                                   <Tr key={`ts-loading-${p.projeto_id}`}>
                                     <td colSpan={4} className="px-5 py-2">
                                       <div className="pl-10 text-xs" style={{ color: 'var(--brand-muted)' }}>
