@@ -7,7 +7,7 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
-import { List, Plus, ExternalLink, AlertCircle, AlertTriangle, Clock, ChevronRight, Rocket, Layers, FolderKanban, MessageSquare, Send, Paperclip, X, Download, MoreVertical, Eye, Pencil, DollarSign, TrendingUp, Users, BarChart2, Check, Trash2 } from 'lucide-react'
+import { List, Plus, ExternalLink, AlertCircle, AlertTriangle, Clock, ChevronRight, Rocket, Layers, FolderKanban, MessageSquare, Send, Paperclip, X, Download, MoreVertical, Eye, Pencil, DollarSign, TrendingUp, Users, BarChart2, UserCheck, Check, Trash2 } from 'lucide-react'
 import { ProjectMessages } from '@/components/shared/ProjectMessages'
 import { ContractMessages } from '@/components/shared/ContractMessages'
 import { ContractCreateModal } from '@/components/shared/ContractCreateModal'
@@ -1581,6 +1581,13 @@ interface ConsultantBreakdown {
   consultant_rate_type?: string
 }
 
+interface CostSummary {
+  project_info: { project_value?: number | null; initial_cost?: number | null; total_available_hours?: number; weighted_hourly_rate?: number }
+  hours_summary: { total_logged_hours: number; approved_hours: number; pending_hours: number; remaining_hours: number; general_balance?: number; total_available_hours?: number; hours_percentage: number }
+  cost_calculation: { total_cost: number; approved_cost: number; pending_cost: number; margin: number; margin_percentage: number }
+  consultant_breakdown: ConsultantBreakdown[]
+}
+
 interface TimesheetEntry {
   id: number
   date: string
@@ -1595,8 +1602,9 @@ interface TimesheetEntry {
 function ProjectViewModal({ projectId, onClose, userRole, initialTab }: { projectId: number; onClose: () => void; userRole?: string; initialTab?: string }) {
   const [p, setP] = useState<ProjectFull | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'overview' | 'financial' | 'consultants' | 'timesheets'>((initialTab as any) ?? 'overview')
+  const [tab, setTab] = useState<'overview' | 'financial' | 'consultants' | 'timesheets' | 'cost'>((initialTab as any) ?? 'overview')
   const [breakdown, setBreakdown] = useState<ConsultantBreakdown[]>([])
+  const [costSummary, setCostSummary] = useState<CostSummary | null>(null)
   const [timesheets, setTimesheets] = useState<TimesheetEntry[]>([])
   const [tsLoading, setTsLoading] = useState(false)
   const [tsLoaded, setTsLoaded] = useState(false)
@@ -1606,9 +1614,10 @@ function ProjectViewModal({ projectId, onClose, userRole, initialTab }: { projec
     setLoading(true)
     Promise.all([
       api.get<ProjectFull>(`/projects/${projectId}`),
-      api.get<{ consultant_breakdown?: ConsultantBreakdown[] }>(`/projects/${projectId}/cost-summary`).catch(() => null),
+      api.get<CostSummary>(`/projects/${projectId}/cost-summary`).catch(() => null),
     ]).then(([proj, cs]) => {
       setP(proj)
+      setCostSummary(cs)
       setBreakdown(Array.isArray(cs?.consultant_breakdown) ? cs!.consultant_breakdown! : [])
     }).catch(() => toast.error('Erro ao carregar projeto'))
     .finally(() => setLoading(false))
@@ -1688,6 +1697,7 @@ function ProjectViewModal({ projectId, onClose, userRole, initialTab }: { projec
     { id: 'consultants' as const, label: `Consultores${breakdown.length > 0 ? ` (${breakdown.length})` : ''}` },
     { id: 'timesheets'  as const, label: 'Apontamentos' },
     { id: 'financial'   as const, label: 'Financeiro' },
+    { id: 'cost'        as const, label: 'Custo' },
   ]
 
   return (
@@ -2123,6 +2133,72 @@ function ProjectViewModal({ projectId, onClose, userRole, initialTab }: { projec
                     <Row label="% Consumido" value={<span style={{ color: bar }}>{totalAvail > 0 ? `${Math.round(pct)}%` : '—'}</span>} />
                   </div>
                 </div>
+              </div>
+            )}
+
+            {tab === 'cost' && (
+              <div className="space-y-5">
+                {!costSummary ? (
+                  <p className="text-xs text-center py-8" style={{ color: 'var(--brand-subtle)' }}>Nenhum dado de custo disponível.</p>
+                ) : (() => {
+                  const { project_info: pi, hours_summary: hs, cost_calculation: cc, consultant_breakdown: cb } = costSummary
+                  const marginColor = cc.margin_percentage >= 30 ? '#22c55e' : cc.margin_percentage >= 10 ? '#f59e0b' : '#ef4444'
+                  const hoursUsedPct = Math.min(100, Math.max(0, hs.hours_percentage ?? 0))
+                  const hoursBarColor = hoursUsedPct >= 90 ? '#ef4444' : hoursUsedPct >= 70 ? '#f59e0b' : '#22c55e'
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { label: 'Valor do Projeto', value: fmtBRL(pi.project_value ?? 0),         icon: DollarSign, color: '#00F5FF' },
+                          { label: 'Custo Total',       value: fmtBRL(cc.total_cost),                 icon: TrendingUp,  color: '#f59e0b' },
+                          { label: 'Margem',            value: fmtBRL(cc.margin),                     icon: BarChart2,   color: marginColor },
+                          { label: 'Margem %',          value: `${cc.margin_percentage.toFixed(1)}%`, icon: BarChart2,   color: marginColor },
+                        ].map(c => (
+                          <div key={c.label} className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+                            <div className="flex items-center gap-2 mb-1"><c.icon size={12} style={{ color: c.color }} /><p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{c.label}</p></div>
+                            <p className="text-sm font-bold tabular-nums" style={{ color: c.color }}>{c.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="rounded-xl p-4" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Monitoramento de Horas</p>
+                        <div className="grid grid-cols-3 gap-4 text-xs mb-3">
+                          <div><p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>Disponíveis</p><p className="font-bold tabular-nums mt-0.5" style={{ color: 'var(--brand-text)' }}>{(hs.total_available_hours ?? pi.total_available_hours ?? 0).toFixed(1)}h</p></div>
+                          <div><p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>Apontadas</p><p className="font-bold tabular-nums mt-0.5" style={{ color: 'var(--brand-text)' }}>{hs.total_logged_hours.toFixed(1)}h</p></div>
+                          <div><p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>Saldo</p><p className="font-bold tabular-nums mt-0.5" style={{ color: (hs.general_balance ?? hs.remaining_hours) < 0 ? '#ef4444' : 'var(--brand-text)' }}>{(hs.general_balance ?? hs.remaining_hours).toFixed(1)}h</p></div>
+                          <div><p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>Aprovadas</p><p className="font-bold tabular-nums mt-0.5" style={{ color: '#22c55e' }}>{hs.approved_hours.toFixed(1)}h</p></div>
+                          <div><p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>Pendentes</p><p className="font-bold tabular-nums mt-0.5" style={{ color: '#f59e0b' }}>{hs.pending_hours.toFixed(1)}h</p></div>
+                        </div>
+                        <div className="w-full rounded-full h-1.5 mb-1" style={{ background: 'var(--brand-border)' }}><div className="h-1.5 rounded-full transition-all" style={{ width: `${hoursUsedPct}%`, background: hoursBarColor }} /></div>
+                        <p className="text-[10px] tabular-nums" style={{ color: 'var(--brand-subtle)' }}>{hoursUsedPct.toFixed(1)}% das horas utilizadas</p>
+                      </div>
+                      {cb.length > 0 && (
+                        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
+                          <div className="px-4 py-3" style={{ background: 'var(--brand-surface)' }}><p className="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--brand-subtle)' }}><UserCheck size={11} />Custo por Consultor</p></div>
+                          <table className="w-full text-xs">
+                            <thead><tr style={{ background: 'var(--brand-bg)', borderBottom: '1px solid var(--brand-border)' }}>{['Consultor','Hs Total','Aprovadas','Pendentes','Taxa/h','Custo'].map(h => <th key={h} className="px-3 py-2 text-left font-semibold text-[10px] uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{h}</th>)}</tr></thead>
+                            <tbody>
+                              {cb.map((c, i) => (
+                                <tr key={i} style={{ borderBottom: '1px solid var(--brand-border)' }}>
+                                  <td className="px-3 py-2.5 font-medium" style={{ color: 'var(--brand-text)' }}>{c.consultant_name}</td>
+                                  <td className="px-3 py-2.5 tabular-nums" style={{ color: 'var(--brand-text)' }}>{c.total_hours.toFixed(1)}h</td>
+                                  <td className="px-3 py-2.5 tabular-nums" style={{ color: '#22c55e' }}>{c.approved_hours.toFixed(1)}h</td>
+                                  <td className="px-3 py-2.5 tabular-nums" style={{ color: '#f59e0b' }}>{c.pending_hours.toFixed(1)}h</td>
+                                  <td className="px-3 py-2.5 tabular-nums text-[11px]" style={{ color: 'var(--brand-muted)' }}>{c.consultant_hourly_rate != null ? fmtBRL(c.consultant_hourly_rate) : '—'}{c.consultant_rate_type === 'monthly' && <span className="ml-1 opacity-60">÷180</span>}</td>
+                                  <td className="px-3 py-2.5 tabular-nums font-bold" style={{ color: 'var(--brand-text)' }}>{fmtBRL(c.cost)}</td>
+                                </tr>
+                              ))}
+                              <tr style={{ background: 'rgba(0,245,255,0.04)', borderTop: '1px solid var(--brand-border)' }}>
+                                <td className="px-3 py-2.5 font-bold text-[11px] uppercase" style={{ color: 'var(--brand-subtle)' }} colSpan={5}>Total</td>
+                                <td className="px-3 py-2.5 font-bold tabular-nums" style={{ color: '#00F5FF' }}>{fmtBRL(cc.total_cost)}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             )}
           </div>

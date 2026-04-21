@@ -1121,6 +1121,9 @@ export default function GestaoProjetosPage() {
   const [viewProject, setViewProject] = useState<ProjectWithTeam | null>(null)
   const [viewProjectFull, setViewProjectFull] = useState<ProjectFull | null>(null)
   const [viewProjectLoading, setViewProjectLoading] = useState(false)
+  const [viewProjectTab, setViewProjectTab] = useState<'overview' | 'cost'>('overview')
+  const [viewCostSummary, setViewCostSummary] = useState<CostSummary | null>(null)
+  const [viewCostLoading, setViewCostLoading] = useState(false)
   const [messagesProject, setMessagesProject] = useState<ProjectWithTeam | null>(null)
 
   // Auto-open messages modal when ?messages=PROJECT_ID is in URL
@@ -1137,6 +1140,8 @@ export default function GestaoProjetosPage() {
     if (action === 'view') {
       setViewProject(project)
       setViewProjectFull(null)
+      setViewProjectTab('overview')
+      setViewCostSummary(null)
       setViewProjectLoading(true)
       api.get<ProjectFull>(`/projects/${project.id}`)
         .then(r => setViewProjectFull(r))
@@ -1834,8 +1839,94 @@ export default function GestaoProjetosPage() {
                 {viewProjectLoading && <span className="text-[10px] animate-pulse" style={{ color: 'var(--brand-subtle)' }}>Carregando detalhes...</span>}
               </div>
 
-              {/* Body — duas colunas */}
+              {/* Tab nav */}
+              <div className="flex gap-1 px-6 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+                {(['overview', 'cost'] as const).map(t => (
+                  <button key={t} onClick={() => {
+                    setViewProjectTab(t)
+                    if (t === 'cost' && !viewCostSummary && !viewCostLoading) {
+                      setViewCostLoading(true)
+                      api.get<CostSummary>(`/projects/${base.id}/cost-summary`)
+                        .then(r => setViewCostSummary(r))
+                        .catch(() => {})
+                        .finally(() => setViewCostLoading(false))
+                    }
+                  }}
+                    className="px-4 py-2.5 text-xs font-semibold transition-colors whitespace-nowrap"
+                    style={{ color: viewProjectTab === t ? '#00F5FF' : 'var(--brand-subtle)', borderBottom: viewProjectTab === t ? '2px solid #00F5FF' : '2px solid transparent', marginBottom: '-1px' }}>
+                    {t === 'overview' ? 'Visão Geral' : 'Custo'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Body */}
               <div className="flex-1 overflow-y-auto">
+                {viewProjectTab === 'cost' && (
+                  <div className="p-6 space-y-5">
+                    {viewCostLoading && <p className="text-xs text-center py-8" style={{ color: 'var(--brand-subtle)' }}>Calculando custos...</p>}
+                    {!viewCostLoading && !viewCostSummary && <p className="text-xs text-center py-8" style={{ color: 'var(--brand-subtle)' }}>Nenhum dado de custo disponível.</p>}
+                    {!viewCostLoading && viewCostSummary && (() => {
+                      const { project_info: pi, hours_summary: hs, cost_calculation: cc, consultant_breakdown: cb } = viewCostSummary
+                      const marginColor = cc.margin_percentage >= 30 ? '#22c55e' : cc.margin_percentage >= 10 ? '#f59e0b' : '#ef4444'
+                      const hoursUsedPct = Math.min(100, Math.max(0, hs.hours_percentage ?? 0))
+                      const hoursBarColor = hoursUsedPct >= 90 ? '#ef4444' : hoursUsedPct >= 70 ? '#f59e0b' : '#22c55e'
+                      return (
+                        <>
+                          <div className="grid grid-cols-2 gap-3">
+                            {[
+                              { label: 'Valor do Projeto', value: fmtBRL(pi.project_value ?? 0),         icon: DollarSign, color: '#00F5FF' },
+                              { label: 'Custo Total',       value: fmtBRL(cc.total_cost),                 icon: TrendingUp,  color: '#f59e0b' },
+                              { label: 'Margem',            value: fmtBRL(cc.margin),                     icon: BarChart2,   color: marginColor },
+                              { label: 'Margem %',          value: `${cc.margin_percentage.toFixed(1)}%`, icon: BarChart2,   color: marginColor },
+                            ].map(c => (
+                              <div key={c.label} className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+                                <div className="flex items-center gap-2 mb-1"><c.icon size={12} style={{ color: c.color }} /><p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{c.label}</p></div>
+                                <p className="text-sm font-bold tabular-nums" style={{ color: c.color }}>{c.value}</p>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="rounded-xl p-4" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+                            <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>Monitoramento de Horas</p>
+                            <div className="grid grid-cols-3 gap-4 text-xs mb-3">
+                              <div><p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>Disponíveis</p><p className="font-bold tabular-nums mt-0.5" style={{ color: 'var(--brand-text)' }}>{(hs.total_available_hours ?? pi.total_available_hours ?? 0).toFixed(1)}h</p></div>
+                              <div><p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>Apontadas</p><p className="font-bold tabular-nums mt-0.5" style={{ color: 'var(--brand-text)' }}>{hs.total_logged_hours.toFixed(1)}h</p></div>
+                              <div><p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>Saldo</p><p className="font-bold tabular-nums mt-0.5" style={{ color: (hs.general_balance ?? hs.remaining_hours) < 0 ? '#ef4444' : 'var(--brand-text)' }}>{(hs.general_balance ?? hs.remaining_hours).toFixed(1)}h</p></div>
+                              <div><p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>Aprovadas</p><p className="font-bold tabular-nums mt-0.5" style={{ color: '#22c55e' }}>{hs.approved_hours.toFixed(1)}h</p></div>
+                              <div><p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>Pendentes</p><p className="font-bold tabular-nums mt-0.5" style={{ color: '#f59e0b' }}>{hs.pending_hours.toFixed(1)}h</p></div>
+                            </div>
+                            <div className="w-full rounded-full h-1.5 mb-1" style={{ background: 'var(--brand-border)' }}><div className="h-1.5 rounded-full transition-all" style={{ width: `${hoursUsedPct}%`, background: hoursBarColor }} /></div>
+                            <p className="text-[10px] tabular-nums" style={{ color: 'var(--brand-subtle)' }}>{hoursUsedPct.toFixed(1)}% das horas utilizadas</p>
+                          </div>
+                          {cb.length > 0 && (
+                            <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
+                              <div className="px-4 py-3" style={{ background: 'var(--brand-surface)' }}><p className="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--brand-subtle)' }}><UserCheck size={11} />Custo por Consultor</p></div>
+                              <table className="w-full text-xs">
+                                <thead><tr style={{ background: 'var(--brand-bg)', borderBottom: '1px solid var(--brand-border)' }}>{['Consultor','Hs Total','Aprovadas','Pendentes','Taxa/h','Custo'].map(h => <th key={h} className="px-3 py-2 text-left font-semibold text-[10px] uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{h}</th>)}</tr></thead>
+                                <tbody>
+                                  {cb.map((c, i) => (
+                                    <tr key={i} style={{ borderBottom: '1px solid var(--brand-border)' }}>
+                                      <td className="px-3 py-2.5 font-medium" style={{ color: 'var(--brand-text)' }}>{c.consultant_name}</td>
+                                      <td className="px-3 py-2.5 tabular-nums" style={{ color: 'var(--brand-text)' }}>{c.total_hours.toFixed(1)}h</td>
+                                      <td className="px-3 py-2.5 tabular-nums" style={{ color: '#22c55e' }}>{c.approved_hours.toFixed(1)}h</td>
+                                      <td className="px-3 py-2.5 tabular-nums" style={{ color: '#f59e0b' }}>{c.pending_hours.toFixed(1)}h</td>
+                                      <td className="px-3 py-2.5 tabular-nums text-[11px]" style={{ color: 'var(--brand-muted)' }}>{c.consultant_hourly_rate != null ? fmtBRL(c.consultant_hourly_rate) : '—'}{c.consultant_rate_type === 'monthly' && <span className="ml-1 opacity-60">÷180</span>}</td>
+                                      <td className="px-3 py-2.5 tabular-nums font-bold" style={{ color: 'var(--brand-text)' }}>{fmtBRL(c.cost)}</td>
+                                    </tr>
+                                  ))}
+                                  <tr style={{ background: 'rgba(0,245,255,0.04)', borderTop: '1px solid var(--brand-border)' }}>
+                                    <td className="px-3 py-2.5 font-bold text-[11px] uppercase" style={{ color: 'var(--brand-subtle)' }} colSpan={5}>Total</td>
+                                    <td className="px-3 py-2.5 font-bold tabular-nums" style={{ color: '#00F5FF' }}>{fmtBRL(cc.total_cost)}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </div>
+                )}
+                {viewProjectTab === 'overview' && (
                 <div className="grid grid-cols-2 gap-0 divide-x" style={{ borderColor: 'var(--brand-border)' }}>
 
                   {/* Coluna esquerda */}
@@ -1967,12 +2058,12 @@ export default function GestaoProjetosPage() {
 
                   </div>
                 </div>
+                )}
               </div>
 
               {/* Footer */}
               <div className="flex items-center justify-between px-6 py-3 shrink-0" style={{ borderTop: '1px solid var(--brand-border)' }}>
                 <div className="flex gap-2">
-                  <button onClick={() => { setViewProject(null); handleMenuAction('costs', base) }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}><DollarSign size={11} /> Custos</button>
                   <button onClick={() => { setViewProject(null); handleMenuAction('aportes', base) }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}><TrendingUp size={11} /> Aportes</button>
                   <button onClick={() => { setViewProject(null); handleMenuAction('team', base) }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}><Users size={11} /> Equipe</button>
                 </div>
