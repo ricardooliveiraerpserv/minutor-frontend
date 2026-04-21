@@ -181,15 +181,15 @@ const BIZIFY_COLOR = '#a78bfa'
 const SUSTENTACAO_COLS: Column[] = [
   {
     id: 'sust_bh_fixo',   label: 'BH Fixo',   type: 'sustentacao', emoji: '🔒', color: SUST_COLOR,
-    sustentacaoValidator: (c) => c.categoria === 'sustentacao' && c.tipo_faturamento === 'banco_horas_fixo',
+    sustentacaoValidator: (c) => c.tipo_faturamento === 'banco_horas_fixo',
   },
   {
     id: 'sust_bh_mensal', label: 'BH Mensal', type: 'sustentacao', emoji: '📅', color: SUST_COLOR,
-    sustentacaoValidator: (c) => c.categoria === 'sustentacao' && c.tipo_faturamento === 'banco_horas_mensal',
+    sustentacaoValidator: (c) => c.tipo_faturamento === 'banco_horas_mensal',
   },
   {
     id: 'sust_on_demand', label: 'On Demand', type: 'sustentacao', emoji: '⚡', color: SUST_COLOR,
-    sustentacaoValidator: (c) => c.categoria === 'sustentacao' && c.tipo_faturamento === 'on_demand',
+    sustentacaoValidator: (c) => c.tipo_faturamento === 'on_demand',
   },
   {
     id: 'sust_cloud',     label: 'Cloud',     type: 'sustentacao', emoji: '☁️', color: '#38bdf8',
