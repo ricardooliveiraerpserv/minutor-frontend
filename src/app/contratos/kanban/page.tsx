@@ -1370,6 +1370,12 @@ function KanbanContent() {
       // ── Between sustentação columns (or from demand to sustentação)
       if (toCol.startsWith('sust_')) {
         if (!isSustAdmin) { toast.error('Apenas admin ou coordenador de sustentação pode mover.'); return }
+        const allSustCols = [...SUSTENTACAO_COLS, BIZIFY_COL]
+        const destSustCol = allSustCols.find(c => c.id === toCol)
+        if (destSustCol?.sustentacaoValidator && card.contract_type && !destSustCol.sustentacaoValidator(card)) {
+          toast.error(`Tipo de contrato incompatível com a fila "${destSustCol.label}".`)
+          return
+        }
         // Optimistic
         setSustGroups(prev => {
           const next = { ...prev }
