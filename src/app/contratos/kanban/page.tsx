@@ -7,8 +7,9 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
-import { List, Plus, ExternalLink, CheckCircle, AlertCircle, AlertTriangle, Clock, Users, Layers, PauseCircle, XCircle, MoreVertical, Eye, Pencil, DollarSign, X, Check } from 'lucide-react'
+import { List, Plus, ExternalLink, CheckCircle, AlertCircle, AlertTriangle, Clock, Users, Layers, PauseCircle, XCircle, MoreVertical, Eye, Pencil, DollarSign, X, Check, MessageSquare } from 'lucide-react'
 import { ContractFormModal } from '@/components/contracts/ContractFormModal'
+import { ContractMessages } from '@/components/shared/ContractMessages'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1137,15 +1138,23 @@ function CardDetailModal({ card, onClose, onEditContract }: {
   onEditContract?: (contractId: number) => void
 }) {
   const badge = statusBadge(card)
+  const [tab, setTab]   = useState<'details' | 'chat' | 'log'>('details')
   const [full, setFull] = useState<any>(null)
   const [logs, setLogs] = useState<any[]>([])
+  const [logsLoaded, setLogsLoaded] = useState(false)
 
   useEffect(() => {
     api.get<any>(`/contracts/${card.id}`).then(setFull).catch(() => {})
-    api.get<any[]>(`/contracts/${card.id}/kanban-logs`).then(setLogs).catch(() => {})
   }, [card.id])
 
-  const fmt = (val: any, fallback = '—') => val ?? fallback
+  useEffect(() => {
+    if (tab === 'log' && !logsLoaded) {
+      api.get<any[]>(`/contracts/${card.id}/kanban-logs`)
+        .then(r => { setLogs(Array.isArray(r) ? r : []); setLogsLoaded(true) })
+        .catch(() => {})
+    }
+  }, [tab, card.id, logsLoaded])
+
   const fmtMoney = (val: any) => val != null ? `R$ ${Number(val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'
   const fmtHours = (val: any) => val != null ? `${val}h` : '—'
   const fmtDate  = (val: any) => val ? new Date(val).toLocaleDateString('pt-BR') : '—'
@@ -1184,10 +1193,14 @@ function CardDetailModal({ card, onClose, onEditContract }: {
     ['Projeto',           card.project_code ?? '—'],
   ]
 
+  const tabStyle = (t: string) => tab === t
+    ? { background: 'rgba(234,179,8,0.12)', color: '#eab308', border: '1px solid rgba(234,179,8,0.3)' }
+    : { color: 'var(--brand-subtle)', border: '1px solid transparent' }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
-      <div className="w-full max-w-lg rounded-2xl overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-        <div className="px-6 py-5 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+      <div className="w-full max-w-lg rounded-2xl overflow-hidden flex flex-col" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)', maxHeight: '85vh' }}>
+        <div className="px-6 py-5 border-b shrink-0" style={{ borderColor: 'var(--brand-border)' }}>
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-base font-bold" style={{ color: 'var(--brand-text)' }}>{card.customer_name}</p>
@@ -1196,32 +1209,32 @@ function CardDetailModal({ card, onClose, onEditContract }: {
             <span className="text-xs font-semibold px-2 py-1 rounded-full shrink-0"
               style={{ background: badge.bg, color: badge.color }}>{badge.label}</span>
           </div>
-        </div>
-        <div className="px-6 py-4 space-y-3 max-h-[60vh] overflow-y-auto">
-          {!full && <p className="text-xs text-center" style={{ color: 'var(--brand-muted)' }}>Carregando...</p>}
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            {fields.map(([label, value]) => (
-              <div key={label}>
-                <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{label}</p>
-                <p className="text-sm" style={{ color: 'var(--brand-text)' }}>{value}</p>
-              </div>
-            ))}
+          <div className="flex gap-1 mt-3">
+            <button onClick={() => setTab('details')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style={tabStyle('details')}>
+              <ExternalLink size={11} /> Detalhes
+            </button>
+            <button onClick={() => setTab('chat')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style={tabStyle('chat')}>
+              <MessageSquare size={11} /> Chat
+            </button>
+            <button onClick={() => setTab('log')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style={tabStyle('log')}>
+              <Clock size={11} /> Histórico
+            </button>
           </div>
-          {!card.is_complete && (
-            <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs"
-              style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>
-              <AlertCircle size={13} className="mt-0.5 shrink-0" />
-              <span>Contrato incompleto — preencha cliente, horas, tipo de contrato e faturamento para alocar a um coordenador.</span>
-            </div>
-          )}
+        </div>
 
-          {logs.length > 0 && (
-            <div className="pt-2 border-t" style={{ borderColor: 'var(--brand-border)' }}>
-              <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--brand-subtle)' }}>Histórico de movimentações</p>
+        {tab === 'chat' ? (
+          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+            <ContractMessages contractId={card.id} />
+          </div>
+        ) : tab === 'log' ? (
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            {logs.length === 0 ? (
+              <p className="text-xs text-center py-8" style={{ color: 'var(--brand-muted)' }}>Nenhum histórico</p>
+            ) : (
               <div className="space-y-2">
                 {logs.map((log) => (
                   <div key={log.id} className="flex items-start gap-2 text-xs" style={{ color: 'var(--brand-muted)' }}>
-                    <span className="mt-0.5 shrink-0 w-1.5 h-1.5 rounded-full bg-current opacity-40 mt-1.5" />
+                    <span className="mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full bg-current opacity-40" />
                     <div>
                       <span style={{ color: 'var(--brand-text)' }}>{colLabel(log.from_column)}</span>
                       <span className="mx-1">→</span>
@@ -1232,22 +1245,43 @@ function CardDetailModal({ card, onClose, onEditContract }: {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="px-6 py-4 space-y-3 overflow-y-auto flex-1">
+              {!full && <p className="text-xs text-center" style={{ color: 'var(--brand-muted)' }}>Carregando...</p>}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                {fields.map(([label, value]) => (
+                  <div key={label}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>{label}</p>
+                    <p className="text-sm" style={{ color: 'var(--brand-text)' }}>{value}</p>
+                  </div>
+                ))}
+              </div>
+              {!card.is_complete && (
+                <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs"
+                  style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>
+                  <AlertCircle size={13} className="mt-0.5 shrink-0" />
+                  <span>Contrato incompleto — preencha cliente, horas, tipo de contrato e faturamento para alocar a um coordenador.</span>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <div className="flex justify-end gap-3 px-6 py-4 border-t" style={{ borderColor: 'var(--brand-border)' }}>
-          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--brand-muted)' }}>Fechar</button>
-          <button onClick={() => { onClose(); onEditContract?.(card.id) }}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
-            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}>
-            <Pencil size={13} /> Editar Contrato
-          </button>
-          <button onClick={() => { window.location.href = '/contratos' }}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
-            style={{ background: 'var(--brand-primary)', color: '#0A0A0B' }}>
-            <ExternalLink size={13} /> Ver Lista
-          </button>
-        </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t shrink-0" style={{ borderColor: 'var(--brand-border)' }}>
+              <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--brand-muted)' }}>Fechar</button>
+              <button onClick={() => { onClose(); onEditContract?.(card.id) }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+                style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}>
+                <Pencil size={13} /> Editar Contrato
+              </button>
+              <button onClick={() => { window.location.href = '/contratos' }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+                style={{ background: 'var(--brand-primary)', color: '#0A0A0B' }}>
+                <ExternalLink size={13} /> Ver Lista
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

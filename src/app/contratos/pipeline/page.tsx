@@ -9,7 +9,9 @@ import { toast } from 'sonner'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { List, Plus, ExternalLink, AlertCircle, AlertTriangle, Clock, ChevronRight, Rocket, Layers, FolderKanban, MessageSquare, Send, Paperclip, X, Download, MoreVertical, Eye, Pencil, DollarSign, TrendingUp, Users, BarChart2, Check, Trash2 } from 'lucide-react'
 import { ProjectMessages } from '@/components/shared/ProjectMessages'
+import { ContractMessages } from '@/components/shared/ContractMessages'
 import { ContractCreateModal } from '@/components/shared/ContractCreateModal'
+import { ContractFormModal } from '@/components/contracts/ContractFormModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -568,14 +570,15 @@ function GenerateProjectModal({
 
 // ─── Card Detail Modal ────────────────────────────────────────────────────────
 
-function ContractDetailModal({ card, onClose, onGenerate, coordinators, canGenerate }: {
+function ContractDetailModal({ card, onClose, onGenerate, coordinators, canGenerate, onEdit }: {
   card: ContractCard
   onClose: () => void
   onGenerate?: () => void
   coordinators: Coordinator[]
   canGenerate: boolean
+  onEdit?: () => void
 }) {
-  const [tab, setTab]             = useState<'details' | 'log'>('details')
+  const [tab, setTab]             = useState<'details' | 'chat' | 'log'>('details')
   const [logs, setLogs]           = useState<KanbanLogEntry[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
   const [logsLoaded, setLogsLoaded]   = useState(false)
@@ -589,6 +592,10 @@ function ContractDetailModal({ card, onClose, onGenerate, coordinators, canGener
         .finally(() => setLogsLoading(false))
     }
   }, [tab, card.id, logsLoaded])
+
+  const tabStyle = (t: string) => tab === t
+    ? { background: 'rgba(234,179,8,0.12)', color: '#eab308', border: '1px solid rgba(234,179,8,0.3)' }
+    : { color: 'var(--brand-subtle)', border: '1px solid transparent' }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
@@ -607,20 +614,24 @@ function ContractDetailModal({ card, onClose, onGenerate, coordinators, canGener
             </span>
           </div>
           <div className="flex gap-1 mt-3">
-            {(['details', 'log'] as const).map(t => (
-              <button key={t} onClick={() => setTab(t)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                style={tab === t
-                  ? { background: 'rgba(234,179,8,0.12)', color: '#eab308', border: '1px solid rgba(234,179,8,0.3)' }
-                  : { color: 'var(--brand-subtle)', border: '1px solid transparent' }}>
-                {t === 'details' ? <><ExternalLink size={11} /> Detalhes</> : <><Clock size={11} /> Histórico</>}
-              </button>
-            ))}
+            <button onClick={() => setTab('details')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style={tabStyle('details')}>
+              <ExternalLink size={11} /> Detalhes
+            </button>
+            <button onClick={() => setTab('chat')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style={tabStyle('chat')}>
+              <MessageSquare size={11} /> Chat
+            </button>
+            <button onClick={() => setTab('log')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style={tabStyle('log')}>
+              <Clock size={11} /> Histórico
+            </button>
           </div>
         </div>
         {tab === 'log' ? (
           <div className="flex-1 overflow-y-auto">
             <KanbanLogTab logs={logs} loading={logsLoading} />
+          </div>
+        ) : tab === 'chat' ? (
+          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+            <ContractMessages contractId={card.id} />
           </div>
         ) : (
         <>
@@ -652,12 +663,14 @@ function ContractDetailModal({ card, onClose, onGenerate, coordinators, canGener
         <div className="flex justify-end gap-3 px-6 py-4 border-t" style={{ borderColor: 'var(--brand-border)' }}>
           <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--brand-muted)' }}>Fechar</button>
           {canGenerate && card.is_complete && card.kanban_status === 'inicio_autorizado' && !card.project_id && (
-            <button
-              onClick={onGenerate}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
-              style={{ background: '#eab308', color: '#000' }}
-            >
+            <button onClick={onGenerate} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold" style={{ background: '#eab308', color: '#000' }}>
               <Rocket size={13} /> Gerar Projeto
+            </button>
+          )}
+          {onEdit && (
+            <button onClick={() => { onClose(); onEdit() }} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}>
+              <Pencil size={13} /> Editar Contrato
             </button>
           )}
           <button onClick={() => { window.location.href = '/contratos' }}
@@ -943,11 +956,18 @@ function ProjectDetailModal({ card, onClose, userRole }: { card: ProjectCard; on
             <div className="flex justify-end gap-3 px-6 py-4 border-t shrink-0" style={{ borderColor: 'rgba(99,102,241,0.2)' }}>
               <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--brand-muted)' }}>Fechar</button>
               {userRole !== 'cliente' && (
-                <button onClick={() => setShowProjectView(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
-                  style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.35)' }}>
-                  <ExternalLink size={13} /> Visualizar Projeto
-                </button>
+                <>
+                  <button onClick={() => setShowProjectView(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+                    style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.35)' }}>
+                    <ExternalLink size={13} /> Visualizar Projeto
+                  </button>
+                  <button onClick={() => window.location.href = `/projetos/${card.id}?edit=1`}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+                    style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}>
+                    <Pencil size={13} /> Editar Projeto
+                  </button>
+                </>
               )}
             </div>
           </>
@@ -3130,6 +3150,8 @@ function KanbanContent() {
   const [generateTarget,   setGenerateTarget]   = useState<ContractCard | null>(null)
   const [projectAction,    setProjectAction]    = useState<{ card: ProjectCard; action: string } | null>(null)
   const [viewMode,         setViewMode]         = useState<'kanban' | 'list'>('kanban')
+  const [editContractData, setEditContractData] = useState<any | null>(null)
+  const [showEditContract, setShowEditContract] = useState(false)
 
   const isConsultor = userRole === 'consultor'
   const isCliente   = userRole === 'cliente'
@@ -3528,6 +3550,23 @@ function KanbanContent() {
           onGenerate={() => { setGenerateTarget(selectedContract); setSelectedContract(null) }}
           coordinators={coordinators}
           canGenerate={!isConsultor && !isCliente}
+          onEdit={!isConsultor && !isCliente ? async () => {
+            const id = selectedContract.id
+            setSelectedContract(null)
+            try {
+              const full = await api.get<any>(`/contracts/${id}`)
+              setEditContractData(full)
+              setShowEditContract(true)
+            } catch { toast.error('Erro ao carregar contrato') }
+          } : undefined}
+        />
+      )}
+      {showEditContract && (
+        <ContractFormModal
+          open={showEditContract}
+          editContract={editContractData}
+          onClose={() => { setShowEditContract(false); setEditContractData(null) }}
+          onSaved={() => { setShowEditContract(false); setEditContractData(null) }}
         />
       )}
       {selectedProject && (
