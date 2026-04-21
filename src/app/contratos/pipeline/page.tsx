@@ -235,10 +235,21 @@ function uniqueCardId(card: AnyCard): string {
 // ─── Contract Card ────────────────────────────────────────────────────────────
 
 function ContractKanbanCard({
-  card, index, canDrag, onClick,
-}: { card: ContractCard; index: number; canDrag: boolean; onClick: () => void }) {
+  card, index, canDrag, onClick, onAction,
+}: { card: ContractCard; index: number; canDrag: boolean; onClick: () => void; onAction?: (action: string) => void }) {
   const isIncomplete = !card.is_complete
   const isTransition = card.kanban_status === 'inicio_autorizado'
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuOpen])
 
   return (
     <Draggable draggableId={uniqueCardId(card)} index={index} isDragDisabled={!canDrag}>
@@ -248,7 +259,7 @@ function ContractKanbanCard({
           {...prov.draggableProps}
           {...prov.dragHandleProps}
           onClick={onClick}
-          className="rounded-xl p-3 cursor-pointer select-none transition-all"
+          className="rounded-xl p-3 cursor-pointer select-none transition-all group"
           style={{
             background: snap.isDragging ? 'rgba(0,245,255,0.06)' : 'var(--brand-surface)',
             border: `1px solid ${snap.isDragging ? 'rgba(0,245,255,0.3)' : isTransition ? 'rgba(234,179,8,0.3)' : 'var(--brand-border)'}`,
@@ -265,18 +276,48 @@ function ContractKanbanCard({
                 <p className="text-xs truncate" style={{ color: 'var(--brand-subtle)' }}>{card.project_name}</p>
               )}
             </div>
-            <span
-              className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
-              style={
-                card.project_id
-                  ? { background: 'rgba(34,197,94,0.12)', color: '#22c55e' }
-                  : isIncomplete
-                  ? { background: 'rgba(239,68,68,0.12)', color: '#ef4444' }
-                  : { background: 'rgba(234,179,8,0.12)', color: '#eab308' }
-              }
-            >
-              {card.project_id ? 'Projeto' : isIncomplete ? 'Incompleto' : 'Completo'}
-            </span>
+            <div className="flex items-center gap-1 shrink-0">
+              <span
+                className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                style={
+                  card.project_id
+                    ? { background: 'rgba(34,197,94,0.12)', color: '#22c55e' }
+                    : isIncomplete
+                    ? { background: 'rgba(239,68,68,0.12)', color: '#ef4444' }
+                    : { background: 'rgba(234,179,8,0.12)', color: '#eab308' }
+                }
+              >
+                {card.project_id ? 'Projeto' : isIncomplete ? 'Incompleto' : 'Completo'}
+              </span>
+              {onAction && (
+                <div ref={menuRef} className="relative" onClick={e => e.stopPropagation()}>
+                  <button
+                    onClick={e => { e.stopPropagation(); setMenuOpen(v => !v) }}
+                    className="p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10"
+                    style={{ color: 'var(--brand-subtle)' }}
+                  >
+                    <MoreVertical size={12} />
+                  </button>
+                  {menuOpen && (
+                    <div className="absolute right-0 top-6 z-[100] w-44 rounded-xl overflow-hidden shadow-2xl"
+                      style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                      {CONTRACT_MENU_ITEMS.map(item => {
+                        const Icon = item.icon
+                        return (
+                          <button key={item.action}
+                            onClick={e => { e.stopPropagation(); setMenuOpen(false); onAction(item.action) }}
+                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-left transition-colors hover:bg-white/5"
+                            style={{ color: 'var(--brand-text)' }}>
+                            <Icon size={13} style={{ color: 'var(--brand-subtle)' }} />
+                            {item.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-1 mb-2">
@@ -363,6 +404,13 @@ function RequestKanbanCard({ card }: { card: RequestCard }) {
 }
 
 // ─── Project Card ─────────────────────────────────────────────────────────────
+
+const CONTRACT_MENU_ITEMS = [
+  { action: 'view',    label: 'Visualizar', icon: Eye },
+  { action: 'edit',    label: 'Editar',     icon: Pencil },
+  { action: 'chat',    label: 'Chat',       icon: MessageSquare },
+  { action: 'log',     label: 'Histórico',  icon: Clock },
+] as const
 
 const PROJECT_MENU_ITEMS = [
   { action: 'view',       label: 'Visualizar',       icon: Eye },
@@ -570,15 +618,16 @@ function GenerateProjectModal({
 
 // ─── Card Detail Modal ────────────────────────────────────────────────────────
 
-function ContractDetailModal({ card, onClose, onGenerate, coordinators, canGenerate, onEdit }: {
+function ContractDetailModal({ card, onClose, onGenerate, coordinators, canGenerate, onEdit, initialTab }: {
   card: ContractCard
   onClose: () => void
   onGenerate?: () => void
   coordinators: Coordinator[]
   canGenerate: boolean
   onEdit?: () => void
+  initialTab?: 'details' | 'chat' | 'log'
 }) {
-  const [tab, setTab]             = useState<'details' | 'chat' | 'log'>('details')
+  const [tab, setTab]             = useState<'details' | 'chat' | 'log'>(initialTab ?? 'details')
   const [logs, setLogs]           = useState<KanbanLogEntry[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
   const [logsLoaded, setLogsLoaded]   = useState(false)
@@ -2979,7 +3028,7 @@ function RequestDetailModal({ card, onClose }: { card: RequestCard; onClose: () 
 // ─── Column Component ─────────────────────────────────────────────────────────
 
 function KanbanColumn({
-  col, contractCards, projectCards, requestCards = [], canDrag, canDrop, onContractClick, onProjectClick, onRequestClick, onProjectAction,
+  col, contractCards, projectCards, requestCards = [], canDrag, canDrop, onContractClick, onProjectClick, onRequestClick, onProjectAction, onContractAction,
 }: {
   col: Column
   contractCards: ContractCard[]
@@ -2991,6 +3040,7 @@ function KanbanColumn({
   onProjectClick: (card: ProjectCard) => void
   onRequestClick?: (card: RequestCard) => void
   onProjectAction?: (card: ProjectCard, action: string) => void
+  onContractAction?: (card: ContractCard, action: string) => void
 }) {
   const isTransition  = col.phase === 'transition'
   const isProject     = col.phase === 'project'
@@ -3100,7 +3150,7 @@ function KanbanColumn({
               <div style={{ borderTop: '1px dashed rgba(139,92,246,0.2)' }} />
             )}
             {contractCards.map((card, idx) => (
-              <ContractKanbanCard key={uniqueCardId(card)} card={card} index={requestCards.length + idx} canDrag={canDrag} onClick={() => onContractClick(card)} />
+              <ContractKanbanCard key={uniqueCardId(card)} card={card} index={requestCards.length + idx} canDrag={canDrag} onClick={() => onContractClick(card)} onAction={onContractAction ? action => onContractAction(card, action) : undefined} />
             ))}
             {projectCards.map((card, idx) => (
               <ProjectKanbanCard key={uniqueCardId(card)} card={card} index={requestCards.length + contractCards.length + idx} canDrag={canDrag} onClick={() => onProjectClick(card)} onAction={action => onProjectAction?.(card, action)} />
@@ -3155,6 +3205,7 @@ function KanbanContent() {
   const [viewMode,         setViewMode]         = useState<'kanban' | 'list'>('kanban')
   const [editContractData, setEditContractData] = useState<any | null>(null)
   const [showEditContract, setShowEditContract] = useState(false)
+  const [contractAction,   setContractAction]   = useState<{ card: ContractCard; action: string } | null>(null)
 
   const isConsultor = userRole === 'consultor'
   const isCliente   = userRole === 'cliente'
@@ -3490,6 +3541,7 @@ function KanbanContent() {
                   canDrag={colCanDrag(col.id)}
                   canDrop={colCanDrop(col.id)}
                   onContractClick={setSelectedContract}
+                  onContractAction={(card, action) => setContractAction({ card, action })}
                   onProjectClick={setSelectedProject}
                   onProjectAction={(card, action) => setProjectAction({ card, action })}
                   onRequestClick={card =>
@@ -3518,6 +3570,7 @@ function KanbanContent() {
                         setSelectedContract(card)
                       }
                     }}
+                    onContractAction={(card, action) => setContractAction({ card, action })}
                     onProjectClick={setSelectedProject}
                     onProjectAction={(card, action) => setProjectAction({ card, action })}
                     onRequestClick={setSelectedRequest}
@@ -3685,6 +3738,38 @@ function KanbanContent() {
         if (action === 'expenses')   return <ProjectExpensesModal projectId={card.id} projectName={card.project_name} onClose={close} />
         if (action === 'aportes')    return <ProjectAportesModal projectId={card.id} projectName={card.project_name} onClose={close} />
         if (action === 'team')       return <ProjectTeamModal projectId={card.id} projectName={card.project_name} onClose={close} onSaved={close} />
+        return null
+      })()}
+
+      {/* ── Contract action modals ── */}
+      {contractAction && (() => {
+        const { card, action } = contractAction
+        const close = () => setContractAction(null)
+        if (action === 'view') return (
+          <ContractDetailModal card={card} onClose={close} coordinators={coordinators} canGenerate={!isConsultor && !isCliente}
+            onGenerate={() => { setGenerateTarget(card); close() }}
+            onEdit={!isConsultor && !isCliente ? async () => {
+              close()
+              try { const full = await api.get<any>(`/contracts/${card.id}`); setEditContractData(full); setShowEditContract(true) }
+              catch { toast.error('Erro ao carregar contrato') }
+            } : undefined}
+          />
+        )
+        if (action === 'chat') return (
+          <ContractDetailModal card={card} onClose={close} coordinators={coordinators} canGenerate={false}
+            onEdit={undefined} initialTab="chat" />
+        )
+        if (action === 'log') return (
+          <ContractDetailModal card={card} onClose={close} coordinators={coordinators} canGenerate={false}
+            onEdit={undefined} initialTab="log" />
+        )
+        if (action === 'edit') {
+          api.get<any>(`/contracts/${card.id}`)
+            .then(full => { setEditContractData(full); setShowEditContract(true) })
+            .catch(() => toast.error('Erro ao carregar contrato'))
+          close()
+          return null
+        }
         return null
       })()}
     </AppLayout>
