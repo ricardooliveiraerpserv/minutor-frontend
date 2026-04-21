@@ -986,7 +986,7 @@ function ContractKanbanCard({ card, index, onClick }: {
 
           <div className="flex items-center justify-between mt-1 pt-2" style={{ borderTop: '1px solid var(--brand-border)' }}>
             <div className="flex items-center gap-3 text-[11px]" style={{ color: 'var(--brand-subtle)' }}>
-              {!!card.horas_contratadas && card.horas_contratadas > 0 && (
+              {card.horas_contratadas != null && card.horas_contratadas > 0 && (
                 <span className="flex items-center gap-1"><Clock size={10} />{card.horas_contratadas}h</span>
               )}
               {card.valor_projeto != null && (
@@ -1125,7 +1125,7 @@ function CardDetailModal({ card, onClose }: { card: ContractCard; onClose: () =>
               ['Categoria', card.categoria === 'projeto' ? 'Projeto' : card.categoria === 'sustentacao' ? 'Sustentação' : '—'],
               ['Tipo de Contrato', card.contract_type ?? '—'],
               ['Faturamento', card.tipo_faturamento ? (TIPO_LABEL[card.tipo_faturamento] ?? card.tipo_faturamento) : '—'],
-              ['Horas Contratadas', card.horas_contratadas ? `${card.horas_contratadas}h` : '—'],
+              ['Horas Contratadas', card.horas_contratadas != null ? `${card.horas_contratadas}h` : '—'],
               ['Valor do Projeto', card.valor_projeto != null ? `R$ ${Number(card.valor_projeto).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'],
               ['Coordenador', card.kanban_coordinator ?? '—'],
               ['Status Contrato', card.status],
