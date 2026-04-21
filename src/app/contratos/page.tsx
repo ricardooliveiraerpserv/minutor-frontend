@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { toast } from 'sonner'
-import { Plus, Rocket, Eye, Pencil, CheckCircle, ChevronLeft, ChevronRight, LayoutGrid, Download, FileText, X } from 'lucide-react'
+import { Plus, Pencil, ChevronLeft, ChevronRight, LayoutGrid, Download, FileText, MoreVertical, CheckCircle, Rocket } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { ContractFormModal } from '@/components/contracts/ContractFormModal'
 
@@ -345,29 +345,16 @@ export default function ContratosPage() {
                     : <span className="text-zinc-600">—</span>}
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <button onClick={() => openView(c)} title="Visualizar"
-                      className="p-1.5 rounded-md transition-colors hover:bg-zinc-700/60 text-zinc-400 hover:text-white">
-                      <Eye size={14} />
+                  <div className="flex items-center justify-center gap-2">
+                    <MoreVertical size={14} className="text-zinc-600 shrink-0" />
+                    <button onClick={() => openView(c)}
+                      className="px-2.5 py-1 rounded-md text-xs transition-colors hover:bg-zinc-700/60 text-zinc-400 hover:text-white">
+                      Visualizar
                     </button>
-                    {!c.project_id && (
-                      <button onClick={() => openEdit(c)} title="Editar"
-                        className="p-1.5 rounded-md transition-colors hover:bg-zinc-700/60 text-zinc-400 hover:text-white">
-                        <Pencil size={14} />
-                      </button>
-                    )}
-                    {c.status === 'rascunho' && (
-                      <button onClick={() => updateStatus(c, 'aprovado')} title="Aprovar"
-                        className="p-1.5 rounded-md transition-colors hover:bg-blue-900/40 text-zinc-400 hover:text-blue-400">
-                        <CheckCircle size={14} />
-                      </button>
-                    )}
-                    {(c.status === 'aprovado' || c.status === 'rascunho') && !c.project_id && (
-                      <button onClick={() => openGenModal(c)} title="Gerar Projeto"
-                        className="p-1.5 rounded-md transition-colors hover:bg-yellow-900/40 text-zinc-400 hover:text-yellow-400">
-                        <Rocket size={14} />
-                      </button>
-                    )}
+                    <button onClick={() => openEdit(c)}
+                      className="px-2.5 py-1 rounded-md text-xs transition-colors hover:bg-zinc-700/60 text-zinc-400 hover:text-white">
+                      Editar
+                    </button>
                   </div>
                 </td>
               </tr>
