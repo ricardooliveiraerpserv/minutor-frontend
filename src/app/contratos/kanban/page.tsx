@@ -1263,7 +1263,6 @@ function KanbanContent() {
   const [loading,           setLoading]            = useState(true)
   const [selected,          setSelected]           = useState<ContractCard | null>(null)
   const [projectAction,     setProjectAction]      = useState<{ card: ProjectCard; action: string } | null>(null)
-  const [draggingIsSust,    setDraggingIsSust]     = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1332,25 +1331,7 @@ function KanbanContent() {
     return projectCards.filter(p => p.status === targetStatus)
   }
 
-  const onDragStart = (start: any) => {
-    const [cardType, rawId] = start.draggableId.split('-')
-    if (cardType !== 'contract') return
-    const cardId = Number(rawId)
-    const allSustCards = Object.values(sustGroups).flat()
-    const card = [...demandCards, ...allSustCards].find(c => c.id === cardId)
-    if (!card) return
-    const ctLower = card.contract_type?.toLowerCase() ?? ''
-    const svLower = card.service_type?.toLowerCase() ?? ''
-    const isSust = card.categoria === 'sustentacao'
-      || card.sustentacao_column != null
-      || ctLower.includes('banco de horas') || ctLower.includes('on demand')
-      || ctLower.includes('cloud') || ctLower.includes('bizify')
-      || svLower.includes('cloud') || svLower.includes('bizify')
-    setDraggingIsSust(isSust)
-  }
-
   const onDragEnd = async (result: DropResult) => {
-    setDraggingIsSust(false)
     const { source, destination, draggableId } = result
     if (!destination) return
     if (source.droppableId === destination.droppableId && source.index === destination.index) return
@@ -1389,12 +1370,6 @@ function KanbanContent() {
       // ── Between sustentação columns (or from demand to sustentação)
       if (toCol.startsWith('sust_')) {
         if (!isSustAdmin) { toast.error('Apenas admin ou coordenador de sustentação pode mover.'); return }
-        const allSustCols = [...SUSTENTACAO_COLS, BIZIFY_COL]
-        const destSustCol = allSustCols.find(c => c.id === toCol)
-        if (destSustCol?.sustentacaoValidator && card.contract_type && !destSustCol.sustentacaoValidator(card)) {
-          toast.error(`Tipo de contrato incompatível com a fila "${destSustCol.label}".`)
-          return
-        }
         // Optimistic
         setSustGroups(prev => {
           const next = { ...prev }
@@ -1511,7 +1486,7 @@ function KanbanContent() {
             <p className="text-sm" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p>
           </div>
         ) : (
-          <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
+          <DragDropContext onDragEnd={onDragEnd}>
             <div className="flex-1 overflow-x-auto overflow-y-hidden">
               <div className="flex gap-3 p-4 h-full" style={{ minWidth: `${columns.length * 272 + 60}px` }}>
                 {columns.map((col, colIdx) => {
@@ -1617,8 +1592,7 @@ function KanbanContent() {
                         <Droppable
                           droppableId={col.id}
                           isDropDisabled={
-                            (isStatusCol && !['col_pausado', 'col_cancelado', 'col_encerrado'].includes(col.id)) ||
-                            (isCoord && draggingIsSust)
+                            isStatusCol && !['col_pausado', 'col_cancelado', 'col_encerrado'].includes(col.id)
                           }
                         >
                           {(prov, snap) => (
