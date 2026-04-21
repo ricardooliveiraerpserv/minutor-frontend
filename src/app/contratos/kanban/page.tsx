@@ -149,6 +149,13 @@ const PROJECT_MENU_ITEMS = [
   { action: 'timesheets', label: 'Apontamentos',   icon: Clock },
 ]
 
+const CONTRACT_MENU_ITEMS = [
+  { action: 'view',  label: 'Visualizar', icon: Eye },
+  { action: 'edit',  label: 'Editar',     icon: Pencil },
+  { action: 'chat',  label: 'Chat',       icon: MessageSquare },
+  { action: 'log',   label: 'Histórico',  icon: Clock },
+]
+
 const STATUS_LABEL: Record<string, string> = {
   awaiting_start:       'Aguardando',
   started:              'Em Andamento',
@@ -947,10 +954,22 @@ function ProjectStatusModal({ projectId, projectName, currentStatus, onClose, on
 
 // ─── Contract Card ────────────────────────────────────────────────────────────
 
-function ContractKanbanCard({ card, index, onClick }: {
-  card: ContractCard; index: number; onClick: () => void
+function ContractKanbanCard({ card, index, onClick, onAction }: {
+  card: ContractCard; index: number; onClick: () => void; onAction?: (action: string) => void
 }) {
   const badge = statusBadge(card)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuOpen])
+
   return (
     <Draggable draggableId={`contract-${card.id}`} index={index}>
       {(prov, snap) => (
@@ -959,7 +978,7 @@ function ContractKanbanCard({ card, index, onClick }: {
           {...prov.draggableProps}
           {...prov.dragHandleProps}
           onClick={onClick}
-          className="rounded-xl p-3 cursor-pointer select-none transition-all"
+          className="rounded-xl p-3 cursor-pointer select-none transition-all group"
           style={{
             background: snap.isDragging ? 'rgba(0,245,255,0.06)' : 'var(--brand-surface)',
             border: `1px solid ${snap.isDragging ? 'rgba(0,245,255,0.35)' : 'var(--brand-border)'}`,
@@ -976,10 +995,40 @@ function ContractKanbanCard({ card, index, onClick }: {
                 <p className="text-xs truncate" style={{ color: 'var(--brand-subtle)' }}>{card.project_name}</p>
               )}
             </div>
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
-              style={{ background: badge.bg, color: badge.color }}>
-              {badge.label}
-            </span>
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                style={{ background: badge.bg, color: badge.color }}>
+                {badge.label}
+              </span>
+              {onAction && (
+                <div ref={menuRef} className="relative" onClick={e => e.stopPropagation()}>
+                  <button
+                    onClick={e => { e.stopPropagation(); setMenuOpen(v => !v) }}
+                    className="p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10"
+                    style={{ color: 'var(--brand-subtle)' }}
+                  >
+                    <MoreVertical size={12} />
+                  </button>
+                  {menuOpen && (
+                    <div className="absolute right-0 top-6 z-[100] w-44 rounded-xl overflow-hidden shadow-2xl"
+                      style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                      {CONTRACT_MENU_ITEMS.map(item => {
+                        const Icon = item.icon
+                        return (
+                          <button key={item.action}
+                            onClick={e => { e.stopPropagation(); setMenuOpen(false); onAction(item.action) }}
+                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-left transition-colors hover:bg-white/5"
+                            style={{ color: 'var(--brand-text)' }}>
+                            <Icon size={13} style={{ color: 'var(--brand-subtle)' }} />
+                            {item.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-1 mb-2">
@@ -1132,13 +1181,14 @@ function colLabel(col: string) {
   return COL_LABEL[col] ?? col
 }
 
-function CardDetailModal({ card, onClose, onEditContract }: {
+function CardDetailModal({ card, onClose, onEditContract, initialTab }: {
   card: ContractCard
   onClose: () => void
   onEditContract?: (contractId: number) => void
+  initialTab?: 'details' | 'chat' | 'log'
 }) {
   const badge = statusBadge(card)
-  const [tab, setTab]   = useState<'details' | 'chat' | 'log'>('details')
+  const [tab, setTab]   = useState<'details' | 'chat' | 'log'>(initialTab ?? 'details')
   const [full, setFull] = useState<any>(null)
   const [logs, setLogs] = useState<any[]>([])
   const [logsLoaded, setLogsLoaded] = useState(false)
@@ -1306,6 +1356,7 @@ function KanbanContent() {
   })
   const [loading,           setLoading]            = useState(true)
   const [selected,          setSelected]           = useState<ContractCard | null>(null)
+  const [contractAction,    setContractAction]     = useState<{ card: ContractCard; action: string } | null>(null)
   const [projectAction,     setProjectAction]      = useState<{ card: ProjectCard; action: string } | null>(null)
 
   // Contract form modal state
@@ -1652,7 +1703,7 @@ function KanbanContent() {
                               }}
                             >
                               {contractCards.map((card, idx) => (
-                                <ContractKanbanCard key={`c-${card.id}`} card={card} index={idx} onClick={() => setSelected(card)} />
+                                <ContractKanbanCard key={`c-${card.id}`} card={card} index={idx} onClick={() => setSelected(card)} onAction={action => setContractAction({ card, action })} />
                               ))}
                               {activeProjects.map((proj, idx) => (
                                 <ProjectKanbanCard key={`p-${proj.id}`} card={proj} index={contractCards.length + idx} onClick={() => setProjectAction({ card: proj, action: 'view' })} onAction={action => setProjectAction({ card: proj, action })} />
@@ -1701,6 +1752,23 @@ function KanbanContent() {
         onClose={() => { setShowNewContract(false); setEditingContractData(null) }}
         onSaved={load}
       />
+
+      {contractAction && (() => {
+        const { card, action } = contractAction
+        const close = () => setContractAction(null)
+        if (action === 'view') return <CardDetailModal card={card} onClose={close} initialTab="details"
+          onEditContract={async id => { close(); try { const c = await api.get<any>(`/contracts/${id}`); setEditingContractData(c); setShowNewContract(true) } catch { toast.error('Erro') } }} />
+        if (action === 'chat') return <CardDetailModal card={card} onClose={close} initialTab="chat" />
+        if (action === 'log')  return <CardDetailModal card={card} onClose={close} initialTab="log" />
+        if (action === 'edit') {
+          api.get<any>(`/contracts/${card.id}`)
+            .then(c => { setEditingContractData(c); setShowNewContract(true) })
+            .catch(() => toast.error('Erro ao carregar contrato'))
+          close()
+          return null
+        }
+        return null
+      })()}
 
       {projectAction && (() => {
         const { card, action } = projectAction
