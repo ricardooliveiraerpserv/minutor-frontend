@@ -135,7 +135,16 @@ const NAV: NavEntry[] = [
     ],
   },
   { type: 'item', label: 'Banco de Horas', href: '/hora-banco', icon: Landmark },
-  { type: 'item', label: 'Fechamento',     href: '/fechamento', icon: DollarSign },
+  {
+    type: 'group',
+    label: 'Fechamento',
+    icon: DollarSign,
+    items: [
+      { label: 'Geral',      href: '/fechamento',          icon: BarChart2  },
+      { label: 'Clientes',   href: '/fechamento/cliente',  icon: Building2  },
+      { label: 'Parceiros',  href: '/fechamento/parceiro', icon: Handshake  },
+    ],
+  },
   {
     type: 'group',
     label: 'Cadastros',
