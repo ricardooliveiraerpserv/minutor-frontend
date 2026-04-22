@@ -917,24 +917,20 @@ function MiniDonut({ services, expenses }: { services: number; expenses: number 
 }
 
 function HeroTotal({
-  period, total, services, expTotal, variation, prevLabel,
+  period, total, variation, prevLabel,
 }: {
   period: string
   total: number | null
-  services: number | null
-  expTotal: number
   variation: number | null
   prevLabel: string
 }) {
   const isPos = variation !== null && variation >= 0
-  const t = total ?? 0
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900 px-6 py-5 grid grid-cols-[auto_1fr_auto] gap-x-8 items-center">
-
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900 px-6 py-5 flex items-center gap-8">
       {/* ESQUERDA — contexto */}
-      <div className="flex flex-col gap-2 min-w-[100px]">
-        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500">Total Geral</span>
+      <div className="flex flex-col gap-2 min-w-[120px]">
+        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500">Total Serviços</span>
         <span className="text-[12px] text-zinc-400 font-medium">{period}</span>
         {variation !== null && (
           <div className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border w-fit ${
@@ -948,40 +944,13 @@ function HeroTotal({
         )}
       </div>
 
-      {/* CENTRO — valor principal */}
-      <div className="flex flex-col gap-1 border-l border-r border-zinc-800 px-8">
+      {/* VALOR — destaque */}
+      <div className="flex flex-col gap-1 border-l border-zinc-800 pl-8">
         <div className="text-[42px] font-extrabold leading-none tracking-tight text-[#00F5FF]">
           {total !== null ? formatBRL(total) : '—'}
         </div>
-        <span className="text-[11px] text-zinc-600 mt-1">valor total a receber no período</span>
+        <span className="text-[11px] text-zinc-600 mt-1">total de serviços no período</span>
       </div>
-
-      {/* DIREITA — composição */}
-      <div className="flex items-center gap-5 min-w-[200px]">
-        {t > 0 && <MiniDonut services={services ?? 0} expenses={expTotal} />}
-        <div className="flex flex-col gap-2.5">
-          {services !== null && (
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-[#00F5FF] shrink-0" />
-              <span className="text-[11px] text-zinc-500 w-16">Serviços</span>
-              <span className="text-[11px] font-medium text-zinc-200">{formatBRL(services)}</span>
-              {t > 0 && <span className="text-[10px] text-zinc-600">{Math.round((services / t) * 100)}%</span>}
-            </div>
-          )}
-          {expTotal > 0 && (
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />
-              <span className="text-[11px] text-zinc-500 w-16">Despesas</span>
-              <span className="text-[11px] font-medium text-zinc-200">{formatBRL(expTotal)}</span>
-              {t > 0 && <span className="text-[10px] text-zinc-600">{Math.round((expTotal / t) * 100)}%</span>}
-            </div>
-          )}
-          {services === null && expTotal === 0 && (
-            <span className="text-[11px] text-zinc-600">Sem lançamentos</span>
-          )}
-        </div>
-      </div>
-
     </div>
   )
 }
@@ -1908,30 +1877,22 @@ export default function MeuPainelPage() {
   const heroPeriodLabel = fmtYearMonth(`${year}-${_heroPad(month + 1)}`)
   const heroPrevPoint   = history.length >= 2 ? history[history.length - 2] : null
   const heroCurrPoint   = history.length >= 1 ? history[history.length - 1] : null
-  const heroPrevTotal   = heroPrevPoint ? heroPrevPoint.revenue + heroPrevPoint.expenses : null
-  const heroCurrTotal   = heroCurrPoint ? heroCurrPoint.revenue + heroCurrPoint.expenses : null
-  const heroVariation   = heroPrevTotal && heroPrevTotal > 0 && heroCurrTotal !== null
-    ? ((heroCurrTotal - heroPrevTotal) / heroPrevTotal) * 100
+  const heroPrevSvc     = heroPrevPoint ? heroPrevPoint.revenue : null
+  const heroCurrSvc     = heroCurrPoint ? heroCurrPoint.revenue : null
+  const heroVariation   = heroPrevSvc && heroPrevSvc > 0 && heroCurrSvc !== null
+    ? ((heroCurrSvc - heroPrevSvc) / heroPrevSvc) * 100
     : null
   const heroPrevLabel   = heroPrevPoint?.label ?? '—'
 
-  let heroTotal: number | null    = null
-  let heroServices: number | null = null
+  let heroTotal: number | null = null
   if (!isParceiroSimples) {
     if (isFixo) {
       const fixedMonthlySvc = hourlyRate > 0 ? Math.round(hourlyRate * prorationRatio * 100) / 100 : null
-      heroServices = fixedMonthlySvc
-      heroTotal    = fixedMonthlySvc !== null ? fixedMonthlySvc + expTotal : expTotal > 0 ? expTotal : null
+      heroTotal = fixedMonthlySvc
     } else if (isHBConsultant) {
-      if (!hbBeforeStart && hourlyRate > 0) {
-        heroServices = hbServiceVal
-        heroTotal    = hbTotalGeral
-      } else if (!hbBeforeStart && expTotal > 0) {
-        heroTotal = expTotal
-      }
+      if (!hbBeforeStart && hourlyRate > 0) heroTotal = hbServiceVal
     } else {
-      heroServices = estimatedValue
-      heroTotal    = estimatedValue !== null ? estimatedValue + expTotal : expTotal > 0 ? expTotal : null
+      heroTotal = estimatedValue
     }
   }
 
@@ -2041,15 +2002,13 @@ export default function MeuPainelPage() {
             <HeroTotal
               period={heroPeriodLabel}
               total={heroTotal}
-              services={heroServices}
-              expTotal={expTotal}
               variation={heroVariation}
               prevLabel={heroPrevLabel}
             />
           )}
 
-          {/* Summary cards */}
-          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-6 [&>*]:min-w-0">
+          {/* Linha 1 — Serviços */}
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 [&>*]:min-w-0">
             <SummaryCard
               label="Horas no Período"
               value={minutesToHours(tsTotalMin)}
@@ -2075,13 +2034,6 @@ export default function MeuPainelPage() {
                   icon={DollarSign}
                   accent="bg-indigo-500/15 text-indigo-400"
                 />
-                <ExpenseBreakdownCard
-                  total={expTotal + expPaid}
-                  paid={expPaid}
-                  pending={expTotal}
-                  count={expenses.length}
-                  onClick={() => setActiveTab('expenses')}
-                />
               </>
             ) : isHBConsultant ? (
               <>
@@ -2105,13 +2057,6 @@ export default function MeuPainelPage() {
                     accent="bg-green-500/15 text-green-400"
                   />
                 )}
-                <ExpenseBreakdownCard
-                  total={expTotal + expPaid}
-                  paid={expPaid}
-                  pending={expTotal}
-                  count={expenses.length}
-                  onClick={() => setActiveTab('expenses')}
-                />
               </>
             ) : (
               <>
@@ -2133,13 +2078,6 @@ export default function MeuPainelPage() {
                   icon={TrendingUp}
                   accent="bg-green-500/15 text-green-400"
                 />
-                <ExpenseBreakdownCard
-                  total={expTotal + expPaid}
-                  paid={expPaid}
-                  pending={expTotal}
-                  count={expenses.length}
-                  onClick={() => setActiveTab('expenses')}
-                />
               </>
             ))}
             <SummaryCard
@@ -2149,6 +2087,34 @@ export default function MeuPainelPage() {
               icon={BarChart2}
               accent="bg-purple-500/15 text-purple-400"
               onClick={() => setActiveTab('timesheets')}
+            />
+          </div>
+
+          {/* Linha 2 — Despesas */}
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 [&>*]:min-w-0">
+            <SummaryCard
+              label="Total no Mês"
+              value={formatBRL(expTotal + expPaid)}
+              sub={`${expenses.length} lançamento${expenses.length !== 1 ? 's' : ''}`}
+              icon={Receipt}
+              accent="bg-orange-500/15 text-orange-400"
+              onClick={() => setActiveTab('expenses')}
+            />
+            <SummaryCard
+              label="Valor Pago"
+              value={expPaid > 0 ? formatBRL(expPaid) : '—'}
+              sub="despesas reembolsadas"
+              icon={DollarSign}
+              accent="bg-emerald-500/15 text-emerald-400"
+              onClick={() => setActiveTab('expenses')}
+            />
+            <SummaryCard
+              label="A Receber"
+              value={expTotal > 0 ? formatBRL(expTotal) : '—'}
+              sub="despesas em aberto"
+              icon={TrendingUp}
+              accent="bg-amber-500/15 text-amber-400"
+              onClick={() => setActiveTab('expenses')}
             />
             <SummaryCard
               label="Despesas Pendentes"
