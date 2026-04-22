@@ -412,7 +412,8 @@ export default function FechamentoClientePage() {
             if (loadingGlobal) return <SkeletonTable rows={6} cols={4} />
 
             // Agrega TODOS os tipos → um mapa por cliente com todos os projetos
-            type ProjDisp = ProjetoGlobal & { tipo_nome: string; tipo_code: string }
+            // total_receita na visão global = horas × valor_hora (não a mensalidade contratada)
+            type ProjDisp = ProjetoGlobal & { tipo_nome: string; tipo_code: string; total_display: number }
             type ClienteAgg = { customer_id: number; nome: string; projetos: ProjDisp[]; total_horas: number; total_receita: number }
             const clientMap = new Map<number, ClienteAgg>()
             ;(globalData?.tipos ?? []).forEach(tipo => {
@@ -422,10 +423,13 @@ export default function FechamentoClientePage() {
                 }
                 const entry = clientMap.get(c.customer_id)!
                 c.projetos.forEach(p => {
-                  if (p.total_receita > 0) entry.projetos.push({ ...p, tipo_nome: tipo.nome, tipo_code: tipo.code })
+                  const display = Math.round(p.horas * p.valor_hora * 100) / 100
+                  if (p.horas > 0) {
+                    entry.projetos.push({ ...p, tipo_nome: tipo.nome, tipo_code: tipo.code, total_display: display })
+                    entry.total_horas   += p.horas
+                    entry.total_receita += display
+                  }
                 })
-                entry.total_horas   += c.total_horas
-                entry.total_receita += c.total_receita
               })
             })
             const lista = Array.from(clientMap.values())
@@ -512,7 +516,7 @@ export default function FechamentoClientePage() {
                               {c.total_horas.toFixed(2)}h
                             </td>
                             <td className="px-5 py-3 text-right tabular-nums text-sm" style={{ color: 'var(--brand-muted)' }}>
-                              {!hasMult && c.projetos[0]?.tipo_code === 'on_demand' ? formatBRL(c.projetos[0].valor_hora) : '—'}
+                              {!hasMult && c.projetos[0] ? formatBRL(c.projetos[0].valor_hora) : '—'}
                             </td>
                             <td className="px-5 py-3 text-right tabular-nums font-semibold" style={{ color: 'var(--brand-primary)' }}>
                               {formatBRL(c.total_receita)}
@@ -530,7 +534,7 @@ export default function FechamentoClientePage() {
                                 {p.nome}
                                 <span className="ml-2 opacity-60">{p.codigo}</span>
                                 <span className="ml-2 px-1.5 py-0.5 rounded text-xs" style={{ background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)' }}>
-                                  {(p as any).tipo_nome}
+                                  {p.tipo_nome}
                                 </span>
                               </td>
                               <td />
@@ -538,10 +542,10 @@ export default function FechamentoClientePage() {
                                 {p.horas.toFixed(2)}h
                               </td>
                               <td className="px-5 py-2.5 text-right tabular-nums text-xs" style={{ color: 'var(--brand-muted)' }}>
-                                {p.tipo_code === 'on_demand' ? formatBRL(p.valor_hora) : '—'}
+                                {formatBRL(p.valor_hora)}
                               </td>
                               <td className="px-5 py-2.5 text-right tabular-nums text-xs font-medium" style={{ color: 'var(--brand-primary)' }}>
-                                {formatBRL(p.total_receita)}
+                                {formatBRL(p.total_display)}
                               </td>
                             </tr>
                           ))}
