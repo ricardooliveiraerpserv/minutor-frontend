@@ -133,7 +133,7 @@ interface Customer { id: number; name: string }
 function NovaRequisicaoContent() {
   const router    = useRouter()
   const { user }  = useAuth()
-  const isCliente = user?.role === 'cliente'
+  const isCliente = user?.type === 'cliente'
 
   const [submitted,   setSubmitted]   = useState(false)
   const [saving,      setSaving]      = useState(false)
@@ -142,9 +142,8 @@ function NovaRequisicaoContent() {
 
   useEffect(() => {
     if (!isCliente) {
-      api.get('/customers?per_page=200').then((r: any) => {
-        const list: Customer[] = r.data ?? r
-        setCustomers(list)
+      api.get<any>('/customers?pageSize=500').then(r => {
+        setCustomers(r?.items ?? [])
       }).catch(() => {})
     }
   }, [isCliente])
