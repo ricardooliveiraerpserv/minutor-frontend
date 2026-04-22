@@ -838,11 +838,10 @@ export default function ExpensesPage() {
                     <Badge variant={exp.status as any}>{STATUS_LABEL[exp.status] ?? exp.status}</Badge>
                   </Td>
                   <Td>
-                    {exp.status === 'approved' && (
-                      exp.is_paid
-                        ? <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400">Pago</span>
-                        : <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-950 text-amber-400">Em aberto</span>
-                    )}
+                    {exp.is_paid
+                      ? <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400">Pago</span>
+                      : <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-950 text-amber-400">Em aberto</span>
+                    }
                   </Td>
                 </Tr>
               ))}
