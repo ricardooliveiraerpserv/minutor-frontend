@@ -1724,7 +1724,9 @@ export default function MeuPainelPage() {
   const consultantStartStr = (user as any)?.bank_hours_start_date as string | null | undefined
   const prorationRatio = (() => {
     if (!consultantStartStr) return 1
-    const sd = new Date(consultantStartStr + 'T00:00:00')
+    // Garante formato YYYY-MM-DD independente de vir com timestamp da API
+    const dateOnly = consultantStartStr.substring(0, 10)
+    const sd = new Date(dateOnly + 'T00:00:00')
     const startYM    = sd.getFullYear() * 12 + sd.getMonth()
     const selectedYM = year * 12 + month
     if (selectedYM < startYM) return 0  // mês anterior à contratação: sem valor
@@ -1745,9 +1747,11 @@ export default function MeuPainelPage() {
 
   // Para horistas com horas garantidas: piso mínimo de cobrança (proporcional se entrou no mês)
   const guaranteedProrated  = guaranteedHours !== null ? Math.round(guaranteedHours * prorationRatio * 100) / 100 : null
-  const billableHours   = guaranteedProrated !== null
-    ? Math.max(workedHours, guaranteedProrated)
-    : workedHours
+  const billableHours   = prorationRatio === 0
+    ? 0  // mês anterior à contratação: sem horas faturáveis
+    : guaranteedProrated !== null
+      ? Math.max(workedHours, guaranteedProrated)
+      : workedHours
   const estimatedValue  = effectiveRate > 0
     ? billableHours * effectiveRate
     : null
