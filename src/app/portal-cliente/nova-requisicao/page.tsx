@@ -1,9 +1,10 @@
 'use client'
 
 import { AppLayout } from '@/components/layout/app-layout'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
+import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 import { CheckCircle, ChevronLeft, AlertCircle, Send } from 'lucide-react'
 
@@ -127,10 +128,26 @@ function SuccessScreen({ onNew, onList, onClose }: { onNew: () => void; onList: 
 
 // ─── Main Form ────────────────────────────────────────────────────────────────
 
+interface Customer { id: number; name: string }
+
 function NovaRequisicaoContent() {
-  const router = useRouter()
-  const [submitted, setSubmitted] = useState(false)
-  const [saving, setSaving]       = useState(false)
+  const router    = useRouter()
+  const { user }  = useAuth()
+  const isCliente = user?.role === 'cliente'
+
+  const [submitted,   setSubmitted]   = useState(false)
+  const [saving,      setSaving]      = useState(false)
+  const [customers,   setCustomers]   = useState<Customer[]>([])
+  const [customerId,  setCustomerId]  = useState<string>('')
+
+  useEffect(() => {
+    if (!isCliente) {
+      api.get('/customers?per_page=200').then((r: any) => {
+        const list: Customer[] = r.data ?? r
+        setCustomers(list)
+      }).catch(() => {})
+    }
+  }, [isCliente])
 
   const [form, setForm] = useState({
     area_requisitante:  '',
@@ -150,16 +167,19 @@ function NovaRequisicaoContent() {
 
   const isOutro = form.tipo_necessidade === 'outro'
   const isValid = form.area_requisitante.trim() && form.tipo_necessidade && form.nivel_urgencia &&
-    (!isOutro || form.tipo_necessidade_outro.trim())
+    (!isOutro || form.tipo_necessidade_outro.trim()) &&
+    (isCliente || !!customerId)
 
   const handleSubmit = async () => {
     if (!isValid) {
-      toast.error('Preencha os campos obrigatórios: área requisitante, tipo de necessidade e urgência.')
+      toast.error('Preencha os campos obrigatórios: cliente, área requisitante, tipo de necessidade e urgência.')
       return
     }
     setSaving(true)
     try {
-      await api.post('/contract-requests', form)
+      const payload: any = { ...form }
+      if (!isCliente && customerId) payload.customer_id = Number(customerId)
+      await api.post('/contract-requests', payload)
       setSubmitted(true)
     } catch (e: any) {
       toast.error(e?.message ?? 'Erro ao enviar requisição')
@@ -170,6 +190,7 @@ function NovaRequisicaoContent() {
 
   const resetForm = () => {
     setForm({ area_requisitante: '', project_name: '', product_owner: '', modulo_tecnologia: '', tipo_necessidade: '', tipo_necessidade_outro: '', nivel_urgencia: '', descricao: '', cenario_atual: '', cenario_desejado: '' })
+    setCustomerId('')
     setSubmitted(false)
   }
 
@@ -194,6 +215,38 @@ function NovaRequisicaoContent() {
         ) : (
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-2xl mx-auto px-6 py-8 space-y-8">
+
+              {/* Seletor de cliente (apenas para admin/coordenador) */}
+              {!isCliente && (
+                <div className="rounded-2xl p-6" style={{ background: 'var(--brand-surface)', border: '1px solid rgba(0,245,255,0.25)' }}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                      style={{ background: 'var(--brand-primary)', color: '#0A0A0B' }}>C</div>
+                    <p className="text-sm font-bold" style={{ color: 'var(--brand-text)' }}>Cliente</p>
+                  </div>
+                  <Label required>Selecione o Cliente</Label>
+                  <select
+                    value={customerId}
+                    onChange={e => setCustomerId(e.target.value)}
+                    className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+                    style={{
+                      background: 'var(--brand-bg)',
+                      border: `1px solid ${customerId ? 'var(--brand-primary)' : 'var(--brand-border)'}`,
+                      color: customerId ? 'var(--brand-text)' : 'var(--brand-subtle)',
+                    }}
+                  >
+                    <option value="">Selecione o cliente...</option>
+                    {customers.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  {!customerId && (
+                    <p className="text-[11px] mt-2 flex items-center gap-1" style={{ color: '#ef4444' }}>
+                      <AlertCircle size={11} /> Selecione o cliente para esta requisição
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Seção 1–3: Identificação */}
               <div className="rounded-2xl p-6" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
