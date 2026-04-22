@@ -2115,19 +2115,6 @@ export default function MeuPainelPage() {
           </div>
           </div>
 
-          {/* Fixo: seção de remuneração direto no Total Geral */}
-          {isFixo && !isParceiroSimples && (
-            <FixoPaymentSection
-              yearMonth={`${year}-${String(month + 1).padStart(2, '0')}`}
-              workedHours={workedHours}
-              fixedMonthly={Math.round(hourlyRate * prorationRatio * 100) / 100}
-              expTotal={expTotal}
-              expPaid={expPaid}
-              proporcional={isProporcional}
-              prorationRatio={prorationRatio}
-            />
-          )}
-
           {/* Recent lists */}
           <div className="grid md:grid-cols-2 gap-4">
 
