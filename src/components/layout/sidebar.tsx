@@ -220,7 +220,6 @@ function SidebarInner({ user }: { user: User }) {
 
   const visibleNav = useMemo(() => {
     if (isCoordenador) {
-      const ep = user?.extra_permissions ?? []
       const has = (p: string) => ep.includes(p)
       const nav: NavEntry[] = [...NAV_COORDINATOR]
 
