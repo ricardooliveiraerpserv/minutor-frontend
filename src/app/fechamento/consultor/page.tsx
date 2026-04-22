@@ -119,6 +119,9 @@ const printStyles = `
   .section-header { display: flex; justify-content: space-between; align-items: center; background: #ede9fe; border-left: 3px solid #7c3aed; padding: 6px 10px; margin-bottom: 6px; border-radius: 0 4px 4px 0; }
   .section-title { font-size: 11px; font-weight: 700; color: #5b21b6; text-transform: uppercase; letter-spacing: 0.4px; }
   .section-total { font-size: 12px; font-weight: 700; color: #5b21b6; }
+  .client-header { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; margin: 8px 0 4px; border-bottom: 1px solid #ddd6fe; }
+  .client-name { font-size: 11px; font-weight: 700; color: #1a1a1a; }
+  .client-total { font-size: 11px; color: #7c3aed; font-weight: 600; }
   table { width: 100%; border-collapse: collapse; }
   th { background: #f3f4f6; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 5px 8px; text-align: left; color: #555; border-bottom: 1px solid #ddd; }
   td { font-size: 11px; padding: 4px 8px; border-bottom: 1px solid #f0f0f0; }
@@ -166,26 +169,46 @@ function buildReport(
   } else {
     for (const [tipo, rows] of grouped.entries()) {
       const totalHoras = rows.reduce((s, r) => s + r.horas, 0)
-      const rowsHtml = rows.map(r => `
-        <tr>
-          <td>${fmtDate(r.data)}</td>
-          <td><span style="color:#888;margin-right:4px">${r.projeto_codigo}</span>${r.projeto}</td>
-          <td>${r.cliente}</td>
-          <td>${r.ticket ?? '—'}</td>
-          <td>${r.titulo ? r.titulo.slice(0, 60) : (r.observacao ? r.observacao.slice(0, 60) : '—')}</td>
-          <td class="right">${fmtH(r.horas)}</td>
-        </tr>
-      `).join('')
+
+      // Sub-group by client within each contract type
+      const byCliente = new Map<string, ApontamentoRow[]>()
+      for (const r of rows) {
+        const c = r.cliente || 'Sem cliente'
+        if (!byCliente.has(c)) byCliente.set(c, [])
+        byCliente.get(c)!.push(r)
+      }
+
+      let clienteBlocksHtml = ''
+      for (const [cliente, clienteRows] of byCliente.entries()) {
+        const clienteHoras = clienteRows.reduce((s, r) => s + r.horas, 0)
+        const rowsHtml = clienteRows.map(r => `
+          <tr>
+            <td>${fmtDate(r.data)}</td>
+            <td><span style="color:#888;margin-right:4px">${r.projeto_codigo}</span>${r.projeto}</td>
+            <td>${r.ticket ?? '—'}</td>
+            <td>${r.titulo ? r.titulo.slice(0, 70) : (r.observacao ? r.observacao.slice(0, 70) : '—')}</td>
+            <td class="right">${fmtH(r.horas)}</td>
+          </tr>
+        `).join('')
+        clienteBlocksHtml += `
+          <div class="client-header">
+            <span class="client-name">${cliente}</span>
+            <span class="client-total">${fmtH(clienteHoras)}</span>
+          </div>
+          <table>
+            <thead><tr><th>Data</th><th>Projeto</th><th>Ticket</th><th>Descrição</th><th class="right">Horas</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        `
+      }
+
       sectionsHtml += `
         <div class="section">
           <div class="section-header">
             <span class="section-title">${tipo}</span>
             <span class="section-total">${fmtH(totalHoras)}</span>
           </div>
-          <table>
-            <thead><tr><th>Data</th><th>Projeto</th><th>Cliente</th><th>Ticket</th><th>Descrição</th><th class="right">Horas</th></tr></thead>
-            <tbody>${rowsHtml}</tbody>
-          </table>
+          ${clienteBlocksHtml}
         </div>
       `
     }
