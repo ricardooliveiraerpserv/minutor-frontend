@@ -142,7 +142,7 @@ const DEMAND_COLS: Column[] = [
   { id: 'req_inicio_autorizado', label: 'Aguardando Início (Req.)', phase: 'demand' },
 ]
 
-const REQ_ONLY_COLS = new Set(['req_planejamento', 'req_inicio_autorizado', 'req_em_andamento'])
+const REQ_ONLY_COLS = new Set(['req_planejamento', 'req_em_andamento'])
 
 const TRANSITION_COL: Column = {
   id: 'inicio_autorizado', label: 'Início Autorizado', phase: 'transition',
@@ -3363,7 +3363,6 @@ function KanbanContent() {
 
     // ── Moving a contract card ──
     if (cardType === 'contract') {
-      if (REQ_ONLY_COLS.has(toCol)) return  // colunas de req. não aceitam contratos
       const card = [...demandCards, ...transitionCards].find(c => c.id === cardId)
       if (!card) return
 
