@@ -1387,6 +1387,131 @@ function PlanDecisionModal({ card, coordinators, onClose, onDone, onNovoProjeto,
   )
 }
 
+// ─── Contract Decision Modal (Novo Projeto / Projeto Filho) ──────────────────
+
+function ContractDecisionModal({ card, onClose, onNovoProjeto, onFilho }: {
+  card: ContractCard
+  onClose: () => void
+  onNovoProjeto: () => void
+  onFilho: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
+      <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+          <span className="text-sm font-bold" style={{ color: 'var(--brand-text)' }}>Tipo de Projeto</span>
+          <button onClick={onClose} style={{ color: 'var(--brand-muted)' }}><X size={16} /></button>
+        </div>
+        <div className="p-6 space-y-3">
+          <p className="text-xs mb-4" style={{ color: 'var(--brand-muted)' }}>
+            Como este contrato deve ser classificado?
+          </p>
+          <button
+            onClick={onNovoProjeto}
+            className="w-full text-left px-4 py-3 rounded-xl transition-all hover:opacity-90"
+            style={{ background: 'rgba(0,245,255,0.06)', border: '1px solid rgba(0,245,255,0.25)' }}
+          >
+            <p className="font-semibold text-sm" style={{ color: 'var(--brand-text)' }}>Novo Projeto</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--brand-subtle)' }}>Cadastrar um novo contrato de projeto para este cliente</p>
+          </button>
+          <button
+            onClick={onFilho}
+            className="w-full text-left px-4 py-3 rounded-xl transition-all hover:opacity-90"
+            style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.25)' }}
+          >
+            <p className="font-semibold text-sm" style={{ color: 'var(--brand-text)' }}>Projeto Filho</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--brand-subtle)' }}>Vinculado a um projeto pai existente</p>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Contract Filho Modal ─────────────────────────────────────────────────────
+
+function ContractFilhoModal({ card, onClose, onDone }: {
+  card: ContractCard
+  onClose: () => void
+  onDone: (updatedCard: ContractCard) => void
+}) {
+  const [loading, setLoading]   = useState(false)
+  const [projects, setProjects] = useState<{ id: number; name: string; code?: string }[]>([])
+  const [projLoading, setProjLoading] = useState(false)
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
+
+  useEffect(() => {
+    setProjLoading(true)
+    api.get<any>(`/projects?minimal=true&per_page=200&customer_id=${card.customer_id}`)
+      .then(r => setProjects(r?.items ?? []))
+      .catch(() => toast.error('Erro ao carregar projetos'))
+      .finally(() => setProjLoading(false))
+  }, [])
+
+  const handleConfirm = async () => {
+    if (!selectedProjectId) { toast.error('Selecione um projeto pai'); return }
+    setLoading(true)
+    try {
+      await api.patch(`/contracts/${card.id}/kanban-move`, { to_column: 'req_inicio_autorizado', parent_project_id: selectedProjectId, order: 0 })
+      toast.success('Contrato vinculado como projeto filho')
+      onDone({ ...card, kanban_status: 'req_inicio_autorizado' })
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Erro ao vincular contrato')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const labelStyle: React.CSSProperties = { color: 'var(--brand-subtle)', fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.07em', textTransform: 'uppercase' as const }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
+      <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
+          <span className="text-sm font-bold" style={{ color: 'var(--brand-text)' }}>Selecionar Projeto Pai</span>
+          <button onClick={onClose} style={{ color: 'var(--brand-muted)' }}><X size={16} /></button>
+        </div>
+        <div className="p-6 space-y-3">
+          <label className="block text-xs font-semibold mb-1.5" style={labelStyle}>PROJETO PAI *</label>
+          {projLoading
+            ? <p className="text-xs py-2" style={{ color: 'var(--brand-muted)' }}>Carregando projetos...</p>
+            : (
+              <div className="space-y-1 max-h-52 overflow-y-auto">
+                {projects.length === 0
+                  ? <p className="text-xs py-2" style={{ color: 'var(--brand-muted)' }}>Nenhum projeto encontrado para este cliente.</p>
+                  : projects.map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => setSelectedProjectId(p.id)}
+                      className="w-full text-left px-3 py-2 rounded-lg text-sm transition-all"
+                      style={{
+                        background: selectedProjectId === p.id ? 'rgba(0,245,255,0.12)' : 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${selectedProjectId === p.id ? 'rgba(0,245,255,0.4)' : 'var(--brand-border)'}`,
+                        color: 'var(--brand-text)',
+                      }}
+                    >
+                      {p.code && <span className="text-xs mr-2" style={{ color: 'var(--brand-muted)' }}>{p.code}</span>}
+                      {p.name}
+                    </button>
+                  ))
+                }
+              </div>
+            )
+          }
+          <div className="flex justify-end gap-3 pt-2">
+            <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--brand-muted)' }}>Cancelar</button>
+            <button onClick={handleConfirm} disabled={loading || !selectedProjectId}
+              className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+              style={{ background: '#8B5CF6', color: '#fff' }}>
+              {loading ? 'Vinculando...' : 'Confirmar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Finalize Request Modal ───────────────────────────────────────────────────
 
 function FinalizeRequestModal({ card, coordinators, onClose, onDone }: {
@@ -3274,9 +3399,12 @@ function KanbanContent() {
   const [subprojetoForReq, setSubprojetoForReq] = useState<{ card: RequestCard; projectId: number } | null>(null)
   const [finalizeCard,         setFinalizeCard]         = useState<RequestCard | null>(null)
 
-  const [selectedContract, setSelectedContract] = useState<ContractCard | null>(null)
-  const [selectedProject,  setSelectedProject]  = useState<ProjectCard | null>(null)
-  const [generateTarget,   setGenerateTarget]   = useState<ContractCard | null>(null)
+  const [selectedContract,      setSelectedContract]      = useState<ContractCard | null>(null)
+  const [contractDecisionCard,  setContractDecisionCard]  = useState<ContractCard | null>(null)
+  const [contractFilhoCard,     setContractFilhoCard]     = useState<ContractCard | null>(null)
+  const [contractCreateForDecision, setContractCreateForDecision] = useState<ContractCard | null>(null)
+  const [selectedProject,       setSelectedProject]       = useState<ProjectCard | null>(null)
+  const [generateTarget,       setGenerateTarget]       = useState<ContractCard | null>(null)
   const [projectAction,    setProjectAction]    = useState<{ card: ProjectCard; action: string } | null>(null)
   const [viewMode,         setViewMode]         = useState<'kanban' | 'list'>('kanban')
   const [editContractData, setEditContractData] = useState<any | null>(null)
@@ -3365,6 +3493,12 @@ function KanbanContent() {
     if (cardType === 'contract') {
       const card = [...demandCards, ...transitionCards].find(c => c.id === cardId)
       if (!card) return
+
+      // Dropped on Aguardando Início (Req.) → open decision modal
+      if (toCol === 'req_inicio_autorizado') {
+        setContractDecisionCard(card)
+        return
+      }
 
       if (toCol === 'inicio_autorizado') {
         if (!card.is_complete) {
@@ -3706,6 +3840,49 @@ function KanbanContent() {
       )}
       {selectedRequest && (
         <RequestDetailModal card={selectedRequest} onClose={() => setSelectedRequest(null)} />
+      )}
+      {contractDecisionCard && (
+        <ContractDecisionModal
+          card={contractDecisionCard}
+          onClose={() => setContractDecisionCard(null)}
+          onNovoProjeto={() => {
+            const card = contractDecisionCard
+            setContractDecisionCard(null)
+            setContractCreateForDecision(card)
+          }}
+          onFilho={() => {
+            const card = contractDecisionCard
+            setContractDecisionCard(null)
+            setContractFilhoCard(card)
+          }}
+        />
+      )}
+      {contractCreateForDecision && (
+        <ContractCreateModal
+          initialCustomerId={contractCreateForDecision.customer_id}
+          customerReadOnly
+          title="Novo Projeto"
+          onClose={() => setContractCreateForDecision(null)}
+          onSuccess={async (_contractId: number) => {
+            const card = contractCreateForDecision
+            setContractCreateForDecision(null)
+            try {
+              await api.patch(`/contracts/${card.id}/kanban-move`, { to_column: 'req_inicio_autorizado', order: 0 })
+              setDemandCards(prev => prev.map(c => c.id === card.id ? { ...c, kanban_status: 'req_inicio_autorizado' } : c))
+              toast.success('Contrato cadastrado e movido para Aguardando Início')
+            } catch { load() }
+          }}
+        />
+      )}
+      {contractFilhoCard && (
+        <ContractFilhoModal
+          card={contractFilhoCard}
+          onClose={() => setContractFilhoCard(null)}
+          onDone={updated => {
+            setDemandCards(prev => prev.map(c => c.id === updated.id ? { ...c, kanban_status: 'req_inicio_autorizado' } : c))
+            setContractFilhoCard(null)
+          }}
+        />
       )}
       {planDecisionCard && (
         <PlanDecisionModal

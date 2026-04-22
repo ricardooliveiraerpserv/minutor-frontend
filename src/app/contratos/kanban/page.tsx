@@ -188,8 +188,9 @@ const COL_TO_PROJECT_STATUS: Record<string, string> = {
 const PRONTO_COLOR = '#eab308'
 
 const FIXED_COLUMNS: Column[] = [
-  { id: 'novo',   label: 'Novo Contrato',       type: 'fixed', emoji: '🆕' },
-  { id: 'pronto', label: 'Pronto para Iniciar', type: 'fixed', emoji: '🚀', color: PRONTO_COLOR },
+  { id: 'novo',             label: 'Novo Contrato',       type: 'fixed', emoji: '🆕' },
+  { id: 'aguardando_inicio', label: 'Aguardando Início',  type: 'fixed', emoji: '⏳', color: '#8B5CF6' },
+  { id: 'pronto',           label: 'Pronto para Iniciar', type: 'fixed', emoji: '🚀', color: PRONTO_COLOR },
 ]
 
 const SUST_COLOR   = '#f97316'
@@ -244,6 +245,10 @@ const STATUS_PROJECT_COLUMNS: Column[] = [
 function contractColumnId(card: ContractCard): string {
   if (card.kanban_status === 'alocado' && card.kanban_coordinator_id) {
     return `coordinator:${card.kanban_coordinator_id}`
+  }
+  // Aguardando Início (Req.) → coluna dedicada
+  if (card.kanban_status === 'req_inicio_autorizado') {
+    return 'aguardando_inicio'
   }
   // All non-approved demand statuses → "novo" column
   if (['backlog', 'novo_projeto', 'em_planejamento', 'em_validacao', 'em_revisao'].includes(card.kanban_status ?? '')) {
