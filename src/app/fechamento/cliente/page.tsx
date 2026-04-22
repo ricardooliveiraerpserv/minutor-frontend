@@ -66,6 +66,11 @@ interface DespesaRow {
   valor: number
 }
 
+// Estrutura mínima do /fechamento-contrato (on_demand only)
+interface ProjetoGlobal { projeto_id: number; nome: string; codigo: string; horas: number; valor_hora: number; total_receita: number }
+interface ClienteGlobal  { customer_id: number; nome: string; projetos: ProjetoGlobal[]; total_horas: number; total_receita: number }
+interface GlobalData     { tipos: { code: string; clientes: ClienteGlobal[]; total_clientes: number; total_horas: number; total_receita: number }[]; total_geral: number }
+
 type Tab = 'global' | 'servicos' | 'relatorio' | 'despesas'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -123,6 +128,9 @@ export default function FechamentoClientePage() {
   const [tab, setTab]               = useState<Tab>('servicos')
 
   // ── Dados ──
+  const [globalData,    setGlobalData]    = useState<GlobalData | null>(null)
+  const [loadingGlobal, setLoadingGlobal] = useState(false)
+
   const [dados,    setDados]    = useState<ApontamentosData | null>(null)
   const [despesas, setDespesas] = useState<DespesaRow[]>([])
 
@@ -144,6 +152,15 @@ export default function FechamentoClientePage() {
       })
       .catch(() => {})
   }, [toYM, customerId])
+
+  const loadGlobal = useCallback(() => {
+    if (!toYM) return
+    setLoadingGlobal(true)
+    api.get<{ data: GlobalData }>(`/fechamento-contrato?year_month=${toYM}`)
+      .then(r => setGlobalData(r.data ?? null))
+      .catch(() => {})
+      .finally(() => setLoadingGlobal(false))
+  }, [toYM])
 
   const loadServicos = useCallback(() => {
     if (!customerId || !fromYM || !toYM) return
@@ -169,6 +186,7 @@ export default function FechamentoClientePage() {
 
   useEffect(() => {
     loadClientes()
+    loadGlobal()
     setDados(null)
     setDespesas([])
     setProjetoFilter(null)
@@ -383,14 +401,21 @@ export default function FechamentoClientePage() {
 
           {/* ── Tab Visão Global ── */}
           {tab === 'global' && (() => {
+            if (loadingGlobal && clientes.length === 0) return <SkeletonTable rows={6} cols={4} />
             if (clientes.length === 0) {
               return (
                 <EmptyState icon={Building2} title="Sem clientes On Demand"
                   description="Nenhum cliente com contrato On Demand encontrado." />
               )
             }
-            const totalServicos = clientes.reduce((s, c) => s + c.total_servicos, 0)
-            const comMovimento  = clientes.filter(c => c.total_servicos > 0).length
+            // Mapa de totais calculados (do /fechamento-contrato — só clientes com timesheets aprovados)
+            const onDemandGlobal = globalData?.tipos.find(t => t.code === 'on_demand')
+            const byId = new Map<number, ClienteGlobal>(
+              onDemandGlobal?.clientes.map(c => [c.customer_id, c]) ?? []
+            )
+            const totalHoras    = onDemandGlobal?.total_horas ?? 0
+            const totalReceita  = onDemandGlobal?.total_receita ?? 0
+            const comMovimento  = byId.size
             return (
               <div>
                 {/* Cards de resumo */}
@@ -405,76 +430,75 @@ export default function FechamentoClientePage() {
                     )}
                   </div>
                   <div className="rounded-xl p-4" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-                    <div className="text-xs mb-1" style={{ color: 'var(--brand-muted)' }}>Clientes Ativos</div>
-                    <div className="text-2xl font-bold" style={{ color: 'var(--brand-text)' }}>
-                      {clientes.filter(c => c.status !== 'sem_registro').length}
+                    <div className="text-xs mb-1" style={{ color: 'var(--brand-muted)' }}>Horas Aprovadas</div>
+                    <div className="text-2xl font-bold tabular-nums" style={{ color: 'var(--brand-text)' }}>
+                      {totalHoras.toFixed(2)}h
                     </div>
                   </div>
                   <div className="rounded-xl p-4" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-                    <div className="text-xs mb-1" style={{ color: 'var(--brand-muted)' }}>Total Serviços</div>
+                    <div className="text-xs mb-1" style={{ color: 'var(--brand-muted)' }}>Total On Demand</div>
                     <div className="text-2xl font-bold tabular-nums" style={{ color: 'var(--brand-primary)' }}>
-                      {formatBRL(totalServicos)}
+                      {formatBRL(totalReceita)}
                     </div>
                   </div>
                 </div>
 
-                {/* Tabela de todos os clientes */}
+                {/* Tabela: todos os clientes (com totais do /fechamento-contrato onde disponível) */}
                 <Table>
                   <Thead>
                     <tr>
                       <Th>Cliente</Th>
                       <Th>Status</Th>
-                      <Th right>Serviços</Th>
-                      <Th right>Despesas</Th>
-                      <Th right>Total</Th>
+                      <Th right>Horas</Th>
+                      <Th right>Total Serviços</Th>
                     </tr>
                   </Thead>
                   <Tbody>
-                    {clientes.map(c => (
-                      <tr
-                        key={c.customer_id}
-                        style={{ cursor: 'pointer' }}
-                        className="border-b transition-colors hover:bg-white/5"
-                        onClick={() => { setCustomerId(c.customer_id); setTab('servicos') }}
-                      >
-                        <td className="px-5 py-3 text-sm font-medium" style={{ color: 'var(--brand-text)' }}>
-                          <div className="flex items-center gap-2">
-                            <ChevronRight size={14} style={{ color: 'var(--brand-muted)' }} />
-                            {c.nome}
-                          </div>
-                        </td>
-                        <td className="px-5 py-3">
-                          {c.status === 'closed'
-                            ? <Badge variant="success"><Lock size={10} className="mr-1" />Fechado</Badge>
-                            : c.status === 'open'
-                            ? <Badge variant="warning">Aberto</Badge>
-                            : <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>Sem registro</span>
-                          }
-                        </td>
-                        <td className="px-5 py-3 text-right tabular-nums text-sm" style={{ color: c.total_servicos > 0 ? 'var(--brand-text)' : 'var(--brand-muted)' }}>
-                          {formatBRL(c.total_servicos)}
-                        </td>
-                        <td className="px-5 py-3 text-right tabular-nums text-sm" style={{ color: c.total_despesas > 0 ? 'var(--brand-text)' : 'var(--brand-muted)' }}>
-                          {formatBRL(c.total_despesas)}
-                        </td>
-                        <td className="px-5 py-3 text-right tabular-nums font-semibold" style={{ color: c.total_geral > 0 ? 'var(--brand-primary)' : 'var(--brand-muted)' }}>
-                          {formatBRL(c.total_geral)}
-                        </td>
-                      </tr>
-                    ))}
+                    {clientes.map(c => {
+                      const g = byId.get(c.customer_id)
+                      return (
+                        <tr
+                          key={c.customer_id}
+                          style={{ cursor: 'pointer' }}
+                          className="border-b transition-colors hover:bg-white/5"
+                          onClick={() => { setCustomerId(c.customer_id); setTab('servicos') }}
+                        >
+                          <td className="px-5 py-3 text-sm font-medium" style={{ color: 'var(--brand-text)' }}>
+                            <div className="flex items-center gap-2">
+                              <ChevronRight size={14} style={{ color: 'var(--brand-muted)' }} />
+                              {c.nome}
+                            </div>
+                          </td>
+                          <td className="px-5 py-3">
+                            {c.status === 'closed'
+                              ? <Badge variant="success"><Lock size={10} className="mr-1" />Fechado</Badge>
+                              : c.status === 'open'
+                              ? <Badge variant="warning">Aberto</Badge>
+                              : <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>—</span>
+                            }
+                          </td>
+                          <td className="px-5 py-3 text-right tabular-nums text-sm" style={{ color: g ? 'var(--brand-text)' : 'var(--brand-muted)' }}>
+                            {g ? `${g.total_horas.toFixed(2)}h` : '—'}
+                          </td>
+                          <td className="px-5 py-3 text-right tabular-nums font-semibold" style={{ color: g ? 'var(--brand-primary)' : 'var(--brand-muted)' }}>
+                            {g ? formatBRL(g.total_receita) : '—'}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </Tbody>
                 </Table>
 
                 {/* Rodapé total */}
-                {totalServicos > 0 && (
+                {totalReceita > 0 && (
                   <div className="flex justify-end pt-4">
                     <div className="px-5 py-3 rounded-xl"
                       style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
                       <span className="text-sm font-semibold mr-4" style={{ color: 'var(--brand-muted)' }}>
-                        Total On Demand
+                        {totalHoras.toFixed(2)}h · Total On Demand
                       </span>
                       <span className="text-base font-bold tabular-nums" style={{ color: 'var(--brand-primary)' }}>
-                        {formatBRL(totalServicos)}
+                        {formatBRL(totalReceita)}
                       </span>
                     </div>
                   </div>
