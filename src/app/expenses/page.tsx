@@ -790,12 +790,13 @@ export default function ExpensesPage() {
                 <Th className="hidden xl:table-cell">Tipo de Serviço</Th>
                 <Th right>Valor</Th>
                 <Th>Status</Th>
+                <Th>Pagamento</Th>
               </tr>
             </Thead>
             <Tbody>
               {data?.items.length === 0 ? (
                 <tr>
-                  <td colSpan={isCliente ? 5 : 9}>
+                  <td colSpan={isCliente ? 5 : 10}>
                     <EmptyState icon={Receipt} title="Nenhuma despesa encontrada" description="Tente ajustar os filtros ou criar uma nova despesa." />
                   </td>
                 </tr>
@@ -834,14 +835,14 @@ export default function ExpensesPage() {
                   <Td muted className="hidden xl:table-cell truncate max-w-[120px]">{(exp.project as any)?.service_type?.name ?? '—'}</Td>
                   <Td right mono className={`font-semibold ${exp.is_paid ? 'opacity-40' : ''}`} style={{ color: exp.is_paid ? 'var(--brand-muted)' : 'var(--brand-primary)' }}>{formatCurrency(exp.amount)}</Td>
                   <Td>
-                    <div className="flex flex-wrap items-center gap-1">
-                      <Badge variant={exp.status as any}>{STATUS_LABEL[exp.status] ?? exp.status}</Badge>
-                      {exp.is_paid && (
-                        <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-zinc-700/60 text-zinc-500 border border-zinc-600/40">
-                          Pago
-                        </span>
-                      )}
-                    </div>
+                    <Badge variant={exp.status as any}>{STATUS_LABEL[exp.status] ?? exp.status}</Badge>
+                  </Td>
+                  <Td>
+                    {exp.status === 'approved' && (
+                      exp.is_paid
+                        ? <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400">Pago</span>
+                        : <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-950 text-amber-400">Em aberto</span>
+                    )}
                   </Td>
                 </Tr>
               ))}
