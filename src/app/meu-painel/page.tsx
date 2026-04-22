@@ -786,7 +786,7 @@ function ModalOverlay({ children, onClose }: { children: React.ReactNode; onClos
 }
 
 function SummaryCard({
-  label, value, sub, icon: Icon, accent, onClick,
+  label, value, sub, icon: Icon, accent, onClick, featured = false,
 }: {
   label: string
   value: string
@@ -794,20 +794,25 @@ function SummaryCard({
   icon: React.ElementType
   accent: string
   onClick?: () => void
+  featured?: boolean
 }) {
   return (
     <div
       onClick={onClick}
-      className={`rounded-xl border border-zinc-800 bg-zinc-900 p-5 transition-colors ${onClick ? 'cursor-pointer hover:border-zinc-600 hover:bg-zinc-800/60' : ''}`}
+      className={`rounded-xl p-5 transition-colors ${
+        featured
+          ? 'border-2 border-[#00F5FF] bg-[rgba(0,245,255,0.06)] shadow-[0_0_20px_rgba(0,245,255,0.15)]'
+          : `border border-zinc-800 bg-zinc-900 ${onClick ? 'cursor-pointer hover:border-zinc-600 hover:bg-zinc-800/60' : ''}`
+      }`}
     >
       <div className="flex items-start justify-between mb-3">
-        <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">{label}</span>
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${accent}`}>
+        <span className={`text-[11px] font-semibold uppercase tracking-wider ${featured ? 'text-[#00F5FF]' : 'text-zinc-500'}`}>{label}</span>
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${featured ? 'bg-[rgba(0,245,255,0.15)] text-[#00F5FF]' : accent}`}>
           <Icon size={14} />
         </div>
       </div>
-      <div className="text-lg font-bold text-white tracking-tight break-all leading-tight">{value}</div>
-      {sub && <div className="text-xs text-zinc-500 mt-1.5">{sub}</div>}
+      <div className={`font-bold tracking-tight break-all leading-tight ${featured ? 'text-2xl text-[#00F5FF]' : 'text-lg text-white'}`}>{value}</div>
+      {sub && <div className={`text-xs mt-1.5 ${featured ? 'text-[rgba(0,245,255,0.6)]' : 'text-zinc-500'}`}>{sub}</div>}
     </div>
   )
 }
@@ -1868,6 +1873,7 @@ export default function MeuPainelPage() {
                   sub={expTotal > 0 ? 'Valor fixo + despesas' : 'Sem despesas no período'}
                   icon={TrendingUp}
                   accent="bg-cyan-500/15 text-cyan-400"
+                  featured
                 />
                 {/* "Total a Receber" removido — redundante com "Total Geral" */}
               </>
@@ -1909,6 +1915,7 @@ export default function MeuPainelPage() {
                     : 'Sem despesas no período'}
                   icon={DollarSign}
                   accent="bg-cyan-500/15 text-cyan-400"
+                  featured
                 />
               </>
             ) : (
@@ -1947,6 +1954,7 @@ export default function MeuPainelPage() {
                     : expTotal > 0 ? 'Somente despesas' : 'Sem lançamentos'}
                   icon={TrendingUp}
                   accent="bg-cyan-500/15 text-cyan-400"
+                  featured
                 />
               </>
             ))}
