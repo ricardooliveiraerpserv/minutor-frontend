@@ -252,7 +252,7 @@ const EMPTY_FORM = {
   name: '', email: '', password: '', enabled: true,
   hourly_rate: '', rate_type: 'hourly' as 'hourly' | 'monthly',
   daily_hours: '8', profiles: [] as ProfileType[],
-  consultant_type: '' as ConsultantType | '',
+  consultant_type: 'horista' as ConsultantType | '',
   coordinator_type: '' as 'projetos' | 'sustentacao' | '',
   bank_hours_start_date: '',
   guaranteed_hours: '',
