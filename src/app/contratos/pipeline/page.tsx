@@ -1514,22 +1514,18 @@ function ContractFilhoModal({ card, onClose, onDone }: {
 
 // ─── Finalize Request Modal ───────────────────────────────────────────────────
 
-function FinalizeRequestModal({ card, coordinators, onClose, onDone }: {
+function FinalizeRequestModal({ card, onClose, onDone }: {
   card: RequestCard
-  coordinators: Coordinator[]
   onClose: () => void
   onDone: (updatedCard: RequestCard) => void
 }) {
-  const [coordinatorId, setCoordinatorId] = useState<number | null>(card.linked_coordinator_id ?? null)
   const [loading, setLoading] = useState(false)
 
   const handleConfirm = async () => {
     setLoading(true)
     try {
-      await api.post(`/contract-requests/${card.id}/finalize`, {
-        coordinator_id: coordinatorId ?? undefined,
-      })
-      toast.success('Projeto gerado com sucesso!')
+      await api.post(`/contract-requests/${card.id}/finalize`, {})
+      toast.success('Requisição movida para Em Andamento!')
       onDone({ ...card, kanban_column: 'req_em_andamento' })
       onClose()
     } catch (e: any) {
@@ -1541,7 +1537,7 @@ function FinalizeRequestModal({ card, coordinators, onClose, onDone }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
-      <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+      <div className="w-full max-w-sm rounded-2xl overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
         <div className="px-6 py-5 border-b flex items-center justify-between" style={{ borderColor: 'var(--brand-border)' }}>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.25)' }}>
@@ -1554,26 +1550,17 @@ function FinalizeRequestModal({ card, coordinators, onClose, onDone }: {
           </div>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10" style={{ color: 'var(--brand-subtle)' }}><X size={16} /></button>
         </div>
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-6 py-5">
           <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>
-            O projeto será gerado e alocado ao coordenador selecionado.
+            O coordenador já foi definido no Kanban de Contratos. Confirme para mover a requisição para Em Andamento.
           </p>
-          <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--brand-subtle)' }}>COORDENADOR</label>
-            <select value={coordinatorId ?? ''} onChange={e => setCoordinatorId(e.target.value ? Number(e.target.value) : null)}
-              className="w-full rounded-lg px-3 py-2 text-sm"
-              style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}>
-              <option value="">Sem coordenador</option>
-              {coordinators.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
         </div>
         <div className="flex justify-end gap-3 px-6 py-4 border-t" style={{ borderColor: 'var(--brand-border)' }}>
           <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--brand-muted)' }}>Cancelar</button>
           <button onClick={handleConfirm} disabled={loading}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
             style={{ background: '#eab308', color: '#000' }}>
-            <Rocket size={13} /> {loading ? 'Finalizando...' : 'Confirmar'}
+            <Rocket size={13} /> {loading ? 'Movendo...' : 'Confirmar'}
           </button>
         </div>
       </div>
@@ -3975,7 +3962,6 @@ function KanbanContent() {
       {finalizeCard && (
         <FinalizeRequestModal
           card={finalizeCard}
-          coordinators={coordinators}
           onClose={() => setFinalizeCard(null)}
           onDone={updated => {
             setFinalizeCard(null)
