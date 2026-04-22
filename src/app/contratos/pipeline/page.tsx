@@ -3363,6 +3363,7 @@ function KanbanContent() {
 
     // ── Moving a contract card ──
     if (cardType === 'contract') {
+      if (REQ_ONLY_COLS.has(toCol)) return  // colunas de req. não aceitam contratos
       const card = [...demandCards, ...transitionCards].find(c => c.id === cardId)
       if (!card) return
 
