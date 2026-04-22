@@ -539,8 +539,13 @@ function TimesheetsPageContent() {
   const { data: serviceTypes }  = useApiQuery<{ items: SelectOption[] } | SelectOption[]>('/service-types')
   const { data: contractTypes } = useApiQuery<{ items: SelectOption[] } | SelectOption[]>('/contract-types')
 
-  const serviceTypeList: SelectOption[] = Array.isArray(serviceTypes)
+  const isSustentacaoCoordenador = isCoordenador && (user as any)?.coordinator_type === 'sustentacao'
+
+  const allServiceTypeList: SelectOption[] = Array.isArray(serviceTypes)
     ? serviceTypes : (serviceTypes as any)?.items ?? []
+  const serviceTypeList: SelectOption[] = isSustentacaoCoordenador
+    ? allServiceTypeList.filter(s => ['sustentacao', 'cloud'].includes((s as any).code ?? ''))
+    : allServiceTypeList
   const contractTypeList: SelectOption[] = Array.isArray(contractTypes)
     ? contractTypes : (contractTypes as any)?.items ?? []
 
