@@ -647,7 +647,9 @@ export default function UsersPage() {
                     <p className="text-xs text-zinc-500 mt-1">
                       {form.consultant_type === 'banco_de_horas'
                         ? 'Meses anteriores não entram no banco; mês de entrada calculado proporcionalmente'
-                        : 'Se entrou no meio do mês, o pagamento será calculado proporcionalmente aos dias úteis'}
+                        : form.consultant_type === 'horista' && form.guaranteed_hours
+                          ? `Se entrou no meio do mês, o pagamento e as ${form.guaranteed_hours}h garantidas serão calculados proporcionalmente aos dias úteis do mês de entrada.`
+                          : 'Se entrou no meio do mês, o pagamento será calculado proporcionalmente aos dias úteis'}
                     </p>
                   </div>
                 )}
@@ -832,6 +834,10 @@ export default function UsersPage() {
         ]
         if (u.hourly_rate != null) rows.push({ label: 'Remuneração', value: `${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(u.hourly_rate))} ${u.rate_type === 'monthly' ? '/ mês' : '/ hora'}` })
         if (u.daily_hours != null) rows.push({ label: 'Horas/dia útil', value: `${u.daily_hours}h` })
+        if (u.guaranteed_hours != null && u.consultant_type === 'horista') rows.push({
+          label: 'Horas garantidas',
+          value: <span className="text-right">{u.guaranteed_hours}h/mês <span className="text-zinc-500">(piso mínimo de cobrança)</span></span>
+        })
         return (
           <ModalOverlay onClose={() => setViewUser(null)}>
             <div className="p-5">
