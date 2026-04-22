@@ -3878,11 +3878,9 @@ function KanbanContent() {
         <ContractFilhoModal
           card={contractFilhoCard}
           onClose={() => setContractFilhoCard(null)}
-          onDone={updated => {
-            // Filho vai direto para Início Autorizado → sai de demandCards, entra em transitionCards
-            setDemandCards(prev => prev.filter(c => c.id !== updated.id))
-            setTransitionCards(prev => [...prev, { ...updated, kanban_status: 'inicio_autorizado' }])
+          onDone={_updated => {
             setContractFilhoCard(null)
+            load()
           }}
         />
       )}
