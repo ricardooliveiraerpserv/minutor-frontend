@@ -412,7 +412,7 @@ export default function FechamentoClientePage() {
             if (loadingGlobal) return <SkeletonTable rows={6} cols={4} />
 
             // Agrega TODOS os tipos → um mapa por cliente com todos os projetos
-            type ProjDisp = ProjetoGlobal & { tipo_nome: string }
+            type ProjDisp = ProjetoGlobal & { tipo_nome: string; tipo_code: string }
             type ClienteAgg = { customer_id: number; nome: string; projetos: ProjDisp[]; total_horas: number; total_receita: number }
             const clientMap = new Map<number, ClienteAgg>()
             ;(globalData?.tipos ?? []).forEach(tipo => {
@@ -422,7 +422,7 @@ export default function FechamentoClientePage() {
                 }
                 const entry = clientMap.get(c.customer_id)!
                 c.projetos.forEach(p => {
-                  if (p.total_receita > 0) entry.projetos.push({ ...p, tipo_nome: tipo.nome })
+                  if (p.total_receita > 0) entry.projetos.push({ ...p, tipo_nome: tipo.nome, tipo_code: tipo.code })
                 })
                 entry.total_horas   += c.total_horas
                 entry.total_receita += c.total_receita
@@ -512,7 +512,7 @@ export default function FechamentoClientePage() {
                               {c.total_horas.toFixed(2)}h
                             </td>
                             <td className="px-5 py-3 text-right tabular-nums text-sm" style={{ color: 'var(--brand-muted)' }}>
-                              {!hasMult && c.projetos[0] ? formatBRL(c.projetos[0].valor_hora) : '—'}
+                              {!hasMult && c.projetos[0]?.tipo_code === 'on_demand' ? formatBRL(c.projetos[0].valor_hora) : '—'}
                             </td>
                             <td className="px-5 py-3 text-right tabular-nums font-semibold" style={{ color: 'var(--brand-primary)' }}>
                               {formatBRL(c.total_receita)}
@@ -538,7 +538,7 @@ export default function FechamentoClientePage() {
                                 {p.horas.toFixed(2)}h
                               </td>
                               <td className="px-5 py-2.5 text-right tabular-nums text-xs" style={{ color: 'var(--brand-muted)' }}>
-                                {formatBRL(p.valor_hora)}
+                                {p.tipo_code === 'on_demand' ? formatBRL(p.valor_hora) : '—'}
                               </td>
                               <td className="px-5 py-2.5 text-right tabular-nums text-xs font-medium" style={{ color: 'var(--brand-primary)' }}>
                                 {formatBRL(p.total_receita)}
