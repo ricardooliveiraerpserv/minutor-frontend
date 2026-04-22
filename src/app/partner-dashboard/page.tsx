@@ -85,6 +85,7 @@ interface ExpenseItem {
   formatted_amount: string
   status: string
   status_display: string
+  is_paid?: boolean
   user?: { id: number; name: string }
   project?: { id: number; name: string; customer?: { id: number; name: string } }
   category?: { id: number; name: string }
