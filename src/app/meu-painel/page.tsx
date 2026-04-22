@@ -295,6 +295,58 @@ function FixoPaymentSection({
   )
 }
 
+function ParceiroSimplesSection({
+  yearMonth, workedMinutes, expTotal, expPaid,
+}: {
+  yearMonth: string
+  workedMinutes: number
+  expTotal: number
+  expPaid: number
+}) {
+  const expAllTotal = expTotal + expPaid
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900 px-6 py-5 grid grid-cols-[auto_1fr_auto] gap-x-8 items-center">
+      {/* ESQUERDA */}
+      <div className="flex flex-col gap-2 min-w-[120px]">
+        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500">Horas no Período</span>
+        <span className="text-[12px] text-zinc-400 font-medium">{fmtYearMonth(yearMonth)}</span>
+      </div>
+      {/* CENTRO — horas totais */}
+      <div className="flex flex-col gap-1 border-l border-zinc-800 pl-8">
+        <div className="text-[42px] font-extrabold leading-none tracking-tight text-[#00F5FF]">
+          {minutesToHours(workedMinutes)}
+        </div>
+        <span className="text-[11px] text-zinc-600 mt-1">
+          {(workedMinutes / 60).toFixed(1)}h apontadas no período
+        </span>
+      </div>
+      {/* DIREITA — despesas */}
+      <div className="rounded-xl border border-orange-900/40 bg-orange-950/10 p-3 space-y-2 min-w-[280px]">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-orange-500/70 px-0.5">Despesas</p>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-lg p-2.5 border border-zinc-800 bg-zinc-900">
+            <p className="text-[9px] uppercase tracking-wider mb-1 text-zinc-500">Total no Mês</p>
+            <p className="text-sm font-bold" style={{ color: expAllTotal > 0 ? '#f97316' : 'var(--brand-muted)' }}>
+              {expAllTotal > 0 ? formatBRL(expAllTotal) : '—'}
+            </p>
+            <p className="text-[9px] mt-0.5 text-zinc-600">reembolsos e gastos</p>
+          </div>
+          <div className="rounded-lg p-2.5 border border-zinc-800 bg-zinc-900">
+            <p className="text-[9px] uppercase tracking-wider mb-1 text-zinc-500">Valor Pago</p>
+            <p className="text-sm font-bold text-emerald-400">{expPaid > 0 ? formatBRL(expPaid) : '—'}</p>
+            <p className="text-[9px] mt-0.5 text-zinc-600">já reembolsado</p>
+          </div>
+          <div className="rounded-lg p-2.5 border border-zinc-800 bg-zinc-900">
+            <p className="text-[9px] uppercase tracking-wider mb-1 text-zinc-500">A Receber</p>
+            <p className="text-sm font-bold text-amber-400">{expTotal > 0 ? formatBRL(expTotal) : '—'}</p>
+            <p className="text-[9px] mt-0.5 text-zinc-600">em aberto</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function HBPaymentSection({ data, fixedSalary, expTotal, expPaid, showExtras = true }: { data: HourBankMonth; fixedSalary: number; expTotal: number; expPaid: number; showExtras?: boolean }) {
   const hasExtra     = showExtras && data.accumulated_balance > 0
   const extraHours   = hasExtra ? data.accumulated_balance : 0
@@ -1987,6 +2039,16 @@ export default function MeuPainelPage() {
               total={heroTotal}
               variation={heroVariation}
               prevLabel={heroPrevLabel}
+            />
+          )}
+
+          {/* Hero Parceiro Simples — horas + despesas */}
+          {isParceiroSimples && (
+            <ParceiroSimplesSection
+              yearMonth={`${year}-${String(month + 1).padStart(2, '0')}`}
+              workedMinutes={tsTotalMin}
+              expTotal={expTotal}
+              expPaid={expPaid}
             />
           )}
 
