@@ -700,12 +700,12 @@ export function UserManagementTab() {
                       )}
                       <CurrencyInput value={form.hourly_rate}
                         onChange={v => setForm(f => ({ ...f, hourly_rate: v }))}
-                        placeholder="0,00" className="flex-1 bg-zinc-800 border-zinc-700 text-white h-8 text-xs" />
+                        placeholder="0.000,00" className="flex-1 bg-zinc-800 border-zinc-700 text-white h-8 text-xs" />
                       <span className="text-xs text-zinc-500">R$</span>
                     </div>
                   </div>
                 )}
-                {isConsultor && form.consultant_type !== 'horista' && (
+                {isConsultor && ['banco_de_horas', 'bh_mensal', 'bh_fixo'].includes(form.consultant_type) && (
                   <div>
                     <Label className="text-xs text-zinc-400 mb-1 block">Horas por dia útil (Banco de Horas)</Label>
                     <div className="flex items-center gap-2">
@@ -738,6 +738,17 @@ export function UserManagementTab() {
                 {isConsultor && (
                   <ConsultantTypeCard value={form.consultant_type}
                     onChange={opt => setForm(f => ({ ...f, consultant_type: opt, rate_type: opt === 'horista' ? 'hourly' : 'monthly' }))} />
+                )}
+                {isConsultor && form.consultant_type === 'horista' && (
+                  <div>
+                    <Label className="text-xs text-zinc-400 mb-1 block">Horas garantidas / mês</Label>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" min="0" step="1" value={form.guaranteed_hours}
+                        onChange={e => setForm(f => ({ ...f, guaranteed_hours: e.target.value }))}
+                        placeholder="Ex: 160" className="w-32 bg-zinc-800 border-zinc-700 text-white h-8 text-xs" />
+                      <span className="text-xs text-zinc-500">h/mês — piso mínimo de cobrança</span>
+                    </div>
+                  </div>
                 )}
                 {isCoordenador && (
                   <div>
