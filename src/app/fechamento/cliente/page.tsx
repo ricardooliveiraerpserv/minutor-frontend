@@ -403,15 +403,15 @@ export default function FechamentoClientePage() {
           {tab === 'global' && (() => {
             if (loadingGlobal) return <SkeletonTable rows={6} cols={4} />
             const onDemand = globalData?.tipos.find(t => t.code === 'on_demand')
-            const lista    = onDemand?.clientes ?? []
+            const lista    = (onDemand?.clientes ?? []).filter(c => c.total_receita > 0)
             if (lista.length === 0) {
               return (
                 <EmptyState icon={Building2} title="Sem movimento no período"
                   description="Nenhum cliente com apontamentos aprovados em contratos On Demand no período selecionado." />
               )
             }
-            const totalHoras   = onDemand!.total_horas
-            const totalReceita = onDemand!.total_receita
+            const totalHoras   = lista.reduce((s, c) => s + c.total_horas, 0)
+            const totalReceita = lista.reduce((s, c) => s + c.total_receita, 0)
             // Enriquece com status de fechamento (da lista de clientes já carregada)
             const statusMap = new Map(clientes.map(c => [c.customer_id, c.status]))
             return (
