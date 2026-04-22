@@ -223,9 +223,10 @@ function SidebarInner({ user }: { user: User }) {
       const has = (p: string) => ep.includes(p)
       const nav: NavEntry[] = [...NAV_COORDINATOR]
 
-      // Gestão de Projetos — somente para coordenadores do tipo "projetos"
+      // Gestão de Projetos + Demandas e Projetos — somente para coordenadores do tipo "projetos"
       if (user?.coordinator_type === 'projetos') {
-        nav.splice(1, 0, { type: 'item', label: 'Gestão de Projetos', href: '/gestao-projetos', icon: Layers })
+        nav.splice(1, 0, { type: 'item', label: 'Demandas e Projetos', href: '/contratos/pipeline', icon: LayoutGrid })
+        nav.splice(1, 0, { type: 'item', label: 'Gestão de Projetos',  href: '/gestao-projetos',    icon: Layers })
       }
 
       // Portal de Sustentação + Kanban — somente para coordenadores do tipo "sustentacao"
