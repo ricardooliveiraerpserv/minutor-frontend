@@ -470,6 +470,7 @@ export default function FechamentoClientePage() {
                       <Th>Cliente / Projeto</Th>
                       <Th>Status</Th>
                       <Th right>Horas</Th>
+                      <Th right>Valor/h</Th>
                       <Th right>Total Serviços</Th>
                     </tr>
                   </Thead>
@@ -510,6 +511,9 @@ export default function FechamentoClientePage() {
                             <td className="px-5 py-3 text-right tabular-nums text-sm" style={{ color: 'var(--brand-text)' }}>
                               {c.total_horas.toFixed(2)}h
                             </td>
+                            <td className="px-5 py-3 text-right tabular-nums text-sm" style={{ color: 'var(--brand-muted)' }}>
+                              {!hasMult && c.projetos[0] ? formatBRL(c.projetos[0].valor_hora) : '—'}
+                            </td>
                             <td className="px-5 py-3 text-right tabular-nums font-semibold" style={{ color: 'var(--brand-primary)' }}>
                               {formatBRL(c.total_receita)}
                             </td>
@@ -532,6 +536,9 @@ export default function FechamentoClientePage() {
                               <td />
                               <td className="px-5 py-2.5 text-right tabular-nums text-xs" style={{ color: 'var(--brand-muted)' }}>
                                 {p.horas.toFixed(2)}h
+                              </td>
+                              <td className="px-5 py-2.5 text-right tabular-nums text-xs" style={{ color: 'var(--brand-muted)' }}>
+                                {formatBRL(p.valor_hora)}
                               </td>
                               <td className="px-5 py-2.5 text-right tabular-nums text-xs font-medium" style={{ color: 'var(--brand-primary)' }}>
                                 {formatBRL(p.total_receita)}
