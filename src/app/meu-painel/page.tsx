@@ -2091,6 +2091,8 @@ export default function MeuPainelPage() {
           </div>
 
           {/* Linha 2 — Despesas */}
+          <div className="rounded-xl border border-orange-900/40 bg-orange-950/10 p-3 space-y-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-orange-500/70 px-1">Despesas</p>
           <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 [&>*]:min-w-0">
             <SummaryCard
               label="Total no Mês"
@@ -2124,6 +2126,7 @@ export default function MeuPainelPage() {
               accent="bg-yellow-500/15 text-yellow-400"
               onClick={() => setActiveTab('expenses')}
             />
+          </div>
           </div>
 
           {/* Fixo: seção de remuneração direto no Total Geral */}
