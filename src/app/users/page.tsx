@@ -27,6 +27,7 @@ interface UserItem {
   hourly_rate?: number
   rate_type?: string
   daily_hours?: number
+  bank_hours_start_date?: string | null
   consultant_type?: string | null
   coordinator_type?: 'projetos' | 'sustentacao' | null
   customer_id?: number | null
@@ -197,6 +198,7 @@ const EMPTY_FORM = {
   hourly_rate: '',
   rate_type: 'hourly' as 'hourly' | 'monthly',
   daily_hours: '8',
+  bank_hours_start_date: '',
   profiles: [] as ProfileType[],
   consultant_type: '' as ConsultantType | '',
   coordinator_type: '' as 'projetos' | 'sustentacao' | '',
@@ -289,7 +291,8 @@ export default function UsersPage() {
       enabled:             item.enabled,
       hourly_rate:         item.hourly_rate ? String(item.hourly_rate) : '',
       rate_type:           (item.rate_type as 'hourly' | 'monthly') ?? 'hourly',
-      daily_hours:         item.daily_hours != null ? String(item.daily_hours) : '8',
+      daily_hours:            item.daily_hours != null ? String(item.daily_hours) : '8',
+      bank_hours_start_date:  item.bank_hours_start_date ?? '',
       profiles,
       consultant_type:      consultant_type as ConsultantType | '',
       coordinator_type:     (item.coordinator_type as 'projetos' | 'sustentacao' | undefined) ?? '',
@@ -321,6 +324,9 @@ export default function UsersPage() {
       if (form.hourly_rate) payload.hourly_rate = parseFloat(form.hourly_rate)
       if (form.daily_hours) payload.daily_hours = parseFloat(form.daily_hours)
       if (form.profiles.includes('consultor') && form.consultant_type) payload.consultant_type = form.consultant_type
+      if (form.consultant_type === 'banco_de_horas') {
+        payload.bank_hours_start_date = form.bank_hours_start_date || null
+      }
       if (form.profiles.includes('coordenador')) payload.coordinator_type = form.coordinator_type || null
       if (!modal.item && form.password) payload.password = form.password
 
@@ -619,6 +625,20 @@ export default function UsersPage() {
                         className="w-24 bg-zinc-800 border-zinc-700 text-white h-8 text-xs" />
                       <span className="text-xs text-zinc-500">h/dia (padrão: 8h)</span>
                     </div>
+                  </div>
+                )}
+
+                {/* ── Data início do Banco de Horas ── */}
+                {isConsultor && form.consultant_type === 'banco_de_horas' && (
+                  <div>
+                    <Label className="text-xs text-zinc-400 mb-1 block">Data Início do Banco de Horas</Label>
+                    <Input
+                      type="date"
+                      value={form.bank_hours_start_date}
+                      onChange={e => setForm(f => ({ ...f, bank_hours_start_date: e.target.value }))}
+                      className="w-44 bg-zinc-800 border-zinc-700 text-white h-8 text-xs"
+                    />
+                    <p className="text-xs text-zinc-500 mt-1">Meses anteriores a esta data não são calculados no banco</p>
                   </div>
                 )}
 
