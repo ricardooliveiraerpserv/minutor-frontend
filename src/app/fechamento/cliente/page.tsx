@@ -69,7 +69,7 @@ interface DespesaRow {
 // Estrutura mínima do /fechamento-contrato (on_demand only)
 interface ProjetoGlobal { projeto_id: number; nome: string; codigo: string; horas: number; valor_hora: number; total_receita: number }
 interface ClienteGlobal  { customer_id: number; nome: string; projetos: ProjetoGlobal[]; total_horas: number; total_receita: number }
-interface GlobalData     { tipos: { code: string; clientes: ClienteGlobal[]; total_clientes: number; total_horas: number; total_receita: number }[]; total_geral: number }
+interface GlobalData     { tipos: { code: string; nome: string; clientes: ClienteGlobal[]; total_clientes: number; total_horas: number; total_receita: number }[]; total_geral: number }
 
 type Tab = 'global' | 'servicos' | 'relatorio' | 'despesas'
 
