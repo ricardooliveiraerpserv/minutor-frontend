@@ -30,6 +30,7 @@ interface UserItem {
   bank_hours_start_date?: string | null
   consultant_type?: string | null
   coordinator_type?: 'projetos' | 'sustentacao' | null
+  guaranteed_hours?: number | null
   customer_id?: number | null
   partner_id?: number | null
   is_executive?: boolean
@@ -199,8 +200,9 @@ const EMPTY_FORM = {
   rate_type: 'hourly' as 'hourly' | 'monthly',
   daily_hours: '8',
   bank_hours_start_date: '',
+  guaranteed_hours: '',
   profiles: [] as ProfileType[],
-  consultant_type: '' as ConsultantType | '',
+  consultant_type: 'horista' as ConsultantType | '',
   coordinator_type: '' as 'projetos' | 'sustentacao' | '',
   is_partner_consultor: false,
   is_partner_adm: false,
@@ -293,6 +295,7 @@ export default function UsersPage() {
       rate_type:           (item.rate_type as 'hourly' | 'monthly') ?? 'hourly',
       daily_hours:            item.daily_hours != null ? String(item.daily_hours) : '8',
       bank_hours_start_date:  item.bank_hours_start_date ?? '',
+      guaranteed_hours:       item.guaranteed_hours != null ? String(item.guaranteed_hours) : '',
       profiles,
       consultant_type:      consultant_type as ConsultantType | '',
       coordinator_type:     (item.coordinator_type as 'projetos' | 'sustentacao' | undefined) ?? '',
@@ -326,6 +329,9 @@ export default function UsersPage() {
       if (form.profiles.includes('consultor') && form.consultant_type) {
         payload.consultant_type       = form.consultant_type
         payload.bank_hours_start_date = form.bank_hours_start_date || null
+        if (form.consultant_type === 'horista') {
+          payload.guaranteed_hours = form.guaranteed_hours ? parseFloat(form.guaranteed_hours) : null
+        }
       }
       if (form.profiles.includes('coordenador')) payload.coordinator_type = form.coordinator_type || null
       if (!modal.item && form.password) payload.password = form.password
@@ -614,8 +620,8 @@ export default function UsersPage() {
                   </div>
                 )}
 
-                {/* ── Horas/dia útil (Banco de Horas) ── */}
-                {isConsultor && (
+                {/* ── Horas/dia útil (Banco de Horas apenas) ── */}
+                {isConsultor && form.consultant_type === 'banco_de_horas' && (
                   <div>
                     <Label className="text-xs text-zinc-400 mb-1 block">Horas por dia útil (Banco de Horas)</Label>
                     <div className="flex items-center gap-2">
@@ -669,6 +675,24 @@ export default function UsersPage() {
                   />
                 )}
 
+
+                {/* ── Horas garantidas (Horista apenas) ── */}
+                {isConsultor && form.consultant_type === 'horista' && (
+                  <div>
+                    <Label className="text-xs text-zinc-400 mb-1 block">Horas garantidas / mês</Label>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" min="0" max="744" step="1"
+                        value={form.guaranteed_hours}
+                        onChange={e => setForm(f => ({ ...f, guaranteed_hours: e.target.value }))}
+                        placeholder="Ex: 160"
+                        className="w-28 bg-zinc-800 border-zinc-700 text-white h-8 text-xs" />
+                      <span className="text-xs text-zinc-500">h/mês (piso mínimo de cobrança)</span>
+                    </div>
+                    <p className="text-[10px] text-zinc-500 mt-1">
+                      Se fizer menos horas, paga como se tivesse feito este mínimo.
+                    </p>
+                  </div>
+                )}
 
                 {/* ── Coordenador: tipo (Projetos ou Sustentação) ── */}
                 {isCoordenador && (
