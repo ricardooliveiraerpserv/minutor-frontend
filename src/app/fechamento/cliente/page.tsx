@@ -8,7 +8,7 @@ import { MonthYearPicker } from '@/components/ui/month-year-picker'
 import { SearchSelect } from '@/components/ui/search-select'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
-import { Lock, RefreshCw, Building2, Printer, FileText, Receipt } from 'lucide-react'
+import { Lock, RefreshCw, Building2, Printer, FileText, Receipt, ChevronRight, ChevronDown } from 'lucide-react'
 import {
   Table, Thead, Th, Tbody, Tr, Td,
   Badge, Button, SkeletonTable, EmptyState,
@@ -66,7 +66,31 @@ interface DespesaRow {
   valor: number
 }
 
-type Tab = 'servicos' | 'relatorio' | 'despesas'
+// ─── Tipos da Visão Global On Demand ─────────────────────────────────────────
+
+interface ProjetoGlobal {
+  projeto_id: number
+  nome: string
+  codigo: string
+  horas: number
+  valor_hora: number
+  total_receita: number
+}
+
+interface ClienteGlobal {
+  customer_id: number
+  nome: string
+  projetos: ProjetoGlobal[]
+  total_horas: number
+  total_receita: number
+}
+
+interface GlobalData {
+  tipos: { code: string; nome: string; clientes: ClienteGlobal[]; total_clientes: number; total_horas: number; total_receita: number }[]
+  total_geral: number
+}
+
+type Tab = 'global' | 'servicos' | 'relatorio' | 'despesas'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -123,6 +147,10 @@ export default function FechamentoClientePage() {
   const [tab, setTab]               = useState<Tab>('servicos')
 
   // ── Dados ──
+  const [globalData,    setGlobalData]    = useState<GlobalData | null>(null)
+  const [loadingGlobal, setLoadingGlobal] = useState(false)
+  const [expandedClients, setExpandedClients] = useState<Set<number>>(new Set())
+
   const [dados,    setDados]    = useState<ApontamentosData | null>(null)
   const [despesas, setDespesas] = useState<DespesaRow[]>([])
 
@@ -144,6 +172,15 @@ export default function FechamentoClientePage() {
       })
       .catch(() => {})
   }, [toYM, customerId])
+
+  const loadGlobal = useCallback(() => {
+    if (!toYM) return
+    setLoadingGlobal(true)
+    api.get<{ data: GlobalData }>(`/fechamento-contrato?year_month=${toYM}`)
+      .then(r => setGlobalData(r.data ?? null))
+      .catch(() => toast.error('Erro ao carregar visão global'))
+      .finally(() => setLoadingGlobal(false))
+  }, [toYM])
 
   const loadServicos = useCallback(() => {
     if (!customerId || !fromYM || !toYM) return
@@ -169,9 +206,11 @@ export default function FechamentoClientePage() {
 
   useEffect(() => {
     loadClientes()
+    loadGlobal()
     setDados(null)
     setDespesas([])
     setProjetoFilter(null)
+    setExpandedClients(new Set())
   }, [fromYM, toYM])
 
   useEffect(() => {
@@ -223,6 +262,17 @@ export default function FechamentoClientePage() {
     document.body.setAttribute('data-print', target)
     window.print()
     setTimeout(() => document.body.removeAttribute('data-print'), 500)
+  }
+
+  // ── Toggle cliente expandido (visão global) ──
+
+  const toggleClient = (id: number) => {
+    setExpandedClients(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   // ── Derivados ──
@@ -357,33 +407,133 @@ export default function FechamentoClientePage() {
           )}
         </div>
 
-        {!customerId ? (
-          <EmptyState icon={Building2} title="Selecione um cliente"
-            description="Escolha o cliente e o período para visualizar o fechamento." />
-        ) : (
-          <>
-            {/* ── Tabs ── */}
-            <div className="flex gap-1 px-6 border-b" style={{ borderColor: 'var(--brand-border)' }}>
-              {([
-                { key: 'servicos',  label: 'Apontamentos' },
-                { key: 'relatorio', label: 'Relatório Serviços' },
-                { key: 'despesas',  label: `Despesas${despesas.length > 0 ? ` (${despesas.length})` : ''}` },
-              ] as const).map(t => (
-                <button
-                  key={t.key}
-                  onClick={() => setTab(t.key)}
-                  className="px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap"
-                  style={{
-                    color: tab === t.key ? 'var(--brand-primary)' : 'var(--brand-muted)',
-                    borderBottom: tab === t.key ? '2px solid var(--brand-primary)' : '2px solid transparent',
-                  }}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+        {/* ── Tabs — sempre visíveis ── */}
+        <div className="flex gap-1 px-6 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+          {([
+            { key: 'global',    label: 'Visão Global' },
+            { key: 'servicos',  label: 'Apontamentos' },
+            { key: 'relatorio', label: 'Relatório Serviços' },
+            { key: 'despesas',  label: `Despesas${despesas.length > 0 ? ` (${despesas.length})` : ''}` },
+          ] as const).map(t => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className="px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap"
+              style={{
+                color: tab === t.key ? 'var(--brand-primary)' : 'var(--brand-muted)',
+                borderBottom: tab === t.key ? '2px solid var(--brand-primary)' : '2px solid transparent',
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-            <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-6">
+
+          {/* ── Tab Visão Global ── */}
+          {tab === 'global' && (
+            loadingGlobal ? <SkeletonTable rows={6} cols={3} /> : (() => {
+              const onDemand = globalData?.tipos.find(t => t.code === 'on_demand')
+              if (!onDemand || onDemand.clientes.length === 0) {
+                return (
+                  <EmptyState icon={Building2} title="Sem dados On Demand"
+                    description="Nenhum cliente com apontamentos aprovados no período selecionado." />
+                )
+              }
+              return (
+                <div>
+                  {/* Cards de resumo */}
+                  <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div className="rounded-xl p-4" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                      <div className="text-xs mb-1" style={{ color: 'var(--brand-muted)' }}>Clientes</div>
+                      <div className="text-2xl font-bold" style={{ color: 'var(--brand-text)' }}>{onDemand.total_clientes}</div>
+                    </div>
+                    <div className="rounded-xl p-4" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                      <div className="text-xs mb-1" style={{ color: 'var(--brand-muted)' }}>Horas Aprovadas</div>
+                      <div className="text-2xl font-bold tabular-nums" style={{ color: 'var(--brand-text)' }}>
+                        {onDemand.total_horas.toFixed(2)}h
+                      </div>
+                    </div>
+                    <div className="rounded-xl p-4" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                      <div className="text-xs mb-1" style={{ color: 'var(--brand-muted)' }}>Total On Demand</div>
+                      <div className="text-2xl font-bold tabular-nums" style={{ color: 'var(--brand-primary)' }}>
+                        {formatBRL(onDemand.total_receita)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tabela de clientes expansível */}
+                  <Table>
+                    <Thead>
+                      <tr>
+                        <Th>Cliente</Th>
+                        <Th right>Horas</Th>
+                        <Th right>Total</Th>
+                      </tr>
+                    </Thead>
+                    <Tbody>
+                      {onDemand.clientes.map(c => (
+                        <>
+                          <tr
+                            key={c.customer_id}
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => toggleClient(c.customer_id)}
+                            className="border-b transition-colors hover:bg-white/5"
+                          >
+                            <td className="px-5 py-3 text-sm font-medium" style={{ color: 'var(--brand-text)' }}>
+                              <div className="flex items-center gap-2">
+                                {expandedClients.has(c.customer_id)
+                                  ? <ChevronDown size={14} style={{ color: 'var(--brand-muted)' }} />
+                                  : <ChevronRight size={14} style={{ color: 'var(--brand-muted)' }} />
+                                }
+                                {c.nome}
+                              </div>
+                            </td>
+                            <td className="px-5 py-3 text-right tabular-nums text-sm" style={{ color: 'var(--brand-text)' }}>
+                              {c.total_horas.toFixed(2)}h
+                            </td>
+                            <td className="px-5 py-3 text-right tabular-nums font-semibold" style={{ color: 'var(--brand-primary)' }}>
+                              {formatBRL(c.total_receita)}
+                            </td>
+                          </tr>
+                          {expandedClients.has(c.customer_id) && c.projetos.map(p => (
+                            <Tr key={`${c.customer_id}-${p.projeto_id}`}>
+                              <Td muted className="pl-10 text-xs">{p.codigo} — {p.nome}</Td>
+                              <Td right muted className="text-xs tabular-nums">{p.horas.toFixed(2)}h</Td>
+                              <Td right muted className="text-xs tabular-nums">{formatBRL(p.total_receita)}</Td>
+                            </Tr>
+                          ))}
+                        </>
+                      ))}
+                    </Tbody>
+                  </Table>
+
+                  {/* Rodapé total */}
+                  <div className="flex justify-end pt-4">
+                    <div className="px-5 py-3 rounded-xl"
+                      style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                      <span className="text-sm font-semibold mr-4" style={{ color: 'var(--brand-muted)' }}>
+                        {onDemand.total_horas.toFixed(2)}h · Total On Demand
+                      </span>
+                      <span className="text-base font-bold tabular-nums" style={{ color: 'var(--brand-primary)' }}>
+                        {formatBRL(onDemand.total_receita)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()
+          )}
+
+          {/* Quando tab não é global e nenhum cliente foi selecionado */}
+          {tab !== 'global' && !customerId && (
+            <EmptyState icon={Building2} title="Selecione um cliente"
+              description="Escolha o cliente e o período para visualizar o fechamento." />
+          )}
+
+          {tab !== 'global' && customerId && (
+            <>
 
               {/* ── Tab Apontamentos ── */}
               {tab === 'servicos' && (
@@ -709,9 +859,10 @@ export default function FechamentoClientePage() {
                 )
               )}
 
-            </div>
-          </>
-        )}
+            </>
+          )}
+
+        </div>
       </div>
     </AppLayout>
   )
