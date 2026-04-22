@@ -53,15 +53,16 @@ interface PartnerOption  { id: number; name: string; pricing_type?: 'fixed' | 'v
 
 // ─── Profile type logic ───────────────────────────────────────────────────────
 
-type ProfileType    = 'cliente' | 'consultor' | 'coordenador' | 'parceiro_adm' | 'administrator'
+type ProfileType    = 'cliente' | 'consultor' | 'coordenador' | 'parceiro_adm' | 'administrator' | 'administrativo'
 type ConsultantType = 'horista' | 'banco_de_horas' | 'fixo'
 
 const PROFILE_OPTIONS: { value: ProfileType; label: string }[] = [
-  { value: 'cliente',       label: 'Cliente' },
-  { value: 'consultor',     label: 'Consultor' },
-  { value: 'coordenador',   label: 'Coordenador' },
-  { value: 'parceiro_adm',  label: 'Parceiro' },
-  { value: 'administrator', label: 'Administrador' },
+  { value: 'cliente',        label: 'Cliente' },
+  { value: 'consultor',      label: 'Consultor' },
+  { value: 'coordenador',    label: 'Coordenador' },
+  { value: 'parceiro_adm',   label: 'Parceiro' },
+  { value: 'administrativo', label: 'Administrativo' },
+  { value: 'administrator',  label: 'Administrador' },
 ]
 
 const CONSULTANT_OPTIONS: { value: ConsultantType; label: string; desc: string }[] = [

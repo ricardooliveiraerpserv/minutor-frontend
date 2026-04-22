@@ -196,11 +196,12 @@ function SidebarInner({ user }: { user: User }) {
     return active
   })
 
-  const isConsultor      = user?.type === 'consultor'
-  const isCoordenador    = user?.type === 'coordenador'
-  const isCliente        = user?.type === 'cliente'
-  const isParceiroAdmin  = user?.type === 'parceiro_admin'
-  const isParceiroGestor = isParceiroAdmin && !!user?.is_executive
+  const isConsultor        = user?.type === 'consultor'
+  const isCoordenador      = user?.type === 'coordenador'
+  const isCliente          = user?.type === 'cliente'
+  const isParceiroAdmin    = user?.type === 'parceiro_admin'
+  const isParceiroGestor   = isParceiroAdmin && !!user?.is_executive
+  const isAdministrativo   = user?.type === 'administrativo'
   const ep = user?.extra_permissions ?? []
 
   // Para clientes: carrega os códigos de tipo de contrato dos seus projetos
@@ -271,6 +272,33 @@ function SidebarInner({ user }: { user: User }) {
 
       return nav
     }
+    if (isAdministrativo) {
+      return [
+        { type: 'item', label: 'Início',            href: '/dashboard',           icon: Home },
+        { type: 'item', label: 'Apontamentos',      href: '/timesheets',          icon: Clock },
+        { type: 'item', label: 'Despesas',          href: '/expenses',            icon: Receipt },
+        { type: 'item', label: 'Aprovações',        href: '/approvals',           icon: CheckSquare },
+        { type: 'item', label: 'Kanban Contratos',  href: '/contratos/kanban',    icon: LayoutGrid },
+        {
+          type: 'group', label: 'Fechamento', icon: DollarSign,
+          items: [
+            { label: 'Geral',        href: '/fechamento',           icon: BarChart2 },
+            { label: 'Clientes',     href: '/fechamento/cliente',   icon: Building2 },
+            { label: 'Parceiros',    href: '/fechamento/parceiro',  icon: Handshake },
+            { label: 'Consultores',  href: '/fechamento/consultor', icon: Users },
+            { label: 'Contratos',    href: '/fechamento/contratos', icon: FileText },
+          ],
+        },
+        {
+          type: 'group', label: 'Cadastros', icon: Database,
+          items: [
+            { label: 'Clientes',     href: '/customers',   icon: Building2 },
+          ],
+        },
+        { type: 'item', label: 'Usuários',     href: '/users',    icon: Users },
+        { type: 'item', label: 'Configurações', href: '/settings', icon: Settings },
+      ] as NavEntry[]
+    }
     if (isCliente) {
       // Filtra dashboards pelos tipos de contrato que o cliente realmente possui
       const DASH_MAP: Record<string, { label: string; href: string; icon: typeof BarChart2 }> = {
@@ -313,7 +341,7 @@ function SidebarInner({ user }: { user: User }) {
       ] as NavEntry[]
     }
     return NAV
-  }, [isCoordenador, isConsultor, isCliente, isParceiroAdmin, isParceiroGestor, clienteContractCodes, ep])
+  }, [isCoordenador, isConsultor, isCliente, isParceiroAdmin, isParceiroGestor, isAdministrativo, clienteContractCodes, ep])
 
   // First two letters of name for avatar
   const initials = user?.name
