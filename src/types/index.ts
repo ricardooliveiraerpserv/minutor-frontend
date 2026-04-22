@@ -198,6 +198,9 @@ export interface Expense {
   payment_method: string
   status: string
   charge_client: boolean
+  is_paid: boolean
+  paid_by?: number
+  paid_at?: string
   receipt_path?: string
   receipt_url?: string
   reviewed_by?: number

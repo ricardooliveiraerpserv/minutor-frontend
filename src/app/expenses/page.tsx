@@ -15,7 +15,7 @@ import {
 import {
   Receipt, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   X, Paperclip, Eye, Building2, FolderOpen, Tag,
-  CreditCard, FileText, Calendar, MoreVertical, CalendarDays, RefreshCw,
+  CreditCard, FileText, Calendar, MoreVertical, CalendarDays, RefreshCw, DollarSign,
 } from 'lucide-react'
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
 import { ExpenseViewModal } from '@/components/ui/expense-view-modal'
@@ -409,6 +409,7 @@ export default function ExpensesPage() {
 
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('')
+  const [isPaidFilter, setIsPaidFilter] = useState<'' | 'false' | 'true'>('')
   const [data, setData] = useState<PaginatedResponse<Expense> | null>(null)
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<{ open: boolean; item?: Expense }>({ open: false })
@@ -460,6 +461,7 @@ export default function ExpensesPage() {
   const params = useMemo(() => {
     const p = new URLSearchParams({ page: String(page), per_page: '20' })
     if (status)          p.set('status',           status)
+    if (isPaidFilter)    p.set('is_paid',           isPaidFilter)
     if (dateFrom)        p.set('start_date',        dateFrom)
     if (dateTo)          p.set('end_date',          dateTo)
     if (contractTypeId)  p.set('contract_type_id',  contractTypeId)
@@ -473,7 +475,7 @@ export default function ExpensesPage() {
     if (coordinatorId)   p.set('coordinator_id',     coordinatorId)
     if (executiveId)     p.set('executive_id',       executiveId)
     return p.toString()
-  }, [page, status, dateFrom, dateTo, customerId, projectId, userId, coordinatorId, executiveId, contractTypeId, isCliente, user?.customer_id])
+  }, [page, status, isPaidFilter, dateFrom, dateTo, customerId, projectId, userId, coordinatorId, executiveId, contractTypeId, isCliente, user?.customer_id])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -612,6 +614,14 @@ export default function ExpensesPage() {
 
   const canEdit = (exp: Expense) => ['pending', 'rejected', 'adjustment_requested'].includes(exp.status)
 
+  async function togglePaid(exp: Expense) {
+    try {
+      await api.post(`/expenses/${exp.id}/set-paid`, { is_paid: !exp.is_paid })
+      toast.success(exp.is_paid ? 'Marcação removida.' : 'Despesa marcada como paga.')
+      load()
+    } catch { toast.error('Erro ao atualizar status de pagamento') }
+  }
+
   return (
     <AppLayout title="Despesas">
       <div className="max-w-7xl mx-auto">
@@ -713,24 +723,45 @@ export default function ExpensesPage() {
 
         {/* Status pills — oculto para cliente */}
         {!isCliente && (
-          <div className="flex items-center gap-1 p-1 rounded-xl w-fit mb-6"
-            style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-            {[
-              { value: '', label: 'Todos' },
-              { value: 'pending', label: 'Pendente' },
-              { value: 'approved', label: 'Aprovado' },
-              { value: 'rejected', label: 'Rejeitado' },
-              { value: 'adjustment_requested', label: 'Ajuste' },
-            ].map(s => (
-              <button key={s.value} onClick={() => { setStatus(s.value); setPage(1) }}
-                className="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                style={status === s.value
-                  ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
-                  : { color: 'var(--brand-muted)', background: 'transparent' }
-                }>
-                {s.label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-3 mb-6">
+            <div className="flex items-center gap-1 p-1 rounded-xl w-fit"
+              style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+              {[
+                { value: '', label: 'Todos' },
+                { value: 'pending', label: 'Pendente' },
+                { value: 'approved', label: 'Aprovado' },
+                { value: 'rejected', label: 'Rejeitado' },
+                { value: 'adjustment_requested', label: 'Ajuste' },
+              ].map(s => (
+                <button key={s.value} onClick={() => { setStatus(s.value); setPage(1) }}
+                  className="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                  style={status === s.value
+                    ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
+                    : { color: 'var(--brand-muted)', background: 'transparent' }
+                  }>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            {isAdmin && (
+              <div className="flex items-center gap-1 p-1 rounded-xl w-fit"
+                style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                {([
+                  { value: '' as const, label: 'Todas' },
+                  { value: 'false' as const, label: 'A pagar' },
+                  { value: 'true' as const, label: 'Pagas' },
+                ]).map(s => (
+                  <button key={s.value} onClick={() => { setIsPaidFilter(s.value); setPage(1) }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                    style={isPaidFilter === s.value
+                      ? { background: s.value === 'true' ? '#3f3f46' : 'var(--brand-primary)', color: s.value === 'true' ? '#a1a1aa' : '#0A0A0B' }
+                      : { color: 'var(--brand-muted)', background: 'transparent' }
+                    }>
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -773,6 +804,9 @@ export default function ExpensesPage() {
                         ...(exp.receipt_url ? [
                           { label: 'Ver Comprovante', icon: <Paperclip size={12} />, onClick: () => openReceipt(exp.receipt_url!) },
                         ] : []),
+                        ...(isAdmin ? [
+                          { label: exp.is_paid ? 'Desmarcar Pago' : 'Marcar como Pago', icon: <DollarSign size={12} />, onClick: () => togglePaid(exp) },
+                        ] : []),
                       ]} />
                     </Td>
                   )}
@@ -790,9 +824,16 @@ export default function ExpensesPage() {
                   )}
                   {!isCliente && <Td muted className="hidden lg:table-cell">{exp.category?.name ?? '—'}</Td>}
                   <Td muted className="hidden xl:table-cell truncate max-w-[120px]">{(exp.project as any)?.service_type?.name ?? '—'}</Td>
-                  <Td right mono className="font-semibold" style={{ color: 'var(--brand-primary)' }}>{formatCurrency(exp.amount)}</Td>
+                  <Td right mono className={`font-semibold ${exp.is_paid ? 'opacity-40' : ''}`} style={{ color: exp.is_paid ? 'var(--brand-muted)' : 'var(--brand-primary)' }}>{formatCurrency(exp.amount)}</Td>
                   <Td>
-                    <Badge variant={exp.status as any}>{STATUS_LABEL[exp.status] ?? exp.status}</Badge>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Badge variant={exp.status as any}>{STATUS_LABEL[exp.status] ?? exp.status}</Badge>
+                      {exp.is_paid && (
+                        <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-zinc-700/60 text-zinc-500 border border-zinc-600/40">
+                          Pago
+                        </span>
+                      )}
+                    </div>
                   </Td>
                 </Tr>
               ))}

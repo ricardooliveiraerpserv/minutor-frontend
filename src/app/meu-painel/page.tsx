@@ -58,6 +58,7 @@ interface ExpenseItem {
   status: string
   status_display: string
   charge_client: boolean
+  is_paid: boolean
   receipt_url?: string
 }
 
@@ -1411,7 +1412,7 @@ export default function MeuPainelPage() {
       const list: ExpenseItem[] = Array.isArray(r?.items) ? r.items : []
       setExpenses(list)
       setExpHasNext(!!r?.hasNext)
-      setExpTotal(list.reduce((acc, e) => acc + (parseFloat(String(e.amount)) || 0), 0))
+      setExpTotal(list.filter(e => !e.is_paid).reduce((acc, e) => acc + (parseFloat(String(e.amount)) || 0), 0))
     } catch { toast.error('Erro ao carregar despesas') }
     finally   { setExpLoading(false) }
   }, [expPage, startDate, endDate, expSearch, expCustomer, expProject, expStatus, expCategory, expDateFrom, expDateTo])
