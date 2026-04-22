@@ -15,6 +15,7 @@ import {
 interface ConsultorBase {
   user_id: number
   nome: string
+  email: string
   type: string
   consultant_type: string
   horas_trabalhadas: number
@@ -307,6 +308,43 @@ export default function FechamentoConsultorPage() {
     }
   }
 
+  function handlePrintTodos() {
+    if (!data) return
+    const todos = [
+      ...data.horistas,
+      ...data.banco_horas,
+      ...data.fixos,
+    ].sort((a, b) => a.nome.localeCompare(b.nome))
+
+    const rowsHtml = todos.map(c => `
+      <tr>
+        <td>${c.nome}</td>
+        <td>${c.email ?? '—'}</td>
+        <td class="right">${formatBRL(c.total)}</td>
+      </tr>
+    `).join('')
+
+    const totalGeral = todos.reduce((s, c) => s + c.total, 0)
+
+    const html = `
+      <div class="page">
+        <div class="header">
+          <div class="logo"><img src="${window.location.origin}/logo.png" alt="ERPServ Consultoria" /></div>
+          <div class="meta"><strong>Fechamento de Consultores — Consolidado</strong>${fmtYearMonth(yearMonth)}</div>
+        </div>
+        <table>
+          <thead><tr><th>Consultor</th><th>E-mail</th><th class="right">Total a Pagar</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+        <div class="total-box">
+          <span class="total-label">TOTAL GERAL — ${todos.length} CONSULTORES</span>
+          <span class="total-value">${formatBRL(totalGeral)}</span>
+        </div>
+      </div>
+    `
+    openPrintWindow(html)
+  }
+
   function handlePrintResumo() {
     if (!data) return
     const { totais } = data
@@ -521,7 +559,13 @@ export default function FechamentoConsultorPage() {
     ]
     return (
       <div className="max-w-md">
-        <div className="flex justify-end mb-3">
+        <div className="flex justify-end gap-3 mb-3">
+          <button
+            onClick={handlePrintTodos}
+            className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition-colors font-medium"
+          >
+            <Printer size={13} /> Todos os consultores
+          </button>
           <button
             onClick={handlePrintResumo}
             className="inline-flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 transition-colors"
