@@ -325,77 +325,53 @@ function HBPaymentSection({ data, fixedSalary, expTotal, showExtras = true }: { 
   const totalGeral   = totalSalario + expTotal
 
   return (
-    <div className="rounded-2xl p-5" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-      <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--brand-subtle)' }}>
-        Remuneração — {fmtYearMonth(data.year_month)}
-      </p>
-
-      {/* Linha 1: Valor do Serviço */}
-      <div className={`grid gap-3 mb-3 ${showExtras ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
-        {/* Valor Base Mensal */}
-        <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
-          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Valor Base Mensal</p>
-          <p className="text-lg font-bold" style={{ color: 'var(--brand-text)' }}>
-            {fixedSalary > 0 ? formatBRL(fixedSalary) : '—'}
-          </p>
-          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>mensal</p>
-        </div>
-
-        {/* Horas Extras — apenas para bh_mensal */}
-        {showExtras && (
-          <div className="rounded-xl p-3" style={{ background: hasExtra ? 'rgba(34,197,94,0.06)' : 'var(--brand-bg)', border: `1px solid ${hasExtra ? 'rgba(34,197,94,0.2)' : 'var(--brand-border)'}` }}>
-            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Horas Extras</p>
-            <p className="text-lg font-bold" style={{ color: hasExtra ? '#22c55e' : 'var(--brand-muted)' }}>
-              {hasExtra ? fmtHours(extraHours) : '—'}
-            </p>
-            <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>saldo acumulado {'>'} 0</p>
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900 px-6 py-5 grid grid-cols-[auto_1fr_auto] gap-x-8 items-center">
+      {/* ESQUERDA — contexto */}
+      <div className="flex flex-col gap-2 min-w-[120px]">
+        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500">Total a Receber</span>
+        <span className="text-[12px] text-zinc-400 font-medium">{fmtYearMonth(data.year_month)}</span>
+        {hasExtra && (
+          <div className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border w-fit bg-green-500/10 border-green-500/20 text-green-400">
+            <TrendingUp size={9} />
+            +{fmtHours(extraHours)} extras
           </div>
         )}
-
-        {/* Valor Hora Extra — apenas para bh_mensal */}
-        {showExtras && (
-          <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
-            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Valor / Hora Extra</p>
-            <p className="text-lg font-bold" style={{ color: valorHoraExt > 0 ? 'var(--brand-text)' : 'var(--brand-muted)' }}>
-              {valorHoraExt > 0 ? formatBRL(valorHoraExt) : '—'}
-            </p>
-            <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>fixo ÷ 180</p>
-          </div>
-        )}
-
-        {/* Total do Serviço */}
-        <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
-          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Total do Serviço</p>
-          <p className="text-lg font-bold" style={{ color: 'var(--brand-text)' }}>
-            {fixedSalary > 0 ? formatBRL(totalSalario) : '—'}
-          </p>
-          {hasExtra
-            ? <p className="text-[10px] mt-0.5 text-green-400">+{formatBRL(totalExtra)} extras</p>
-            : <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>sem horas extras</p>
-          }
-        </div>
       </div>
 
-      {/* Linha 2: Despesas + Total */}
-      <div className="grid grid-cols-2 gap-3">
-        {/* Despesas */}
-        <div className="rounded-xl p-3" style={{ background: expTotal > 0 ? 'rgba(249,115,22,0.06)' : 'var(--brand-bg)', border: `1px solid ${expTotal > 0 ? 'rgba(249,115,22,0.2)' : 'var(--brand-border)'}` }}>
-          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Despesas no Período</p>
-          <p className="text-lg font-bold" style={{ color: expTotal > 0 ? '#f97316' : 'var(--brand-muted)' }}>
-            {expTotal > 0 ? formatBRL(expTotal) : '—'}
-          </p>
-          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>reembolsos e gastos</p>
+      {/* CENTRO — valor */}
+      <div className="flex flex-col gap-1 border-l border-r border-zinc-800 px-8">
+        <div className="text-[42px] font-extrabold leading-none tracking-tight text-[#00F5FF]">
+          {fixedSalary > 0 ? formatBRL(totalGeral) : '—'}
         </div>
+        <span className="text-[11px] text-zinc-600 mt-1">
+          {hasExtra
+            ? `base + ${fmtHours(extraHours)} extras${expTotal > 0 ? ' + despesas' : ''}`
+            : expTotal > 0 ? 'base mensal + despesas' : 'base mensal'}
+        </span>
+      </div>
 
-        {/* Total Geral */}
-        <div className="rounded-xl p-3" style={{ background: 'rgba(0,245,255,0.04)', border: '1px solid rgba(0,245,255,0.15)' }}>
-          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Total a Receber</p>
-          <p className="text-lg font-bold" style={{ color: 'var(--brand-primary)' }}>
-            {fixedSalary > 0 ? formatBRL(totalGeral) : '—'}
-          </p>
-          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>
-            valor do serviço{hasExtra ? ' + extras' : ''}{expTotal > 0 ? ' + despesas' : ''}
-          </p>
+      {/* DIREITA — composição */}
+      <div className="flex items-center gap-5 min-w-[200px]">
+        {totalGeral > 0 && <MiniDonut services={totalSalario} expenses={expTotal} />}
+        <div className="flex flex-col gap-2.5">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-[#00F5FF] shrink-0" />
+            <span className="text-[11px] text-zinc-500 w-16">Serviços</span>
+            <span className="text-[11px] font-medium text-zinc-200">{fixedSalary > 0 ? formatBRL(totalSalario) : '—'}</span>
+            {totalGeral > 0 && fixedSalary > 0 && (
+              <span className="text-[10px] text-zinc-600">{Math.round((totalSalario / totalGeral) * 100)}%</span>
+            )}
+          </div>
+          {expTotal > 0 && (
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />
+              <span className="text-[11px] text-zinc-500 w-16">Despesas</span>
+              <span className="text-[11px] font-medium text-zinc-200">{formatBRL(expTotal)}</span>
+              {totalGeral > 0 && (
+                <span className="text-[10px] text-zinc-600">{Math.round((expTotal / totalGeral) * 100)}%</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -403,42 +379,108 @@ function HBPaymentSection({ data, fixedSalary, expTotal, showExtras = true }: { 
 }
 
 function HBCurrentMonthCard({ data, isCurrentMonth }: { data: HourBankMonth; isCurrentMonth: boolean }) {
+  const isNegAccum = data.accumulated_balance < 0
+
   return (
-    <div className="rounded-2xl p-5" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-      <div className="flex items-center gap-2 mb-4">
-        <CalendarDays size={15} color="var(--brand-primary)" />
-        <span className="text-sm font-semibold" style={{ color: 'var(--brand-text)' }}>
-          {fmtYearMonth(data.year_month)}
-        </span>
+    <div className="space-y-3">
+      {/* Cabeçalho da seção */}
+      <div className="flex items-center gap-2 px-1">
+        <Clock size={12} className="text-zinc-600" />
+        <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">Banco de Horas</span>
+        <span className="text-[10px] text-zinc-700">—</span>
+        <span className="text-[11px] text-zinc-400 font-medium">{fmtYearMonth(data.year_month)}</span>
         {isCurrentMonth && (
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20">Em andamento</span>
         )}
       </div>
+
+      {/* 4 cards operacionais */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'Horas Previstas',   value: fmtHours(data.expected_hours),   sub: `${data.working_days} dias úteis`, color: 'var(--brand-muted)' },
-          { label: 'Horas Trabalhadas', value: fmtHours(data.worked_hours),     sub: '', color: 'var(--brand-text)' },
-          { label: 'Saldo do Mês',      value: fmtHours(data.month_balance),    sub: '', color: data.month_balance >= 0 ? '#22c55e' : '#ef4444' },
-          { label: 'Saldo Anterior',    value: fmtHours(data.previous_balance), sub: '', color: data.previous_balance > 0 ? '#22c55e' : data.previous_balance < 0 ? '#ef4444' : 'var(--brand-muted)' },
-        ].map(item => (
-          <div key={item.label} className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
-            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>{item.label}</p>
-            <p className="text-xl font-bold" style={{ color: item.color }}>{item.value}</p>
-            {item.sub && <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>{item.sub}</p>}
+        {([
+          { label: 'Horas Previstas',   value: fmtHours(data.expected_hours),   sub: `${data.working_days} dias úteis`, neg: false, neutral: true },
+          { label: 'Horas Trabalhadas', value: fmtHours(data.worked_hours),     sub: '',                                 neg: false, neutral: false },
+          { label: 'Saldo do Mês',      value: fmtHours(data.month_balance),    sub: data.month_balance < 0 ? 'Déficit mensal' : data.month_balance > 0 ? 'Superávit' : 'Zerado', neg: data.month_balance < 0, neutral: false },
+          { label: 'Saldo Anterior',    value: fmtHours(data.previous_balance), sub: '',                                 neg: data.previous_balance < 0, neutral: data.previous_balance === 0 },
+        ] as const).map(item => (
+          <div key={item.label} className={`rounded-xl p-4 border ${item.neg ? 'border-red-500/20 bg-red-500/[0.04]' : 'border-zinc-800 bg-zinc-900'}`}>
+            <p className="text-[10px] uppercase tracking-wider mb-2 text-zinc-500">{item.label}</p>
+            <p className={`text-xl font-bold ${item.neg ? 'text-red-400' : item.neutral ? 'text-zinc-400' : 'text-white'}`}>{item.value}</p>
+            {item.sub && <p className={`text-[10px] mt-1 ${item.neg ? 'text-red-400/60' : 'text-zinc-600'}`}>{item.sub}</p>}
           </div>
         ))}
       </div>
-      <div className="mt-3 rounded-xl px-4 py-3 flex items-center justify-between"
-        style={{ background: data.accumulated_balance >= 0 ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${data.accumulated_balance >= 0 ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.15)'}` }}>
+
+      {/* Saldo acumulado banner */}
+      <div className={`rounded-xl px-5 py-4 border flex items-center justify-between ${
+        isNegAccum ? 'border-red-500/25 bg-red-500/[0.05]' : 'border-green-500/20 bg-green-500/[0.04]'
+      }`}>
         <div>
-          <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Saldo Acumulado</p>
-          <HBBalancePill value={data.accumulated_balance} size="lg" />
+          <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5">Saldo Acumulado</p>
+          <div className="flex items-center gap-2">
+            <HBBalancePill value={data.accumulated_balance} size="lg" />
+            {isNegAccum && <span className="text-[10px] text-red-400/60 font-medium">Déficit acumulado</span>}
+          </div>
         </div>
         <div className="text-right">
-          <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>Saldo Final</p>
+          <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5">Saldo Final</p>
           <HBBalancePill value={data.final_balance} size="lg" />
         </div>
       </div>
+
+      {/* Alerta de saldo negativo */}
+      {isNegAccum && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.04] px-4 py-3">
+          <AlertTriangle size={13} className="text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-[11px] text-amber-300/70">
+            Saldo negativo indica horas a compensar ou a faturar como extra, conforme contrato.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function HBEvolutionChart({ history, current }: { history: HourBankMonth[]; current: HourBankMonth | null }) {
+  const all = [...history, ...(current ? [current] : [])].sort((a, b) => a.year_month.localeCompare(b.year_month))
+  if (all.length < 2) return null
+
+  const W = 560, H = 80, PADX = 10, PADY = 12
+  const values = all.map(m => m.accumulated_balance)
+  const min = Math.min(...values, 0)
+  const max = Math.max(...values, 0)
+  const range = max - min || 1
+  const toX = (i: number) => PADX + (i / (all.length - 1)) * (W - PADX * 2)
+  const toY = (v: number) => PADY + ((max - v) / range) * (H - PADY * 2)
+  const zeroY = toY(0)
+  const pts = all.map((m, i) => `${toX(i)},${toY(m.accumulated_balance)}`).join(' ')
+  const isAllNeg = values.every(v => v <= 0)
+  const lineColor = isAllNeg ? '#ef4444' : '#22c55e'
+
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500 mb-3">Evolução do Saldo Acumulado</p>
+      <svg viewBox={`0 0 ${W} ${H + 18}`} className="w-full" style={{ minWidth: 280 }}>
+        {/* Zero line */}
+        <line x1={PADX} y1={zeroY} x2={W - PADX} y2={zeroY} stroke="#3f3f46" strokeWidth={1} strokeDasharray="4 3" />
+        {/* Area fill */}
+        <polygon
+          points={`${PADX},${zeroY} ${pts} ${W - PADX},${zeroY}`}
+          fill={isAllNeg ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)'}
+        />
+        {/* Line */}
+        <polyline points={pts} fill="none" stroke={lineColor} strokeWidth={1.5} strokeLinejoin="round" />
+        {/* Dots */}
+        {all.map((m, i) => (
+          <circle key={m.year_month} cx={toX(i)} cy={toY(m.accumulated_balance)} r={2.5}
+            fill={m.accumulated_balance < 0 ? '#ef4444' : '#22c55e'} />
+        ))}
+        {/* Month labels */}
+        {all.map((m, i) => (
+          <text key={`l-${m.year_month}`} x={toX(i)} y={H + 14} textAnchor="middle" fontSize={8} fill="#52525b">
+            {fmtYearMonth(m.year_month).split('/')[0]}
+          </text>
+        ))}
+      </svg>
     </div>
   )
 }
@@ -3225,6 +3267,10 @@ export default function MeuPainelPage() {
                     </>
                   )
                 })()}
+
+                {(hbHistory.length > 0 || hbCurrent) && (
+                  <HBEvolutionChart history={hbHistory} current={hbCurrent} />
+                )}
 
                 {hbHistory.length > 0 && (
                   <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
