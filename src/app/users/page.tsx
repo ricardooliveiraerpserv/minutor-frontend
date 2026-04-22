@@ -35,8 +35,18 @@ interface UserItem {
   partner_id?: number | null
   is_executive?: boolean
   type?: string | null
+  extra_permissions?: string[]
   created_at: string
 }
+
+const COORDINATOR_PERMISSIONS: { key: string; label: string; desc: string }[] = [
+  { key: 'users.reset_password', label: 'Redefinição de senha',    desc: 'Pode resetar a senha de qualquer usuário' },
+  { key: 'users.view_all',       label: 'Visualizar usuários',     desc: 'Pode ver todos os usuários cadastrados' },
+  { key: 'users.create',         label: 'Criar usuários',          desc: 'Pode criar novos usuários' },
+  { key: 'users.update',         label: 'Editar usuários',         desc: 'Pode editar dados de usuários' },
+  { key: 'hora_banco.view',      label: 'Banco de Horas',          desc: 'Acesso à página de banco de horas' },
+  { key: 'settings.view',        label: 'Configurações',           desc: 'Acesso às configurações do sistema' },
+]
 
 interface CustomerOption { id: number; name: string }
 interface PartnerOption  { id: number; name: string; pricing_type?: 'fixed' | 'variable'; hourly_rate?: string | null }
@@ -208,6 +218,7 @@ const EMPTY_FORM = {
   is_partner_adm: false,
   customer_id: '' as number | '',
   partner_id: '' as number | '',
+  extra_permissions: [] as string[],
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -303,6 +314,7 @@ export default function UsersPage() {
       is_partner_adm:       item.is_executive ?? false,
       customer_id:          item.customer_id ?? '',
       partner_id:           item.partner_id  ?? '',
+      extra_permissions:    item.extra_permissions ?? [],
     })
     setModal({ open: true, item })
   }
@@ -333,7 +345,10 @@ export default function UsersPage() {
           payload.guaranteed_hours = form.guaranteed_hours ? parseFloat(form.guaranteed_hours) : null
         }
       }
-      if (form.profiles.includes('coordenador')) payload.coordinator_type = form.coordinator_type || null
+      if (form.profiles.includes('coordenador')) {
+        payload.coordinator_type  = form.coordinator_type || null
+        payload.extra_permissions = form.extra_permissions
+      }
       if (!modal.item && form.password) payload.password = form.password
 
       if (modal.item) await api.put(`/users/${modal.item.id}`, payload)
@@ -712,6 +727,45 @@ export default function UsersPage() {
                           {label}
                         </button>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Coordenador: permissões adicionais ── */}
+                {isCoordenador && (
+                  <div>
+                    <Label className="text-xs text-zinc-400 mb-1 block">Permissões Adicionais</Label>
+                    <div className="space-y-1.5 rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
+                      {COORDINATOR_PERMISSIONS.map(perm => {
+                        const active = form.extra_permissions.includes(perm.key)
+                        return (
+                          <button
+                            key={perm.key}
+                            type="button"
+                            onClick={() => setForm(f => ({
+                              ...f,
+                              extra_permissions: active
+                                ? f.extra_permissions.filter(p => p !== perm.key)
+                                : [...f.extra_permissions, perm.key],
+                            }))}
+                            className={`w-full flex items-start gap-2.5 px-2.5 py-2 rounded-md text-xs text-left transition-colors ${
+                              active
+                                ? 'bg-blue-600/15 border border-blue-500/30'
+                                : 'hover:bg-zinc-700/50 border border-transparent'
+                            }`}
+                          >
+                            <span className={`mt-0.5 w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center ${
+                              active ? 'border-blue-400 bg-blue-500 text-white' : 'border-zinc-600'
+                            }`}>
+                              {active && <Check size={9} />}
+                            </span>
+                            <div>
+                              <p className={`font-medium leading-tight ${active ? 'text-blue-300' : 'text-zinc-300'}`}>{perm.label}</p>
+                              <p className="text-[10px] text-zinc-500 mt-0.5">{perm.desc}</p>
+                            </div>
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
