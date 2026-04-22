@@ -1452,9 +1452,9 @@ function ContractFilhoModal({ card, onClose, onDone }: {
     if (!selectedProjectId) { toast.error('Selecione um projeto pai'); return }
     setLoading(true)
     try {
-      await api.patch(`/contracts/${card.id}/kanban-move`, { to_column: 'req_inicio_autorizado', parent_project_id: selectedProjectId, order: 0 })
-      toast.success('Contrato vinculado como projeto filho')
-      onDone({ ...card, kanban_status: 'req_inicio_autorizado' })
+      await api.patch(`/contracts/${card.id}/kanban-move`, { to_column: 'inicio_autorizado', parent_project_id: selectedProjectId, order: 0 })
+      toast.success('Contrato vinculado como projeto filho — movido para Início Autorizado')
+      onDone({ ...card, kanban_status: 'inicio_autorizado' })
     } catch (e: any) {
       toast.error(e?.message ?? 'Erro ao vincular contrato')
     } finally {
@@ -3879,7 +3879,9 @@ function KanbanContent() {
           card={contractFilhoCard}
           onClose={() => setContractFilhoCard(null)}
           onDone={updated => {
-            setDemandCards(prev => prev.map(c => c.id === updated.id ? { ...c, kanban_status: 'req_inicio_autorizado' } : c))
+            // Filho vai direto para Início Autorizado → sai de demandCards, entra em transitionCards
+            setDemandCards(prev => prev.filter(c => c.id !== updated.id))
+            setTransitionCards(prev => [...prev, { ...updated, kanban_status: 'inicio_autorizado' }])
             setContractFilhoCard(null)
           }}
         />
