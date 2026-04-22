@@ -8,7 +8,7 @@ import { MonthYearPicker } from '@/components/ui/month-year-picker'
 import { SearchSelect } from '@/components/ui/search-select'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
-import { Lock, RefreshCw, Building2, Printer, FileText, Receipt, ChevronRight, ChevronDown } from 'lucide-react'
+import { Lock, RefreshCw, Building2, Printer, FileText, Receipt, ChevronRight } from 'lucide-react'
 import {
   Table, Thead, Th, Tbody, Tr, Td,
   Badge, Button, SkeletonTable, EmptyState,
@@ -64,30 +64,6 @@ interface DespesaRow {
   colaborador: string
   projeto: string
   valor: number
-}
-
-// ─── Tipos da Visão Global On Demand ─────────────────────────────────────────
-
-interface ProjetoGlobal {
-  projeto_id: number
-  nome: string
-  codigo: string
-  horas: number
-  valor_hora: number
-  total_receita: number
-}
-
-interface ClienteGlobal {
-  customer_id: number
-  nome: string
-  projetos: ProjetoGlobal[]
-  total_horas: number
-  total_receita: number
-}
-
-interface GlobalData {
-  tipos: { code: string; nome: string; clientes: ClienteGlobal[]; total_clientes: number; total_horas: number; total_receita: number }[]
-  total_geral: number
 }
 
 type Tab = 'global' | 'servicos' | 'relatorio' | 'despesas'
@@ -147,10 +123,6 @@ export default function FechamentoClientePage() {
   const [tab, setTab]               = useState<Tab>('servicos')
 
   // ── Dados ──
-  const [globalData,    setGlobalData]    = useState<GlobalData | null>(null)
-  const [loadingGlobal, setLoadingGlobal] = useState(false)
-  const [expandedClients, setExpandedClients] = useState<Set<number>>(new Set())
-
   const [dados,    setDados]    = useState<ApontamentosData | null>(null)
   const [despesas, setDespesas] = useState<DespesaRow[]>([])
 
@@ -172,15 +144,6 @@ export default function FechamentoClientePage() {
       })
       .catch(() => {})
   }, [toYM, customerId])
-
-  const loadGlobal = useCallback(() => {
-    if (!toYM) return
-    setLoadingGlobal(true)
-    api.get<{ data: GlobalData }>(`/fechamento-contrato?year_month=${toYM}`)
-      .then(r => setGlobalData(r.data ?? null))
-      .catch(() => toast.error('Erro ao carregar visão global'))
-      .finally(() => setLoadingGlobal(false))
-  }, [toYM])
 
   const loadServicos = useCallback(() => {
     if (!customerId || !fromYM || !toYM) return
@@ -206,11 +169,9 @@ export default function FechamentoClientePage() {
 
   useEffect(() => {
     loadClientes()
-    loadGlobal()
     setDados(null)
     setDespesas([])
     setProjetoFilter(null)
-    setExpandedClients(new Set())
   }, [fromYM, toYM])
 
   useEffect(() => {
@@ -262,17 +223,6 @@ export default function FechamentoClientePage() {
     document.body.setAttribute('data-print', target)
     window.print()
     setTimeout(() => document.body.removeAttribute('data-print'), 500)
-  }
-
-  // ── Toggle cliente expandido (visão global) ──
-
-  const toggleClient = (id: number) => {
-    setExpandedClients(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
   }
 
   // ── Derivados ──
@@ -432,99 +382,106 @@ export default function FechamentoClientePage() {
         <div className="flex-1 overflow-auto p-6">
 
           {/* ── Tab Visão Global ── */}
-          {tab === 'global' && (
-            loadingGlobal ? <SkeletonTable rows={6} cols={3} /> : (() => {
-              const onDemand = globalData?.tipos.find(t => t.code === 'on_demand')
-              if (!onDemand || onDemand.clientes.length === 0) {
-                return (
-                  <EmptyState icon={Building2} title="Sem dados On Demand"
-                    description="Nenhum cliente com apontamentos aprovados no período selecionado." />
-                )
-              }
+          {tab === 'global' && (() => {
+            if (clientes.length === 0) {
               return (
-                <div>
-                  {/* Cards de resumo */}
-                  <div className="grid grid-cols-3 gap-4 mb-6">
-                    <div className="rounded-xl p-4" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-                      <div className="text-xs mb-1" style={{ color: 'var(--brand-muted)' }}>Clientes</div>
-                      <div className="text-2xl font-bold" style={{ color: 'var(--brand-text)' }}>{onDemand.total_clientes}</div>
-                    </div>
-                    <div className="rounded-xl p-4" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-                      <div className="text-xs mb-1" style={{ color: 'var(--brand-muted)' }}>Horas Aprovadas</div>
-                      <div className="text-2xl font-bold tabular-nums" style={{ color: 'var(--brand-text)' }}>
-                        {onDemand.total_horas.toFixed(2)}h
+                <EmptyState icon={Building2} title="Sem clientes On Demand"
+                  description="Nenhum cliente com contrato On Demand encontrado." />
+              )
+            }
+            const totalServicos = clientes.reduce((s, c) => s + c.total_servicos, 0)
+            const comMovimento  = clientes.filter(c => c.total_servicos > 0).length
+            return (
+              <div>
+                {/* Cards de resumo */}
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="rounded-xl p-4" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                    <div className="text-xs mb-1" style={{ color: 'var(--brand-muted)' }}>Total de Clientes</div>
+                    <div className="text-2xl font-bold" style={{ color: 'var(--brand-text)' }}>{clientes.length}</div>
+                    {comMovimento > 0 && (
+                      <div className="text-xs mt-1" style={{ color: 'var(--brand-muted)' }}>
+                        {comMovimento} com movimento no período
                       </div>
-                    </div>
-                    <div className="rounded-xl p-4" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-                      <div className="text-xs mb-1" style={{ color: 'var(--brand-muted)' }}>Total On Demand</div>
-                      <div className="text-2xl font-bold tabular-nums" style={{ color: 'var(--brand-primary)' }}>
-                        {formatBRL(onDemand.total_receita)}
-                      </div>
+                    )}
+                  </div>
+                  <div className="rounded-xl p-4" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                    <div className="text-xs mb-1" style={{ color: 'var(--brand-muted)' }}>Clientes Ativos</div>
+                    <div className="text-2xl font-bold" style={{ color: 'var(--brand-text)' }}>
+                      {clientes.filter(c => c.status !== 'sem_registro').length}
                     </div>
                   </div>
+                  <div className="rounded-xl p-4" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                    <div className="text-xs mb-1" style={{ color: 'var(--brand-muted)' }}>Total Serviços</div>
+                    <div className="text-2xl font-bold tabular-nums" style={{ color: 'var(--brand-primary)' }}>
+                      {formatBRL(totalServicos)}
+                    </div>
+                  </div>
+                </div>
 
-                  {/* Tabela de clientes expansível */}
-                  <Table>
-                    <Thead>
-                      <tr>
-                        <Th>Cliente</Th>
-                        <Th right>Horas</Th>
-                        <Th right>Total</Th>
+                {/* Tabela de todos os clientes */}
+                <Table>
+                  <Thead>
+                    <tr>
+                      <Th>Cliente</Th>
+                      <Th>Status</Th>
+                      <Th right>Serviços</Th>
+                      <Th right>Despesas</Th>
+                      <Th right>Total</Th>
+                    </tr>
+                  </Thead>
+                  <Tbody>
+                    {clientes.map(c => (
+                      <tr
+                        key={c.customer_id}
+                        style={{ cursor: 'pointer' }}
+                        className="border-b transition-colors hover:bg-white/5"
+                        onClick={() => { setCustomerId(c.customer_id); setTab('servicos') }}
+                      >
+                        <td className="px-5 py-3 text-sm font-medium" style={{ color: 'var(--brand-text)' }}>
+                          <div className="flex items-center gap-2">
+                            <ChevronRight size={14} style={{ color: 'var(--brand-muted)' }} />
+                            {c.nome}
+                          </div>
+                        </td>
+                        <td className="px-5 py-3">
+                          {c.status === 'closed'
+                            ? <Badge variant="success"><Lock size={10} className="mr-1" />Fechado</Badge>
+                            : c.status === 'open'
+                            ? <Badge variant="warning">Aberto</Badge>
+                            : <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>Sem registro</span>
+                          }
+                        </td>
+                        <td className="px-5 py-3 text-right tabular-nums text-sm" style={{ color: c.total_servicos > 0 ? 'var(--brand-text)' : 'var(--brand-muted)' }}>
+                          {formatBRL(c.total_servicos)}
+                        </td>
+                        <td className="px-5 py-3 text-right tabular-nums text-sm" style={{ color: c.total_despesas > 0 ? 'var(--brand-text)' : 'var(--brand-muted)' }}>
+                          {formatBRL(c.total_despesas)}
+                        </td>
+                        <td className="px-5 py-3 text-right tabular-nums font-semibold" style={{ color: c.total_geral > 0 ? 'var(--brand-primary)' : 'var(--brand-muted)' }}>
+                          {formatBRL(c.total_geral)}
+                        </td>
                       </tr>
-                    </Thead>
-                    <Tbody>
-                      {onDemand.clientes.map(c => (
-                        <>
-                          <tr
-                            key={c.customer_id}
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => toggleClient(c.customer_id)}
-                            className="border-b transition-colors hover:bg-white/5"
-                          >
-                            <td className="px-5 py-3 text-sm font-medium" style={{ color: 'var(--brand-text)' }}>
-                              <div className="flex items-center gap-2">
-                                {expandedClients.has(c.customer_id)
-                                  ? <ChevronDown size={14} style={{ color: 'var(--brand-muted)' }} />
-                                  : <ChevronRight size={14} style={{ color: 'var(--brand-muted)' }} />
-                                }
-                                {c.nome}
-                              </div>
-                            </td>
-                            <td className="px-5 py-3 text-right tabular-nums text-sm" style={{ color: 'var(--brand-text)' }}>
-                              {c.total_horas.toFixed(2)}h
-                            </td>
-                            <td className="px-5 py-3 text-right tabular-nums font-semibold" style={{ color: 'var(--brand-primary)' }}>
-                              {formatBRL(c.total_receita)}
-                            </td>
-                          </tr>
-                          {expandedClients.has(c.customer_id) && c.projetos.map(p => (
-                            <Tr key={`${c.customer_id}-${p.projeto_id}`}>
-                              <Td muted className="pl-10 text-xs">{p.codigo} — {p.nome}</Td>
-                              <Td right muted className="text-xs tabular-nums">{p.horas.toFixed(2)}h</Td>
-                              <Td right muted className="text-xs tabular-nums">{formatBRL(p.total_receita)}</Td>
-                            </Tr>
-                          ))}
-                        </>
-                      ))}
-                    </Tbody>
-                  </Table>
+                    ))}
+                  </Tbody>
+                </Table>
 
-                  {/* Rodapé total */}
+                {/* Rodapé total */}
+                {totalServicos > 0 && (
                   <div className="flex justify-end pt-4">
                     <div className="px-5 py-3 rounded-xl"
                       style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
                       <span className="text-sm font-semibold mr-4" style={{ color: 'var(--brand-muted)' }}>
-                        {onDemand.total_horas.toFixed(2)}h · Total On Demand
+                        Total On Demand
                       </span>
                       <span className="text-base font-bold tabular-nums" style={{ color: 'var(--brand-primary)' }}>
-                        {formatBRL(onDemand.total_receita)}
+                        {formatBRL(totalServicos)}
                       </span>
                     </div>
                   </div>
-                </div>
-              )
-            })()
-          )}
+                )}
+              </div>
+            )
+          })()}
 
           {/* Quando tab não é global e nenhum cliente foi selecionado */}
           {tab !== 'global' && !customerId && (
