@@ -323,8 +323,8 @@ export default function UsersPage() {
       }
       if (form.hourly_rate) payload.hourly_rate = parseFloat(form.hourly_rate)
       if (form.daily_hours) payload.daily_hours = parseFloat(form.daily_hours)
-      if (form.profiles.includes('consultor') && form.consultant_type) payload.consultant_type = form.consultant_type
-      if (form.consultant_type === 'banco_de_horas') {
+      if (form.profiles.includes('consultor') && form.consultant_type) {
+        payload.consultant_type       = form.consultant_type
         payload.bank_hours_start_date = form.bank_hours_start_date || null
       }
       if (form.profiles.includes('coordenador')) payload.coordinator_type = form.coordinator_type || null
@@ -628,17 +628,21 @@ export default function UsersPage() {
                   </div>
                 )}
 
-                {/* ── Data início do Banco de Horas ── */}
-                {isConsultor && form.consultant_type === 'banco_de_horas' && (
+                {/* ── Data de Início (proporcional) ── */}
+                {isConsultor && !!form.consultant_type && (
                   <div>
-                    <Label className="text-xs text-zinc-400 mb-1 block">Data Início do Banco de Horas</Label>
+                    <Label className="text-xs text-zinc-400 mb-1 block">Data de Início</Label>
                     <Input
                       type="date"
                       value={form.bank_hours_start_date}
                       onChange={e => setForm(f => ({ ...f, bank_hours_start_date: e.target.value }))}
                       className="w-44 bg-zinc-800 border-zinc-700 text-white h-8 text-xs"
                     />
-                    <p className="text-xs text-zinc-500 mt-1">Meses anteriores a esta data não são calculados no banco</p>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      {form.consultant_type === 'banco_de_horas'
+                        ? 'Meses anteriores não entram no banco; mês de entrada calculado proporcionalmente'
+                        : 'Se entrou no meio do mês, o pagamento será calculado proporcionalmente aos dias úteis'}
+                    </p>
                   </div>
                 )}
 

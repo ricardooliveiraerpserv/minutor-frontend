@@ -153,7 +153,7 @@ function HBBalancePill({ value, size = 'sm' }: { value: number; size?: 'sm' | 'l
 // ─── Horista Payment Section ──────────────────────────────────────────────────
 
 function HoristaPaymentSection({
-  yearMonth, workedHours, billableHours, guaranteedHours, hourlyRate, expTotal,
+  yearMonth, workedHours, billableHours, guaranteedHours, hourlyRate, expTotal, proporcional, prorationRatio,
 }: {
   yearMonth: string
   workedHours: number
@@ -161,6 +161,8 @@ function HoristaPaymentSection({
   guaranteedHours: number | null
   hourlyRate: number
   expTotal: number
+  proporcional?: boolean
+  prorationRatio?: number
 }) {
   const totalService = hourlyRate > 0 ? billableHours * hourlyRate : 0
   const totalGeral   = totalService + expTotal
@@ -168,9 +170,16 @@ function HoristaPaymentSection({
 
   return (
     <div className="rounded-2xl p-5 space-y-3" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-      <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>
-        Remuneração — {fmtYearMonth(yearMonth)}
-      </p>
+      <div className="flex items-center gap-2 flex-wrap">
+        <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>
+          Remuneração — {fmtYearMonth(yearMonth)}
+        </p>
+        {proporcional && prorationRatio !== undefined && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(234,179,8,0.1)', color: '#eab308' }}>
+            Proporcional {Math.round(prorationRatio * 100)}%
+          </span>
+        )}
+      </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
@@ -183,7 +192,7 @@ function HoristaPaymentSection({
           <div className="rounded-xl p-3" style={{ background: isGuaranteed ? 'rgba(234,179,8,0.06)' : 'var(--brand-bg)', border: `1px solid ${isGuaranteed ? 'rgba(234,179,8,0.2)' : 'var(--brand-border)'}` }}>
             <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Horas Garantidas</p>
             <p className="text-lg font-bold" style={{ color: isGuaranteed ? '#eab308' : 'var(--brand-muted)' }}>{fmtHours(Number(guaranteedHours))}</p>
-            <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>piso mínimo</p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>{proporcional ? 'piso mínimo (proporcional)' : 'piso mínimo'}</p>
           </div>
         )}
 
@@ -248,20 +257,29 @@ function HoristaPaymentSection({
 // ─── Fixo Payment Section ─────────────────────────────────────────────────────
 
 function FixoPaymentSection({
-  yearMonth, workedHours, fixedMonthly, expTotal,
+  yearMonth, workedHours, fixedMonthly, expTotal, proporcional, prorationRatio,
 }: {
   yearMonth: string
   workedHours: number
   fixedMonthly: number
   expTotal: number
+  proporcional?: boolean
+  prorationRatio?: number
 }) {
   const totalGeral = fixedMonthly + expTotal
 
   return (
     <div className="rounded-2xl p-5 space-y-3" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-      <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>
-        Remuneração — {fmtYearMonth(yearMonth)}
-      </p>
+      <div className="flex items-center gap-2 flex-wrap">
+        <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-subtle)' }}>
+          Remuneração — {fmtYearMonth(yearMonth)}
+        </p>
+        {proporcional && prorationRatio !== undefined && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(234,179,8,0.1)', color: '#eab308' }}>
+            Proporcional {Math.round(prorationRatio * 100)}%
+          </span>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Horas Trabalhadas */}
@@ -273,11 +291,15 @@ function FixoPaymentSection({
 
         {/* Valor Fixo Mensal */}
         <div className="rounded-xl p-3" style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
-          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>Valor Fixo Mensal</p>
+          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--brand-subtle)' }}>
+            {proporcional ? 'Valor Proporcional' : 'Valor Fixo Mensal'}
+          </p>
           <p className="text-lg font-bold" style={{ color: fixedMonthly > 0 ? 'var(--brand-text)' : 'var(--brand-muted)' }}>
             {fixedMonthly > 0 ? formatBRL(fixedMonthly) : '—'}
           </p>
-          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>valor do serviço mensal</p>
+          <p className="text-[10px] mt-0.5" style={{ color: 'var(--brand-subtle)' }}>
+            {proporcional ? `proporcional (${Math.round((prorationRatio ?? 1) * 100)}% do mês)` : 'valor do serviço mensal'}
+          </p>
         </div>
 
         {/* Despesas */}
@@ -1576,9 +1598,30 @@ export default function MeuPainelPage() {
     ? (rateType === 'monthly' ? hourlyRate / 180 : hourlyRate)
     : 0
   const workedHours     = tsTotalMin / 60
-  // Para horistas com horas garantidas: piso mínimo de cobrança
-  const billableHours   = guaranteedHours !== null
-    ? Math.max(workedHours, Number(guaranteedHours))
+
+  // Proporcionalidade: se bank_hours_start_date cai no mês selecionado
+  const consultantStartStr = (user as any)?.bank_hours_start_date as string | null | undefined
+  const prorationRatio = (() => {
+    if (!consultantStartStr) return 1
+    const sd = new Date(consultantStartStr + 'T00:00:00')
+    if (sd.getFullYear() !== year || sd.getMonth() !== month) return 1
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    let fullWD = 0, periodWD = 0
+    for (let i = 1; i <= daysInMonth; i++) {
+      const dow = new Date(year, month, i).getDay()
+      if (dow !== 0 && dow !== 6) {
+        fullWD++
+        if (i >= sd.getDate()) periodWD++
+      }
+    }
+    return fullWD > 0 ? periodWD / fullWD : 1
+  })()
+  const isProporcional = prorationRatio < 1
+
+  // Para horistas com horas garantidas: piso mínimo de cobrança (proporcional se entrou no mês)
+  const guaranteedProrated  = guaranteedHours !== null ? Math.round(guaranteedHours * prorationRatio * 100) / 100 : null
+  const billableHours   = guaranteedProrated !== null
+    ? Math.max(workedHours, guaranteedProrated)
     : workedHours
   const estimatedValue  = effectiveRate > 0
     ? billableHours * effectiveRate
@@ -1930,8 +1973,10 @@ export default function MeuPainelPage() {
             <FixoPaymentSection
               yearMonth={`${year}-${String(month + 1).padStart(2, '0')}`}
               workedHours={workedHours}
-              fixedMonthly={hourlyRate}
+              fixedMonthly={Math.round(hourlyRate * prorationRatio * 100) / 100}
               expTotal={expTotal}
+              proporcional={isProporcional}
+              prorationRatio={prorationRatio}
             />
           )}
 
@@ -2963,9 +3008,11 @@ export default function MeuPainelPage() {
                     yearMonth={`${year}-${String(month + 1).padStart(2, '0')}`}
                     workedHours={workedHours}
                     billableHours={billableHours}
-                    guaranteedHours={guaranteedHours}
+                    guaranteedHours={guaranteedProrated}
                     hourlyRate={hourlyRate}
                     expTotal={expTotal}
+                    proporcional={isProporcional}
+                    prorationRatio={prorationRatio}
                   />
                 )}
 
