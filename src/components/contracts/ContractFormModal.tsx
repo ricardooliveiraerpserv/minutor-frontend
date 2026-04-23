@@ -536,7 +536,12 @@ export function ContractFormModal({ open, editContract, onClose, onSaved }: Cont
               <label className={labelCls}>Tipo de Serviço</label>
               <SearchSelect
                 value={form.service_type_id}
-                onChange={v => setForm(f => ({ ...f, service_type_id: v }))}
+                onChange={v => {
+                  const stName = (serviceTypes.find(s => String(s.id) === String(v))?.name ?? '').toLowerCase()
+                  const isSust = stName.includes('cloud') || stName.includes('bizify')
+                    || stName.includes('sustentacao') || stName.includes('sustentação')
+                  setForm(f => ({ ...f, service_type_id: v, categoria: isSust ? 'sustentacao' : 'projeto' }))
+                }}
                 options={serviceTypes}
                 placeholder="Selecionar tipo de serviço..."
               />
