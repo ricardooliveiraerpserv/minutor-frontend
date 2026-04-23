@@ -1601,11 +1601,13 @@ function KanbanContent() {
       ]
 
   // ── Filtros ──────────────────────────────────────────────────────────────
-  const matchFilter = (customerName = '', name = ''): boolean => {
-    if (filterCustomer && customerName !== filterCustomer) return false
+  const matchFilter = (customerName?: string | null, name?: string | null): boolean => {
+    const cn = customerName ?? ''
+    const nm = name ?? ''
+    if (filterCustomer && cn !== filterCustomer) return false
     if (filterSearch) {
       const q = filterSearch.toLowerCase()
-      return customerName.toLowerCase().includes(q) || name.toLowerCase().includes(q)
+      return cn.toLowerCase().includes(q) || nm.toLowerCase().includes(q)
     }
     return true
   }
