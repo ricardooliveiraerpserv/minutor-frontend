@@ -403,6 +403,45 @@ function RequestKanbanCard({ card }: { card: RequestCard }) {
   )
 }
 
+// ─── List view action menu ────────────────────────────────────────────────────
+
+function ListActionMenu({ card, onAction }: { card: ContractCard; onAction: (action: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button onClick={e => { e.stopPropagation(); setOpen(v => !v) }}
+        className="p-1.5 rounded-lg opacity-0 group-hover/row:opacity-100 transition-opacity hover:bg-white/10"
+        style={{ color: 'var(--brand-subtle)' }}>
+        <MoreVertical size={14} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-7 z-[100] w-44 rounded-xl overflow-hidden shadow-2xl"
+          style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+          {CONTRACT_MENU_ITEMS.map(item => {
+            const Icon = item.icon
+            return (
+              <button key={item.action}
+                onClick={e => { e.stopPropagation(); setOpen(false); onAction(item.action) }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-left transition-colors hover:bg-white/5"
+                style={{ color: item.action === 'delete' ? '#f87171' : 'var(--brand-text)' }}>
+                <Icon size={13} style={{ color: item.action === 'delete' ? '#f87171' : 'var(--brand-subtle)' }} />
+                {item.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Project Card ─────────────────────────────────────────────────────────────
 
 const CONTRACT_MENU_ITEMS = [
@@ -3686,14 +3725,15 @@ function KanbanContent() {
                       <th className="text-center px-4 py-3 text-zinc-400 font-medium">Horas</th>
                       <th className="text-left px-4 py-3 text-zinc-400 font-medium">Valor</th>
                       <th className="text-center px-4 py-3 text-zinc-400 font-medium">Status</th>
+                      <th className="px-4 py-3" />
                     </tr>
                   </thead>
                   <tbody>
                     {allContracts.length === 0 && allProjects.length === 0 && (
-                      <tr><td colSpan={6} className="px-4 py-8 text-center text-zinc-600 text-xs">Nenhum item.</td></tr>
+                      <tr><td colSpan={7} className="px-4 py-8 text-center text-zinc-600 text-xs">Nenhum item.</td></tr>
                     )}
                     {allContracts.map((c, i) => (
-                      <tr key={`c-${c.id}`} onClick={() => setSelectedContract(c)} className="cursor-pointer hover:bg-zinc-800/40 transition-colors"
+                      <tr key={`c-${c.id}`} onClick={() => setSelectedContract(c)} className="cursor-pointer hover:bg-zinc-800/40 transition-colors group/row"
                         style={{ borderTop: i > 0 || allProjects.length > 0 ? '1px solid var(--brand-border)' : undefined }}>
                         <td className="px-4 py-3 text-white font-medium">{c.customer_name}</td>
                         <td className="px-4 py-3 text-zinc-400 text-xs">
@@ -3708,6 +3748,9 @@ function KanbanContent() {
                           <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: 'rgba(99,102,241,0.12)', color: '#818cf8' }}>
                             {c.kanban_status ?? c.status}
                           </span>
+                        </td>
+                        <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
+                          <ListActionMenu card={c} onAction={action => setContractAction({ card: c, action })} />
                         </td>
                       </tr>
                     ))}
@@ -3727,6 +3770,7 @@ function KanbanContent() {
                             {p.status}
                           </span>
                         </td>
+                        <td className="px-4 py-3" />
                       </tr>
                     ))}
                   </tbody>
