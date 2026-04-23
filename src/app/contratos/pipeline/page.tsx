@@ -4072,6 +4072,7 @@ function KanbanContent() {
         <ContractCreateModal
           initialCustomerId={subprojetoForReq.card.customer_id}
           initialProjectName={subprojetoForReq.card.project_name}
+          initialParentProjectId={subprojetoForReq.projectId}
           customerReadOnly
           title="Subprojeto — Novo Contrato"
           onClose={() => setSubprojetoForReq(null)}

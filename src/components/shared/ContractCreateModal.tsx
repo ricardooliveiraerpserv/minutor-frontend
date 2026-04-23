@@ -59,6 +59,7 @@ interface Props {
   onSuccess: (contractId: number) => void
   initialCustomerId?: number | string
   initialProjectName?: string
+  initialParentProjectId?: number | string
   title?: string
   customerReadOnly?: boolean
 }
@@ -67,7 +68,7 @@ interface Props {
 
 export function ContractCreateModal({
   onClose, onSuccess,
-  initialCustomerId, initialProjectName,
+  initialCustomerId, initialProjectName, initialParentProjectId,
   title = 'Novo Contrato',
   customerReadOnly = false,
 }: Props) {
@@ -84,8 +85,9 @@ export function ContractCreateModal({
 
   const [form, setForm] = useState<FormState>({
     ...EMPTY_FORM,
-    customer_id:  initialCustomerId ? String(initialCustomerId) : '',
-    project_name: initialProjectName ?? '',
+    customer_id:       initialCustomerId       ? String(initialCustomerId)       : '',
+    project_name:      initialProjectName      ?? '',
+    parent_project_id: initialParentProjectId  ? String(initialParentProjectId)  : '',
   })
   const [contacts, setContacts] = useState<ContractContact[]>([])
   const [codeExists, setCodeExists]   = useState(false)
