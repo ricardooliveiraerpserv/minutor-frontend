@@ -150,11 +150,12 @@ function endDateStyle(dateStr: string): { color: string; bg: string; label: stri
 }
 
 const PROJECT_MENU_ITEMS = [
-  { action: 'view',       label: 'Visualizar',    icon: Eye },
-  { action: 'edit',       label: 'Editar',         icon: Pencil },
-  { action: 'status',     label: 'Alterar Status', icon: Layers },
-  { action: 'cost',       label: 'Custo',          icon: DollarSign },
-  { action: 'timesheets', label: 'Apontamentos',   icon: Clock },
+  { action: 'view',       label: 'Visualizar',       icon: Eye },
+  { action: 'edit',       label: 'Editar',            icon: Pencil },
+  { action: 'status',     label: 'Alterar Status',    icon: Layers },
+  { action: 'cost',       label: 'Custo',             icon: DollarSign },
+  { action: 'timesheets', label: 'Apontamentos',      icon: Clock },
+  { action: 'team',       label: 'Selecionar Equipe', icon: Users },
 ]
 
 const CONTRACT_MENU_ITEMS = [
@@ -1031,6 +1032,82 @@ function ProjectStatusModal({ projectId, projectName, currentStatus, onClose, on
 }
 
 // ─── Contract Card ────────────────────────────────────────────────────────────
+
+function ProjectTeamModal({ projectId, projectName, onClose, onSaved }: { projectId: number; projectName: string; onClose: () => void; onSaved: () => void }) {
+  const [consultants, setConsultants] = useState<{ id: number; name: string }[]>([])
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    Promise.all([
+      api.get<any>(`/projects/${projectId}`),
+      api.get<any>('/users?type=consultor&pageSize=200'),
+    ]).then(([proj, usrs]) => {
+      setConsultants(usrs?.items ?? usrs?.data ?? [])
+      const ids = (proj?.consultants ?? []).map((c: { id: number }) => c.id)
+      setSelectedIds(new Set(ids))
+    }).catch(() => toast.error('Erro ao carregar equipe'))
+    .finally(() => setLoading(false))
+  }, [projectId])
+
+  const filtered = consultants.filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
+  const toggle = (id: number) => setSelectedIds(prev => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)' }}>
+      <div className="flex flex-col w-full max-w-lg rounded-2xl max-h-[80vh]" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: 'var(--brand-border)' }}>
+          <div><p className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--brand-subtle)' }}>Selecionar Equipe</p><h3 className="text-base font-bold" style={{ color: 'var(--brand-text)' }}>{projectName}</h3></div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5"><X size={16} style={{ color: 'var(--brand-muted)' }} /></button>
+        </div>
+        <div className="px-5 pt-4 shrink-0">
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar consultor..."
+            className="w-full text-sm px-3 py-2 rounded-xl outline-none"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }} />
+          <p className="text-[10px] mt-2 mb-1" style={{ color: 'var(--brand-subtle)' }}>{selectedIds.size} consultor(es) selecionado(s)</p>
+        </div>
+        {loading
+          ? <div className="flex-1 flex items-center justify-center py-10"><p className="text-sm animate-pulse" style={{ color: 'var(--brand-subtle)' }}>Carregando...</p></div>
+          : (
+            <div className="flex-1 overflow-y-auto px-5 pb-4">
+              <div className="space-y-1 mt-2">
+                {filtered.map(c => (
+                  <button key={c.id} onClick={() => toggle(c.id)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-white/5"
+                    style={{ background: selectedIds.has(c.id) ? 'rgba(139,92,246,0.08)' : 'transparent', border: `1px solid ${selectedIds.has(c.id) ? 'rgba(139,92,246,0.3)' : 'transparent'}` }}>
+                    <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                      style={{ background: selectedIds.has(c.id) ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.06)', border: '1px solid var(--brand-border)' }}>
+                      {selectedIds.has(c.id) && <Check size={11} style={{ color: '#a78bfa' }} />}
+                    </div>
+                    <span className="text-sm" style={{ color: selectedIds.has(c.id) ? '#a78bfa' : 'var(--brand-text)' }}>{c.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )
+        }
+        <div className="flex justify-end gap-2 px-6 py-4 border-t shrink-0" style={{ borderColor: 'var(--brand-border)' }}>
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-white/5" style={{ color: 'var(--brand-muted)', border: '1px solid var(--brand-border)' }}>Cancelar</button>
+          <button onClick={async () => {
+            setSaving(true)
+            try { await api.put(`/projects/${projectId}`, { consultant_ids: Array.from(selectedIds) }); toast.success('Equipe atualizada'); onSaved() }
+            catch { toast.error('Erro ao salvar equipe') }
+            finally { setSaving(false) }
+          }} disabled={saving} className="px-5 py-2 rounded-xl text-sm font-semibold"
+            style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)', opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Salvando...' : 'Salvar Equipe'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function ContractKanbanCard({ card, index, onClick, onAction }: {
   card: ContractCard; index: number; onClick: () => void; onAction?: (action: string) => void
@@ -1911,6 +1988,7 @@ function KanbanContent() {
         if (action === 'status')     return <ProjectStatusModal projectId={card.id} projectName={card.project_name} currentStatus={card.status} onClose={close} onSaved={st => { setProjectCards(prev => prev.map(p => p.id === card.id ? { ...p, status: st } : p)); close() }} />
         if (action === 'cost')       return <ProjectViewModal projectId={card.id} onClose={close} userRole={userType} initialTab="consultants" />
         if (action === 'timesheets') return <ProjectViewModal projectId={card.id} onClose={close} userRole={userType} initialTab="timesheets" />
+        if (action === 'team')       return <ProjectTeamModal projectId={card.id} projectName={card.project_name} onClose={close} onSaved={close} />
         return null
       })()}
     </AppLayout>
