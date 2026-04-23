@@ -1620,23 +1620,9 @@ function KanbanContent() {
   }
 
   const handleContractMove = async (cardId: number, card: ContractCard, fromCol: string, toCol: string, order = 0) => {
-    // ── From sustentação column to coordinator → allocate
+    // ── Sustentação → coordinator is never allowed
     if (fromCol.startsWith('sust_') && toCol.startsWith('coordinator:')) {
-      if (!isSustAdmin) { toast.error('Apenas admin ou coordenador de sustentação pode alocar.'); return }
-      if (!card.is_complete) { toast.error('Contrato incompleto.'); return }
-      const coordId = Number(toCol.split(':')[1])
-      setSustGroups(prev => {
-        const next = { ...prev }
-        next[fromCol] = prev[fromCol].filter(c => c.id !== cardId)
-        return next
-      })
-      try {
-        await api.patch(`/contracts/${cardId}/kanban-move`, {
-          to_column: `coordinator:${coordId}`, coordinator_id: coordId, order,
-        })
-        await load()
-        toast.success('🚀 Projeto gerado automaticamente!')
-      } catch (e: any) { toast.error(e?.message ?? 'Erro ao alocar'); load() }
+      toast.error('Contratos de sustentação só podem mover entre filas de sustentação.')
       return
     }
 
@@ -1732,11 +1718,9 @@ function KanbanContent() {
 
     if (fromCol.startsWith('sust_')) {
       if (!isSustAdmin) return []
+      // Sustentação só pode mover entre filas de sustentação — nunca para coordenadores
       SUSTENTACAO_COLS.forEach(s => { if (s.id !== fromCol) cols.push({ id: s.id, label: s.label }) })
       if (BIZIFY_COL.id !== fromCol) cols.push({ id: BIZIFY_COL.id, label: BIZIFY_COL.label })
-      if (card.is_complete) {
-        coordinators.forEach(coord => cols.push({ id: `coordinator:${coord.id}`, label: coord.name }))
-      }
       return cols
     }
 
