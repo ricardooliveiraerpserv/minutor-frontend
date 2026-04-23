@@ -106,6 +106,7 @@ interface RequestCard {
   kanban_column: string
   req_decision?: 'novo_projeto' | 'subprojeto'
   linked_contract_id?: number
+  linked_contract_code?: string
   linked_coordinator_id?: number
   created_at: string
 }
@@ -378,11 +379,12 @@ function ContractKanbanCard({
 
 // ─── Request Card ─────────────────────────────────────────────────────────────
 
-function RequestKanbanCard({ card }: { card: RequestCard }) {
+function RequestKanbanCard({ card, onView }: { card: RequestCard; onView?: (e: React.MouseEvent) => void }) {
   const urgColor = URGENCIA_COLOR[card.nivel_urgencia] ?? '#64748b'
   const tipoLabel = card.tipo_necessidade === 'outro' && card.tipo_necessidade_outro
     ? card.tipo_necessidade_outro
     : (TIPO_NECESSIDADE_LABEL[card.tipo_necessidade] ?? card.tipo_necessidade)
+  const isReqInicio = card.kanban_column === 'req_inicio_autorizado'
 
   return (
     <div
@@ -397,6 +399,11 @@ function RequestKanbanCard({ card }: { card: RequestCard }) {
           <p className="text-xs truncate" style={{ color: 'var(--brand-subtle)' }}>
             {card.project_name ? card.customer_name : card.area_requisitante}
           </p>
+          {card.linked_contract_code && (
+            <p className="text-[10px] font-mono mt-0.5" style={{ color: '#a78bfa' }}>
+              {card.linked_contract_code}
+            </p>
+          )}
         </div>
         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
           style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
@@ -412,9 +419,19 @@ function RequestKanbanCard({ card }: { card: RequestCard }) {
         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: `${urgColor}18`, color: urgColor }}>
           {URGENCIA_LABEL[card.nivel_urgencia] ?? card.nivel_urgencia}
         </span>
-        <span className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>
-          {new Date(card.created_at).toLocaleDateString('pt-BR')}
-        </span>
+        <div className="flex items-center gap-2">
+          {isReqInicio && onView && (
+            <button
+              onClick={onView}
+              className="text-[10px] font-medium px-2 py-0.5 rounded-md transition-colors hover:opacity-80"
+              style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}>
+              Visualizar
+            </button>
+          )}
+          <span className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>
+            {new Date(card.created_at).toLocaleDateString('pt-BR')}
+          </span>
+        </div>
       </div>
     </div>
   )
@@ -3293,7 +3310,7 @@ function RequestDetailModal({ card, onClose }: { card: RequestCard; onClose: () 
 
 function KanbanColumn({
   col, contractCards, projectCards, requestCards = [], canDrag, canDrop,
-  onContractClick, onProjectClick, onRequestClick, onProjectAction, onContractAction,
+  onContractClick, onProjectClick, onRequestClick, onRequestView, onProjectAction, onContractAction,
   onContractMove, onProjectMove, getContractCols, getProjectCols,
 }: {
   col: Column
@@ -3305,6 +3322,7 @@ function KanbanColumn({
   onContractClick: (card: ContractCard) => void
   onProjectClick: (card: ProjectCard) => void
   onRequestClick?: (card: RequestCard) => void
+  onRequestView?: (card: RequestCard) => void
   onProjectAction?: (card: ProjectCard, action: string) => void
   onContractAction?: (card: ContractCard, action: string) => void
   onContractMove?: (card: ContractCard, toCol: string) => void
@@ -3412,7 +3430,10 @@ function KanbanColumn({
                       opacity: rSnap.isDragging ? 0.85 : 1,
                     }}
                   >
-                    <RequestKanbanCard card={card} />
+                    <RequestKanbanCard
+                      card={card}
+                      onView={onRequestView ? e => { e.stopPropagation(); onRequestView(card) } : undefined}
+                    />
                   </div>
                 )}
               </Draggable>
@@ -3889,6 +3910,7 @@ function KanbanContent() {
                       ? setPlanDecisionCard(card)
                       : setSelectedRequest(card)
                   }
+                  onRequestView={setSelectedRequest}
                   onContractMove={(card, toCol) => handleContractMove(card.id, card, card.kanban_status ?? 'backlog', toCol)}
                   getContractCols={getAvailableContractCols}
                 />
