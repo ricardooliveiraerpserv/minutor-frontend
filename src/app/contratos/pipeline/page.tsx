@@ -3966,12 +3966,7 @@ function KanbanContent() {
                   col={col}
                   contractCards={REQ_ONLY_COLS.has(col.id) ? [] : contractsInCol(col.id)}
                   projectCards={[]}
-                  requestCards={requestCards.filter(r => {
-                    const inCol = (r.kanban_column ?? 'backlog') === col.id
-                    // Cards novo_projeto que foram movidos indevidamente para inicio_autorizado: reancora em req_inicio_autorizado
-                    const misplaced = col.id === 'req_inicio_autorizado' && r.req_decision === 'novo_projeto' && r.kanban_column === 'inicio_autorizado'
-                    return (inCol || misplaced) && matchFilter(r.customer_name ?? '', r.project_name ?? '', r.descricao ?? '')
-                  })}
+                  requestCards={requestCards.filter(r => (r.kanban_column ?? 'backlog') === col.id && matchFilter(r.customer_name ?? '', r.project_name ?? '', r.descricao ?? ''))}
                   canDrag={colCanDrag(col.id)}
                   canDrop={colCanDrop(col.id)}
                   onContractClick={setSelectedContract}
