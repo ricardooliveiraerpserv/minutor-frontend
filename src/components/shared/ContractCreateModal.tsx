@@ -174,6 +174,47 @@ export function ContractCreateModal({
     setContacts(c => c.map((ct, idx) => idx === i ? { ...ct, [field]: value } : ct))
   const removeContact = (i: number) => setContacts(c => c.filter((_, idx) => idx !== i))
 
+  // ── Tab validation ────────────────────────────────────────────────────────
+
+  const validateCurrentTab = (): boolean => {
+    switch (activeTab) {
+      case 0: // Cliente
+        if (!form.customer_id) { toast.error('Selecione o cliente'); return false }
+        return true
+
+      case 1: // Classificação
+        if (!form.service_type_id) { toast.error('Selecione o Tipo de Serviço'); return false }
+        return true
+
+      case 2: // Faturamento
+        if (!form.contract_type_id) { toast.error('Selecione o Tipo de Contrato'); return false }
+        return true
+
+      case 4: // Operacional
+        if (!isOnDemand && !form.horas_contratadas) { toast.error('Informe as Horas Contratadas'); return false }
+        if (!form.expectativa_inicio)               { toast.error('Informe a Expectativa de Início'); return false }
+        if (!form.valor_hora)                       { toast.error('Informe o Valor da Hora'); return false }
+        if (form.parent_project_id && parentBalance && !parentBalance.allow_negative) {
+          const childHours = Number(form.horas_contratadas) || 0
+          if (childHours > parentBalance.balance) {
+            toast.error(`Horas (${childHours.toLocaleString('pt-BR', { minimumFractionDigits: 1 })}h) excedem o saldo do projeto pai (${parentBalance.balance.toLocaleString('pt-BR', { minimumFractionDigits: 1 })}h)`)
+            return false
+          }
+        }
+        return true
+
+      case 8: // Observações
+        if (form.observacoes.trim().length < 50) {
+          toast.error(`Observações obrigatórias — mínimo 50 caracteres (${form.observacoes.trim().length}/50)`)
+          return false
+        }
+        return true
+
+      default:
+        return true
+    }
+  }
+
   // ── Number mask helpers ────────────────────────────────────────────────────
 
   const fmtBRInput = (v: string, field: string): string => {
@@ -212,13 +253,26 @@ export function ContractCreateModal({
   // ── Save ──────────────────────────────────────────────────────────────────
 
   const save = async () => {
-    if (!form.customer_id)                      { toast.error('Selecione o cliente'); setActiveTab(0); return }
-    if (!isOnDemand && !form.horas_contratadas) { toast.error('Informe as horas contratadas'); setActiveTab(4); return }
+    // Revalidate all required tabs before saving
+    const checks: [number, () => boolean][] = [
+      [0, () => !!form.customer_id],
+      [1, () => !!form.service_type_id],
+      [2, () => !!form.contract_type_id],
+      [4, () => !isOnDemand ? !!form.horas_contratadas && !!form.expectativa_inicio && !!form.valor_hora : !!form.expectativa_inicio && !!form.valor_hora],
+      [8, () => form.observacoes.trim().length >= 50],
+    ]
+    for (const [tab, check] of checks) {
+      if (!check()) {
+        setActiveTab(tab)
+        validateCurrentTab()
+        return
+      }
+    }
 
     if (form.parent_project_id && parentBalance && !parentBalance.allow_negative) {
       const childHours = Number(form.horas_contratadas) || 0
       if (childHours > parentBalance.balance) {
-        toast.error(`Horas do subprojeto (${childHours.toLocaleString('pt-BR', { minimumFractionDigits: 1 })}h) excedem o saldo do projeto pai (${parentBalance.balance.toLocaleString('pt-BR', { minimumFractionDigits: 1 })}h)`)
+        toast.error(`Horas (${childHours.toLocaleString('pt-BR', { minimumFractionDigits: 1 })}h) excedem o saldo do projeto pai (${parentBalance.balance.toLocaleString('pt-BR', { minimumFractionDigits: 1 })}h)`)
         setActiveTab(4)
         return
       }
@@ -398,13 +452,18 @@ export function ContractCreateModal({
           {activeTab === 1 && (
             <div className="space-y-4">
               <div>
-                <label className={labelCls}>Tipo de Serviço</label>
+                <label className={labelCls}>
+                  Tipo de Serviço <span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <SearchSelect
                   value={form.service_type_id}
                   onChange={v => setForm(f => ({ ...f, service_type_id: v }))}
                   options={serviceTypes}
                   placeholder="Selecionar tipo de serviço..."
                 />
+                {!form.service_type_id && (
+                  <p className="text-[10px] mt-1" style={{ color: '#f87171' }}>Obrigatório</p>
+                )}
               </div>
             </div>
           )}
@@ -412,7 +471,9 @@ export function ContractCreateModal({
           {/* Tab 2: Faturamento */}
           {activeTab === 2 && (
             <div>
-              <label className={labelCls}>Tipo de Contrato</label>
+              <label className={labelCls}>
+                Tipo de Contrato <span style={{ color: '#ef4444' }}>*</span>
+              </label>
               <div className="space-y-2">
                 {contractTypes.map(ct => (
                   <label key={ct.id} className="flex items-center gap-2 cursor-pointer">
@@ -533,10 +594,12 @@ export function ContractCreateModal({
                   </div>
                 )}
                 <div>
-                  <label className={labelCls}>Expectativa de Início</label>
+                  <label className={labelCls}>
+                    Expectativa de Início <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <input type="date" value={form.expectativa_inicio}
                     onChange={e => setForm(f => ({ ...f, expectativa_inicio: e.target.value }))}
-                    className={inputCls} style={inputStyle} />
+                    className={inputCls} style={{ ...inputStyle, borderColor: !form.expectativa_inicio ? 'rgba(239,68,68,0.5)' : undefined }} />
                 </div>
               </div>
               <div>
@@ -555,7 +618,9 @@ export function ContractCreateModal({
                     </div>
                   )}
                   <div>
-                    <label className={labelCls}>Valor da Hora (R$)</label>
+                    <label className={labelCls}>
+                      Valor da Hora (R$) <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
                     <input {...numInput('valor_hora', vh =>
                       setForm(f => {
                         const h = Number(f.horas_contratadas)
@@ -684,14 +749,21 @@ export function ContractCreateModal({
           {activeTab === 8 && (
             <div>
               <label className={labelCls}>
-                Observações
+                Observações <span style={{ color: '#ef4444' }}>*</span>
                 <span className="ml-1 text-yellow-500 text-[10px]">(será copiado ao projeto)</span>
               </label>
               <textarea value={form.observacoes}
                 onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))}
                 rows={10} placeholder="Descreva o escopo, premissas, restrições..."
-                className={inputCls} style={{ ...inputStyle, resize: 'vertical' }} />
-              <p className="text-[10px] text-zinc-600 mt-1">{form.observacoes.length} caracteres</p>
+                className={inputCls}
+                style={{ ...inputStyle, resize: 'vertical', borderColor: form.observacoes.trim().length < 50 ? 'rgba(239,68,68,0.5)' : undefined }} />
+              <div className="flex items-center justify-between mt-1">
+                <p className="text-[10px]" style={{ color: form.observacoes.trim().length >= 50 ? '#71717a' : '#f87171' }}>
+                  {form.observacoes.trim().length < 50
+                    ? `Mínimo 50 caracteres — faltam ${50 - form.observacoes.trim().length}`
+                    : `${form.observacoes.trim().length} caracteres`}
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -707,7 +779,7 @@ export function ContractCreateModal({
               </button>
             )}
             {activeTab < TABS.length - 1 && (
-              <button onClick={() => setActiveTab(t => t + 1)}
+              <button onClick={() => { if (validateCurrentTab()) setActiveTab(t => t + 1) }}
                 className="px-4 py-2 rounded-lg text-sm text-zinc-300 hover:text-white transition-colors"
                 style={{ border: '1px solid var(--brand-border)' }}>
                 Próximo →
