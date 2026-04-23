@@ -1623,8 +1623,13 @@ function KanbanContent() {
     const base = colId.startsWith('sust_')
       ? (sustGroups[colId] ?? [])
       : demandCards.filter(c => contractColumnId(c) === colId)
+    // Em colunas de coordenador, oculta contratos cujo projeto já aparece em activeProjectsInCoordCol
+    const activeProjectIds = colId.startsWith('coordinator:')
+      ? new Set(projectCards.filter(isActiveProject).map(p => p.id))
+      : null
     return base
       .filter(c => matchFilter(c.customer_name, c.project_name))
+      .filter(c => !activeProjectIds || !c.project_id || !activeProjectIds.has(c.project_id))
       .sort((a, b) => a.kanban_order - b.kanban_order)
   }
 
