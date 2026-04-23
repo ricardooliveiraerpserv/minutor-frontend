@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 import { CheckCircle, ChevronLeft, AlertCircle, Send } from 'lucide-react'
+import { SearchSelect } from '@/components/ui/search-select'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -224,21 +225,15 @@ function NovaRequisicaoContent() {
                     <p className="text-sm font-bold" style={{ color: 'var(--brand-text)' }}>Cliente</p>
                   </div>
                   <Label required>Selecione o Cliente</Label>
-                  <select
-                    value={customerId}
-                    onChange={e => setCustomerId(e.target.value)}
-                    className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
-                    style={{
-                      background: 'var(--brand-bg)',
-                      border: `1px solid ${customerId ? 'var(--brand-primary)' : 'var(--brand-border)'}`,
-                      color: customerId ? 'var(--brand-text)' : 'var(--brand-subtle)',
-                    }}
-                  >
-                    <option value="">Selecione o cliente...</option>
-                    {customers.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                  <div className="w-full">
+                    <SearchSelect
+                      value={customerId}
+                      onChange={setCustomerId}
+                      options={customers}
+                      placeholder="Selecione o cliente..."
+                      fullWidth
+                    />
+                  </div>
                   {!customerId && (
                     <p className="text-[11px] mt-2 flex items-center gap-1" style={{ color: '#ef4444' }}>
                       <AlertCircle size={11} /> Selecione o cliente para esta requisição

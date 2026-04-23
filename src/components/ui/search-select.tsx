@@ -5,13 +5,15 @@ import { ChevronDown, Search } from 'lucide-react'
 
 export interface SearchSelectOption { id: number | string; name: string }
 
-export function SearchSelect({ label, value, onChange, options, placeholder, wide }: {
+export function SearchSelect({ label, value, onChange, options, placeholder, wide, fullWidth, disabled }: {
   label?: string
   value: string | number
   onChange: (v: string) => void
   options: SearchSelectOption[]
   placeholder: string
   wide?: boolean
+  fullWidth?: boolean
+  disabled?: boolean
 }) {
   const [open,  setOpen]  = useState(false)
   const [query, setQuery] = useState('')
@@ -46,7 +48,7 @@ export function SearchSelect({ label, value, onChange, options, placeholder, wid
     if (open) { setOpen(false); return }
     if (!btnRef.current) return
     const r = btnRef.current.getBoundingClientRect()
-    const dropW = Math.max(r.width, wide ? 240 : 200)
+    const dropW = fullWidth ? r.width : Math.max(r.width, wide ? 240 : 200)
     const left = Math.min(r.left, window.innerWidth - dropW - 8)
     setPos({ top: r.bottom + 4, left: Math.max(8, left), width: dropW })
     setOpen(true)
@@ -65,7 +67,8 @@ export function SearchSelect({ label, value, onChange, options, placeholder, wid
         ref={btnRef}
         type="button"
         onClick={toggle}
-        className={`flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl text-sm outline-none text-left ${wide ? 'min-w-52' : 'min-w-36'}`}
+        disabled={disabled}
+        className={`flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl text-sm outline-none text-left disabled:opacity-50 disabled:cursor-not-allowed ${fullWidth ? 'w-full' : wide ? 'min-w-52' : 'min-w-36'}`}
         style={{
           background: 'var(--brand-bg)',
           border: `1px solid ${selected ? 'var(--brand-primary)' : 'var(--brand-border)'}`,
