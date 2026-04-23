@@ -3602,10 +3602,13 @@ function KanbanContent() {
     ...requestCards.map(r => r.customer_name ?? ''),
   ].filter(Boolean))].sort() as string[]
 
+  // IDs de projetos já visíveis em colunas de execução — evita duplicar contrato + projeto
+  const visibleProjectIds = new Set(projectCards.map(p => p.id))
+
   // Cards by column
   const contractsInCol = (colId: string): ContractCard[] => {
     const base = colId === 'inicio_autorizado'
-      ? transitionCards
+      ? transitionCards.filter(c => !c.project_id || !visibleProjectIds.has(c.project_id))
       : demandCards.filter(c => !linkedContractIds.has(c.id)).filter(c => contractColumnId(c) === colId)
     return base
       .filter(c => matchFilter(c.customer_name, c.project_name))
