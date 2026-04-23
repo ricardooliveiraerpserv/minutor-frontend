@@ -90,6 +90,9 @@ export function ContractCreateModal({
   const [contacts, setContacts] = useState<ContractContact[]>([])
   const [codeExists, setCodeExists]   = useState(false)
   const [codeChecking, setCodeChecking] = useState(false)
+  const [focusedField, setFocusedField] = useState<string | null>(null)
+  const [parentBalance, setParentBalance] = useState<{ balance: number; allow_negative: boolean } | null>(null)
+  const [parentBalanceLoading, setParentBalanceLoading] = useState(false)
 
   // ── Load master data ───────────────────────────────────────────────────────
 
@@ -101,6 +104,18 @@ export function ContractCreateModal({
     api.get<any>('/service-types?pageSize=100').then(r => setServiceTypes(r?.items ?? r?.data ?? r ?? [])).catch(() => {})
     api.get<any>('/contract-types?pageSize=100').then(r => setContractTypes(r?.items ?? r?.data ?? r ?? [])).catch(() => {})
   }, [customerReadOnly])
+
+  useEffect(() => {
+    if (!form.parent_project_id) { setParentBalance(null); return }
+    setParentBalanceLoading(true)
+    api.get<any>(`/projects/${form.parent_project_id}`)
+      .then(r => {
+        const balance = r.general_hours_balance ?? ((r.sold_hours ?? 0) - (r.consumed_hours ?? 0))
+        setParentBalance({ balance, allow_negative: r.allow_negative_balance ?? false })
+      })
+      .catch(() => setParentBalance(null))
+      .finally(() => setParentBalanceLoading(false))
+  }, [form.parent_project_id])
 
   useEffect(() => {
     if (!form.customer_id) { setCustomerContacts([]); setParentProjects([]); return }
@@ -157,11 +172,55 @@ export function ContractCreateModal({
     setContacts(c => c.map((ct, idx) => idx === i ? { ...ct, [field]: value } : ct))
   const removeContact = (i: number) => setContacts(c => c.filter((_, idx) => idx !== i))
 
+  // ── Number mask helpers ────────────────────────────────────────────────────
+
+  const fmtBRInput = (v: string, field: string): string => {
+    if (focusedField === field || !v) return v
+    const n = parseFloat(v)
+    if (isNaN(n)) return v
+    return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
+  const parseBRInput = (v: string): string => {
+    const hasBoth = v.includes('.') && v.includes(',')
+    const s = hasBoth ? v.replace(/\./g, '').replace(',', '.') : v.includes(',') ? v.replace(',', '.') : v
+    const n = parseFloat(s)
+    return isNaN(n) ? '' : String(n)
+  }
+
+  // When extraOnChange is provided it is responsible for calling setForm (it receives the raw value).
+  // When not provided, numInput calls setForm directly.
+  const numInput = (field: keyof FormState, extraOnChange?: (raw: string) => void) => ({
+    type: 'text' as const,
+    value: fmtBRInput(form[field] as string, field),
+    onFocus: () => setFocusedField(field),
+    onBlur:  () => setFocusedField(null),
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      const raw = parseBRInput(e.target.value)
+      if (extraOnChange) {
+        extraOnChange(raw)
+      } else {
+        setForm(f => ({ ...f, [field]: raw }))
+      }
+    },
+    className: inputCls,
+    style: inputStyle,
+  })
+
   // ── Save ──────────────────────────────────────────────────────────────────
 
   const save = async () => {
     if (!form.customer_id)                      { toast.error('Selecione o cliente'); setActiveTab(0); return }
     if (!isOnDemand && !form.horas_contratadas) { toast.error('Informe as horas contratadas'); setActiveTab(4); return }
+
+    if (form.parent_project_id && parentBalance && !parentBalance.allow_negative) {
+      const childHours = Number(form.horas_contratadas) || 0
+      if (childHours > parentBalance.balance) {
+        toast.error(`Horas do subprojeto (${childHours.toLocaleString('pt-BR', { minimumFractionDigits: 1 })}h) excedem o saldo do projeto pai (${parentBalance.balance.toLocaleString('pt-BR', { minimumFractionDigits: 1 })}h)`)
+        setActiveTab(4)
+        return
+      }
+    }
 
     setSaving(true)
     try {
@@ -422,20 +481,65 @@ export function ContractCreateModal({
                   ))}
                 </div>
               </div>
+              {/* Legenda do saldo do projeto pai */}
+              {form.parent_project_id && (
+                <div className="rounded-xl p-3" style={{
+                  background: parentBalance
+                    ? parentBalance.balance > 0 ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.08)'
+                    : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${parentBalance
+                    ? parentBalance.balance > 0 ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.35)'
+                    : 'var(--brand-border)'}`,
+                }}>
+                  {parentBalanceLoading ? (
+                    <p className="text-xs animate-pulse" style={{ color: 'var(--brand-subtle)' }}>Verificando saldo do projeto pai...</p>
+                  ) : parentBalance ? (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5"
+                          style={{ color: parentBalance.balance > 0 ? '#86efac' : '#fca5a5' }}>
+                          Saldo do Projeto Pai
+                        </p>
+                        <p className="text-lg font-bold tabular-nums"
+                          style={{ color: parentBalance.balance > 0 ? '#22c55e' : '#ef4444' }}>
+                          {parentBalance.balance.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}h
+                        </p>
+                      </div>
+                      {parentBalance.balance <= 0 && (
+                        <div className="text-right">
+                          <p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>Saldo negativo</p>
+                          <p className="text-xs font-semibold"
+                            style={{ color: parentBalance.allow_negative ? '#f59e0b' : '#ef4444' }}>
+                            {parentBalance.allow_negative ? 'Permitido' : 'Bloqueado'}
+                          </p>
+                        </div>
+                      )}
+                      {parentBalance.balance > 0 && Number(form.horas_contratadas) > 0 && (
+                        <div className="text-right">
+                          <p className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>Este subprojeto</p>
+                          <p className="text-xs font-semibold"
+                            style={{ color: Number(form.horas_contratadas) <= parentBalance.balance ? '#22c55e' : '#ef4444' }}>
+                            {Number(form.horas_contratadas).toLocaleString('pt-BR', { minimumFractionDigits: 1 })}h
+                            {Number(form.horas_contratadas) > parentBalance.balance && ' ⚠ Excede saldo'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 {!isOnDemand && (
                   <div>
                     <label className={labelCls}>Horas Contratadas *</label>
-                    <input type="number" min="0" value={form.horas_contratadas}
-                      onChange={e => {
-                        const h = e.target.value
-                        setForm(f => {
-                          const vh = Number(f.valor_hora)
-                          const vp = vh > 0 && Number(h) > 0 ? String((vh * Number(h)).toFixed(2)) : f.valor_projeto
-                          return { ...f, horas_contratadas: h, valor_projeto: vp }
-                        })
-                      }}
-                      className={inputCls} style={inputStyle} />
+                    <input {...numInput('horas_contratadas', raw =>
+                      setForm(f => {
+                        const vh = Number(f.valor_hora)
+                        const vp = vh > 0 && Number(raw) > 0 ? String((vh * Number(raw)).toFixed(2)) : f.valor_projeto
+                        return { ...f, horas_contratadas: raw, valor_projeto: vp }
+                      })
+                    )} placeholder="0,00" />
                   </div>
                 )}
                 <div>
@@ -451,54 +555,47 @@ export function ContractCreateModal({
                   {!isOnDemand && (
                     <div>
                       <label className={labelCls}>Valor do Projeto (R$)</label>
-                      <input type="number" min="0" step="0.01" placeholder="0,00" value={form.valor_projeto}
-                        onChange={e => {
-                          const vp = e.target.value
-                          const h = Number(form.horas_contratadas)
-                          const vh = vp && h > 0 ? String((Number(vp) / h).toFixed(2)) : form.valor_hora
-                          setForm(f => ({ ...f, valor_projeto: vp, valor_hora: vh }))
-                        }}
-                        className={inputCls} style={inputStyle} />
+                      <input {...numInput('valor_projeto', vp =>
+                        setForm(f => {
+                          const h = Number(f.horas_contratadas)
+                          const vh = vp && h > 0 ? String((Number(vp) / h).toFixed(2)) : f.valor_hora
+                          return { ...f, valor_projeto: vp, valor_hora: vh }
+                        })
+                      )} placeholder="0,00" />
                     </div>
                   )}
                   <div>
                     <label className={labelCls}>Valor da Hora (R$)</label>
-                    <input type="number" min="0" step="0.01" placeholder="0,00" value={form.valor_hora}
-                      onChange={e => {
-                        const vh = e.target.value
-                        const h = Number(form.horas_contratadas)
-                        const vp = vh && h > 0 ? String((Number(vh) * h).toFixed(2)) : form.valor_projeto
-                        setForm(f => ({ ...f, valor_hora: vh, valor_projeto: isOnDemand ? f.valor_projeto : vp }))
-                      }}
-                      className={inputCls} style={inputStyle} />
+                    <input {...numInput('valor_hora', vh =>
+                      setForm(f => {
+                        const h = Number(f.horas_contratadas)
+                        const vp = vh && h > 0 ? String((Number(vh) * h).toFixed(2)) : f.valor_projeto
+                        return { ...f, valor_hora: vh, valor_projeto: isOnDemand ? f.valor_projeto : vp }
+                      })
+                    )} placeholder="0,00" />
                   </div>
                   {!isOnDemand && (
                     <div>
                       <label className={labelCls}>Hora Adicional (R$)</label>
-                      <input type="number" min="0" step="0.01" placeholder="0,00" value={form.hora_adicional}
-                        onChange={e => setForm(f => ({ ...f, hora_adicional: e.target.value }))}
-                        className={inputCls} style={inputStyle} />
+                      <input {...numInput('hora_adicional')} placeholder="0,00" />
                     </div>
                   )}
                   {!isOnDemand && (
                     <div>
                       <label className={labelCls}>% Horas Coordenador</label>
-                      <input type="number" min="0" max="100" step="1" placeholder="0" value={form.pct_horas_coordenador}
-                        onChange={e => setForm(f => ({ ...f, pct_horas_coordenador: e.target.value }))}
-                        className={inputCls} style={inputStyle} />
+                      <input {...numInput('pct_horas_coordenador')} placeholder="0,00" />
                     </div>
                   )}
                   {isFechado && (
                     <>
                       <div>
                         <label className={labelCls}>Horas Consultor</label>
-                        <input type="number" min="0" step="1" placeholder="0" value={form.horas_consultor}
-                          onChange={e => setForm(f => ({ ...f, horas_consultor: e.target.value }))}
-                          className={inputCls} style={inputStyle} />
+                        <input {...numInput('horas_consultor')} placeholder="0,00" />
                       </div>
                       <div>
                         <label className={labelCls}>Save ERPSERV</label>
-                        <input readOnly value={saveErpserv ?? ''}
+                        <input readOnly
+                          value={saveErpserv != null ? saveErpserv.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}
                           className={inputCls} style={{ ...inputStyle, opacity: 0.5, cursor: 'not-allowed' }} />
                       </div>
                     </>
