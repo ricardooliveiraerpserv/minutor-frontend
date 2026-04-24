@@ -3572,6 +3572,13 @@ function KanbanContent() {
   const showTransition = !isConsultor
   const visibleProjectCols = PROJECT_COLS
 
+  // IDs de contratos de sustentação — não exibidos em Demandas e Projetos
+  const sustContractIds = new Set(
+    [...demandCards, ...transitionCards]
+      .filter(c => c.categoria === 'sustentacao')
+      .map(c => c.id)
+  )
+
   // IDs de contratos gerenciados por requisições — não exibir como card duplicado no pipeline
   const linkedContractIds = new Set(requestCards.map(r => r.linked_contract_id).filter(Boolean))
 
@@ -3618,6 +3625,7 @@ function KanbanContent() {
       ? transitionCards.filter(c => !c.project_id || !visibleProjectIds.has(c.project_id))
       : demandCards.filter(c => !linkedContractIds.has(c.id)).filter(c => contractColumnId(c) === colId)
     return base
+      .filter(c => c.categoria !== 'sustentacao')
       .filter(c => matchFilter(c.customer_name, c.project_name))
       .sort((a, b) => a.kanban_order - b.kanban_order)
   }
@@ -3625,6 +3633,7 @@ function KanbanContent() {
   const projectsInCol = (colId: string): ProjectCard[] =>
     projectCards
       .filter(p => projectColumnId(p) === colId)
+      .filter(p => !p.contract_id || !sustContractIds.has(p.contract_id))
       .filter(p => matchFilter(p.customer_name, p.project_name))
 
   const handleContractMove = async (cardId: number, card: ContractCard, fromCol: string, toCol: string, order = 0) => {
@@ -3986,6 +3995,7 @@ function KanbanContent() {
                   requestCards={requestCards.filter(r => {
                     if ((r.kanban_column ?? 'backlog') !== col.id) return false
                     if (r.req_decision === 'novo_projeto' && r.linked_contract_id && authorizedContractIds.has(r.linked_contract_id)) return false
+                    if (r.linked_contract_id && sustContractIds.has(r.linked_contract_id)) return false
                     return matchFilter(r.customer_name ?? '', r.project_name ?? '', r.descricao ?? '')
                   })}
                   canDrag={colCanDrag(col.id)}
@@ -4016,6 +4026,7 @@ function KanbanContent() {
                     requestCards={requestCards.filter(r => {
                       if (r.kanban_column !== 'inicio_autorizado') return false
                       if (r.req_decision === 'novo_projeto') return false
+                      if (r.linked_contract_id && sustContractIds.has(r.linked_contract_id)) return false
                       // Suprime subprojeto quando o projeto vinculado já está ativo nas colunas de execução
                       if (r.req_decision === 'subprojeto' && r.linked_contract_id) {
                         const projId = contractToProjectId.get(r.linked_contract_id)
