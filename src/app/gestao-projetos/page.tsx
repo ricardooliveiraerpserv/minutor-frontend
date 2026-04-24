@@ -1172,7 +1172,7 @@ export default function GestaoProjetosPage() {
         const promises: Promise<void>[] = []
         if (allConsultants.length === 0) {
           promises.push(
-            api.get<{ items: { id: number; name: string }[] }>('/users?type=consultor&pageSize=200')
+            api.get<{ items: { id: number; name: string }[] }>('/users?exclude_type=cliente&pageSize=200')
               .then(r => setAllConsultants(r.items ?? []))
           )
         }
