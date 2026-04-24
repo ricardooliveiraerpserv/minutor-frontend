@@ -539,7 +539,7 @@ export default function ExpensesPage() {
     if (!form.customer_id) { setProjects([]); return }
     let cancelled = false
     const qs = new URLSearchParams({ pageSize: '200', customer_id: form.customer_id, status: 'active' })
-    if (!isAdmin) qs.set('consultant_only', 'true')
+    if (isCoordenador) qs.set('consultant_only', 'true')
     api.get<PaginatedResponse<SelectOption>>(`/projects?${qs}`)
       .then(p => { if (!cancelled) setProjects(Array.isArray(p?.items) ? p.items : []) })
       .catch(() => {})
