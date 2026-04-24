@@ -63,7 +63,7 @@ function isImage(mime?: string) {
 
 function AttachmentChip({ att, messageId }: { att: Attachment; messageId: number }) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('minutor_token') : ''
-  const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/messages/${messageId}/attachments/${att.id}/download`
+  const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL ?? ''}/messages/${messageId}/attachments/${att.id}/download`
 
   const handleDownload = async () => {
     try {
@@ -202,7 +202,7 @@ export function ProjectMessages({ projectId, userRole }: Props) {
       files.forEach(f => fd.append('files[]', f))
 
       const apiBase = process.env.NEXT_PUBLIC_API_URL ?? ''
-      const res = await fetch(`${apiBase}/api/projects/${projectId}/messages`, {
+      const res = await fetch(`${apiBase}/projects/${projectId}/messages`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${authToken}` },
         body: fd,
