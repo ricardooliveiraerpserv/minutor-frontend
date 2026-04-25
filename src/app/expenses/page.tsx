@@ -20,6 +20,7 @@ import {
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
 import { ExpenseViewModal } from '@/components/ui/expense-view-modal'
 import { MonthYearPicker } from '@/components/ui/month-year-picker'
+import { MultiSelect } from '@/components/ui/multi-select'
 import { useAuth } from '@/hooks/use-auth'
 
 function ReceiptLink({ url, label = 'Visualizar Comprovante' }: { url: string; label?: string }) {
@@ -434,11 +435,11 @@ export default function ExpensesPage() {
   const [refMonth,       setRefMonth]       = useState<number | null>(null)
   const [refYear,        setRefYear]        = useState<number | null>(null)
   const [filterMode,     setFilterMode]     = useState<'month' | 'period'>('month')
-  const [customerId,     setCustomerId]     = useState('')
+  const [customerIds,    setCustomerIds]    = useState<string[]>([])
   const [projectId,      setProjectId]      = useState('')
-  const [userId,         setUserId]         = useState('')
-  const [coordinatorId,  setCoordinatorId]  = useState('')
-  const [executiveId,    setExecutiveId]    = useState('')
+  const [userIds,        setUserIds]        = useState<string[]>([])
+  const [coordinatorIds, setCoordinatorIds] = useState<string[]>([])
+  const [executiveIds,   setExecutiveIds]   = useState<string[]>([])
   const [customers,        setCustomers]        = useState<SelectOption[]>([])
   const [allProjects,      setAllProjects]      = useState<SelectOption[]>([])
   const [consultants,      setConsultants]      = useState<SelectOption[]>([])
@@ -463,22 +464,19 @@ export default function ExpensesPage() {
 
   const params = useMemo(() => {
     const p = new URLSearchParams({ page: String(page), per_page: '20' })
-    if (status)          p.set('status',           status)
-    if (isPaidFilter)    p.set('is_paid',           isPaidFilter)
-    if (dateFrom)        p.set('start_date',        dateFrom)
-    if (dateTo)          p.set('end_date',          dateTo)
-    if (contractTypeId)  p.set('contract_type_id',  contractTypeId)
-    if (isCliente && user?.customer_id) {
-      p.set('customer_id', String(user.customer_id))
-    } else {
-      if (customerId)    p.set('customer_id',       customerId)
-    }
-    if (projectId)       p.set('project_id',        projectId)
-    if (userId)          p.set('user_id',            userId)
-    if (coordinatorId)   p.set('coordinator_id',     coordinatorId)
-    if (executiveId)     p.set('executive_id',       executiveId)
+    if (status)       p.set('status',    status)
+    if (isPaidFilter) p.set('is_paid',   isPaidFilter)
+    if (dateFrom)     p.set('start_date', dateFrom)
+    if (dateTo)       p.set('end_date',  dateTo)
+    if (contractTypeId) p.set('contract_type_id', contractTypeId)
+    if (isCliente && user?.customer_id) p.set('customer_id', String(user.customer_id))
+    else customerIds.forEach(v => p.append('customer_id[]', v))
+    if (projectId) p.set('project_id', projectId)
+    userIds.forEach(v => p.append('user_id[]', v))
+    coordinatorIds.forEach(v => p.append('coordinator_id[]', v))
+    executiveIds.forEach(v => p.append('executive_id[]', v))
     return p.toString()
-  }, [page, status, isPaidFilter, dateFrom, dateTo, customerId, projectId, userId, coordinatorId, executiveId, contractTypeId, isCliente, user?.customer_id])
+  }, [page, status, isPaidFilter, dateFrom, dateTo, customerIds, projectId, userIds, coordinatorIds, executiveIds, contractTypeId, isCliente, user?.customer_id])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -656,11 +654,11 @@ export default function ExpensesPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-              <SearchSelect value={customerId}    onChange={v => { setCustomerId(v);    setPage(1) }} options={customers}    placeholder="Todos os clientes"     />
+              <MultiSelect value={customerIds}    onChange={v => { setCustomerIds(v);    setPage(1) }} options={customers}    placeholder="Todos os clientes"     />
               <SearchSelect value={projectId}     onChange={v => { setProjectId(v);     setPage(1) }} options={allProjects}  placeholder="Todos os projetos"     />
-              <SearchSelect value={userId}        onChange={v => { setUserId(v);        setPage(1) }} options={consultants}  placeholder="Todos os consultores"  />
-              {!isCoordenador && <SearchSelect value={coordinatorId} onChange={v => { setCoordinatorId(v); setPage(1) }} options={coordinators} placeholder="Todos os coordenadores" />}
-              <SearchSelect value={executiveId}   onChange={v => { setExecutiveId(v);   setPage(1) }} options={executives}   placeholder="Todos os executivos"   />
+              <MultiSelect value={userIds}        onChange={v => { setUserIds(v);        setPage(1) }} options={consultants}  placeholder="Todos os consultores"  />
+              {!isCoordenador && <MultiSelect value={coordinatorIds} onChange={v => { setCoordinatorIds(v); setPage(1) }} options={coordinators} placeholder="Todos os coordenadores" />}
+              <MultiSelect value={executiveIds}   onChange={v => { setExecutiveIds(v);   setPage(1) }} options={executives}   placeholder="Todos os executivos"   />
             </div>
           )}
           <div className="flex items-center gap-2">
@@ -694,8 +692,8 @@ export default function ExpensesPage() {
                 onChange={(f, t) => { setDateFrom(f); setDateTo(t); setRefMonth(null); setRefYear(null); setPage(1) }}
               />
             )}
-            {(customerId || projectId || userId || coordinatorId || executiveId || contractTypeId || dateFrom || dateTo) && (
-              <button onClick={() => { setCustomerId(''); setProjectId(''); setUserId(''); setCoordinatorId(''); setExecutiveId(''); setContractTypeId(''); setDateFrom(''); setDateTo(''); setRefMonth(null); setRefYear(null); setPage(1) }}
+            {(customerIds.length > 0 || projectId || userIds.length > 0 || coordinatorIds.length > 0 || executiveIds.length > 0 || contractTypeId || dateFrom || dateTo) && (
+              <button onClick={() => { setCustomerIds([]); setProjectId(''); setUserIds([]); setCoordinatorIds([]); setExecutiveIds([]); setContractTypeId(''); setDateFrom(''); setDateTo(''); setRefMonth(null); setRefYear(null); setPage(1) }}
                 className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs transition-all hover:bg-white/5"
                 style={{ color: 'var(--brand-danger)', border: '1px solid rgba(239,68,68,0.2)' }}>
                 <X size={11} /> Limpar

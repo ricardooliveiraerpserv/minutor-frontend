@@ -10,6 +10,7 @@ import { formatBRL } from '@/lib/format'
 import { toast } from 'sonner'
 import { Layers, Search, ChevronDown, ChevronRight, Users, TrendingUp, Clock, BarChart2, AlertTriangle, DollarSign, X, UserCheck, Pencil, Trash2, Plus, Edit2, MessageCircle, Eye, Check } from 'lucide-react'
 import { ProjectMessages } from '@/components/shared/ProjectMessages'
+import { MultiSelect } from '@/components/ui/multi-select'
 import { PageHeader } from '@/components/ds'
 import { RowMenu } from '@/components/ui/row-menu'
 
@@ -871,11 +872,11 @@ export default function GestaoProjetosPage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [search, setSearch]       = useState('')
   const [statusFilter, setStatus] = useState('')
-  const [clienteFilter, setCliente] = useState('')
+  const [clienteFilters, setCliente] = useState<string[]>([])
   const [saudeFilter, setSaude]   = useState('')
   const [expanded, setExpanded]   = useState<Set<number>>(new Set())
   const [filterContractType, setFilterContractType] = useState('')
-  const [filterServiceType, setFilterServiceType] = useState('')
+  const [filterServiceTypes, setFilterServiceType] = useState<string[]>([])
   const [serviceTypes, setServiceTypes] = useState<{ id: number; name: string }[]>([])
   const [multiContratual, setMultiContratual] = useState(false)
   const [rows, setRows] = useState<TreeRow[]>([])
@@ -988,12 +989,12 @@ export default function GestaoProjetosPage() {
   const filtered = useMemo(() => {
     return projects.filter(p => {
       if (filterContractType && p.contract_type_display !== filterContractType) return false
-      if (filterServiceType) {
+      if (filterServiceTypes.length > 0) {
         const stId = (p as any).service_type_id ?? (p as any).service_type?.id
-        if (String(stId) !== filterServiceType) return false
+        if (!filterServiceTypes.includes(String(stId))) return false
       }
       if (statusFilter && p.status !== statusFilter) return false
-      if (clienteFilter && String(p.customer_id) !== clienteFilter) return false
+      if (clienteFilters.length > 0 && !clienteFilters.includes(String(p.customer_id))) return false
       if (saudeFilter) {
         const consumed = p.consumed_hours ?? (p.total_logged_minutes != null ? p.total_logged_minutes / 60 : 0)
         const pct = p.sold_hours ? (consumed / p.sold_hours) * 100 : 0
@@ -1010,7 +1011,7 @@ export default function GestaoProjetosPage() {
       }
       return true
     })
-  }, [projects, search, statusFilter, clienteFilter, saudeFilter, filterContractType, filterServiceType])
+  }, [projects, search, statusFilter, clienteFilters, saudeFilter, filterContractType, filterServiceTypes])
 
   const toggleTree = (row: TreeRow) => {
     setRows(prev => {
@@ -1034,7 +1035,7 @@ export default function GestaoProjetosPage() {
     const parentRows = rows.filter(r => r._level === 0)
     const filteredParents = parentRows.filter(p => {
       if (statusFilter && p.status !== statusFilter) return false
-      if (clienteFilter && String(p.customer_id) !== clienteFilter) return false
+      if (clienteFilters.length > 0 && !clienteFilters.includes(String(p.customer_id))) return false
       if (saudeFilter) {
         const consumed = p.consumed_hours ?? (p.total_logged_minutes != null ? p.total_logged_minutes / 60 : 0)
         const pct = p.sold_hours ? (consumed / p.sold_hours) * 100 : 0
@@ -1053,7 +1054,7 @@ export default function GestaoProjetosPage() {
       if (live._isExpanded) result.push(...rows.filter(r => r._parentId === live.id && r._level > 0))
     }
     return result
-  }, [rows, multiContratual, statusFilter, clienteFilter, saudeFilter, search])
+  }, [rows, multiContratual, statusFilter, clienteFilters, saudeFilter, search])
 
   // ── Métricas dos cards ──
   const stats = useMemo(() => {
@@ -1275,8 +1276,8 @@ export default function GestaoProjetosPage() {
               style={{ ...inputStyle }}
             />
           </div>
-          <SearchSelect
-            value={clienteFilter}
+          <MultiSelect
+            value={clienteFilters}
             onChange={v => setCliente(v)}
             options={clientes.map(c => ({ id: c.id, name: c.name }))}
             placeholder="Todos os clientes"
@@ -1294,8 +1295,8 @@ export default function GestaoProjetosPage() {
               { id: 'cancelled',     name: 'Cancelado' },
             ]}
           />
-          <SimpleSelect
-            value={filterServiceType}
+          <MultiSelect
+            value={filterServiceTypes}
             onChange={v => setFilterServiceType(v)}
             placeholder="Todos os serviços"
             options={serviceTypes.map(s => ({ id: String(s.id), name: s.name }))}

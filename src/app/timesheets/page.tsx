@@ -18,6 +18,7 @@ import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
 import { TimesheetViewModal } from '@/components/ui/timesheet-view-modal'
 import { TimesheetFormModal } from '@/components/ui/timesheet-form-modal'
 import { MonthYearPicker } from '@/components/ui/month-year-picker'
+import { MultiSelect } from '@/components/ui/multi-select'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/use-auth'
 import { ApiError } from '@/lib/api'
@@ -491,12 +492,12 @@ function TimesheetsPageContent() {
   const [projectId, setProjectId]     = useState(() => searchParams.get('project_id') ?? '')
   const [page, setPage]               = useState(1)
   const [status, setStatus]           = useState('')
-  const [origin, setOrigin]           = useState('')
-  const [serviceTypeId, setServiceTypeId] = useState('')
-  const [contractTypeId, setContractTypeId] = useState('')
-  const [customerId, setCustomerId]   = useState(() => searchParams.get('customer_id') ?? '')
-  const [executiveId, setExecutiveId] = useState('')
-  const [userId, setUserId]           = useState('')
+  const [origins, setOrigins]               = useState<string[]>([])
+  const [serviceTypeIds, setServiceTypeIds] = useState<string[]>([])
+  const [contractTypeIds, setContractTypeIds] = useState<string[]>([])
+  const [customerIds, setCustomerIds]   = useState<string[]>(() => { const v = searchParams.get('customer_id'); return v ? [v] : [] })
+  const [executiveIds, setExecutiveIds] = useState<string[]>([])
+  const [userIds, setUserIds]           = useState<string[]>([])
   const [startDate, setStartDate]     = useState(() => searchParams.get('start_date') ?? '')
   const [endDate, setEndDate]         = useState(() => searchParams.get('end_date') ?? '')
   const [refMonth, setRefMonth]       = useState<number | null>(null)
@@ -591,35 +592,34 @@ function TimesheetsPageContent() {
 
   const params = useMemo(() => {
     const p = new URLSearchParams({ page: String(page), per_page: '20' })
-    if (status)         p.set('status', status)
-    if (origin)         p.set('origin', origin)
-    if (serviceTypeId)  p.set('service_type_id', serviceTypeId)
-    if (contractTypeId) p.set('contract_type_id', contractTypeId)
-    // Cliente: auto-aplica o customer_id do próprio usuário
+    if (status) p.set('status', status)
+    origins.forEach(v => p.append('origin[]', v))
+    serviceTypeIds.forEach(v => p.append('service_type_id[]', v))
+    contractTypeIds.forEach(v => p.append('contract_type_id[]', v))
     if (isCliente && user?.customer_id) p.set('customer_id', String(user.customer_id))
-    else if (customerId) p.set('customer_id', customerId)
-    if (executiveId)    p.set('executive_id', executiveId)
-    if (userId)         p.set('user_id', userId)
-    if (startDate)      p.set('start_date', startDate)
-    if (endDate)        p.set('end_date', endDate)
-    if (ticket)         p.set('ticket', ticket)
-    if (requester)      p.set('requester', requester)
-    if (ticketService)  p.set('ticket_service', ticketService)
-    if (projectId)      p.set('project_id', projectId)
-    if (sortField)      p.set('order', sortDir === 'desc' ? `-${sortField}` : sortField)
+    else customerIds.forEach(v => p.append('customer_id[]', v))
+    executiveIds.forEach(v => p.append('executive_id[]', v))
+    userIds.forEach(v => p.append('user_id[]', v))
+    if (startDate)     p.set('start_date', startDate)
+    if (endDate)       p.set('end_date', endDate)
+    if (ticket)        p.set('ticket', ticket)
+    if (requester)     p.set('requester', requester)
+    if (ticketService) p.set('ticket_service', ticketService)
+    if (projectId)     p.set('project_id', projectId)
+    if (sortField)     p.set('order', sortDir === 'desc' ? `-${sortField}` : sortField)
     return p.toString()
-  }, [page, status, origin, serviceTypeId, contractTypeId, customerId, executiveId, userId, projectId, startDate, endDate, ticket, requester, ticketService, sortField, sortDir, isCliente, user?.customer_id])
+  }, [page, status, origins, serviceTypeIds, contractTypeIds, customerIds, executiveIds, userIds, projectId, startDate, endDate, ticket, requester, ticketService, sortField, sortDir, isCliente, user?.customer_id])
 
   const { data, loading, error, refetch } = useApiQuery<PaginatedResponse<Timesheet>>(
     `/timesheets?${params}`, [params]
   )
 
   const resetPage = useCallback(() => setPage(1), [])
-  const hasFilters = !!(status || origin || serviceTypeId || contractTypeId || customerId || executiveId || userId || projectId || startDate || endDate || ticket || requester || ticketService)
+  const hasFilters = !!(status || origins.length || serviceTypeIds.length || contractTypeIds.length || customerIds.length || executiveIds.length || userIds.length || projectId || startDate || endDate || ticket || requester || ticketService)
 
   const clearFilters = useCallback(() => {
-    setStatus(''); setOrigin(''); setServiceTypeId(''); setContractTypeId('')
-    setCustomerId(''); setExecutiveId(''); setUserId(''); setProjectId('')
+    setStatus(''); setOrigins([]); setServiceTypeIds([]); setContractTypeIds([])
+    setCustomerIds([]); setExecutiveIds([]); setUserIds([]); setProjectId('')
     setStartDate(''); setEndDate(''); setRefMonth(null); setRefYear(null)
     setTicket(''); setRequester(''); setTicketService(''); setPage(1)
   }, [])
@@ -628,18 +628,18 @@ function TimesheetsPageContent() {
     setExporting(true)
     try {
       const p = new URLSearchParams()
-      if (status)         p.set('status', status)
-      if (serviceTypeId)  p.set('service_type_id', serviceTypeId)
-      if (contractTypeId) p.set('contract_type_id', contractTypeId)
-      if (customerId)     p.set('customer_id', customerId)
-      if (projectId)      p.set('project_id', projectId)
-      if (userId)         p.set('user_id', userId)
-      if (startDate)      p.set('start_date', startDate)
-      if (endDate)        p.set('end_date', endDate)
-      if (ticket)         p.set('ticket', ticket)
-      if (requester)      p.set('requester', requester)
-      if (ticketService)  p.set('ticket_service', ticketService)
+      if (status) p.set('status', status)
+      serviceTypeIds.forEach(v => p.append('service_type_id[]', v))
+      contractTypeIds.forEach(v => p.append('contract_type_id[]', v))
       if (isCliente && user?.customer_id) p.set('customer_id', String(user.customer_id))
+      else customerIds.forEach(v => p.append('customer_id[]', v))
+      userIds.forEach(v => p.append('user_id[]', v))
+      if (projectId)     p.set('project_id', projectId)
+      if (startDate)     p.set('start_date', startDate)
+      if (endDate)       p.set('end_date', endDate)
+      if (ticket)        p.set('ticket', ticket)
+      if (requester)     p.set('requester', requester)
+      if (ticketService) p.set('ticket_service', ticketService)
       const token = localStorage.getItem('minutor_token')
       const res = await fetch(`/api/v1/timesheets/export?${p}`, { headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) throw new Error()
@@ -701,41 +701,44 @@ function TimesheetsPageContent() {
             ) : (
               // Filtros completos para admin/coordenador/consultor
               <>
-                <SearchSelect
-                  value={userId}
-                  onChange={v => { setUserId(v); resetPage() }}
+                <MultiSelect
+                  value={userIds}
+                  onChange={v => { setUserIds(v); resetPage() }}
                   options={consultants}
                   placeholder="Todos os colaboradores"
                 />
-                <SearchSelect
-                  value={customerId}
-                  onChange={v => { setCustomerId(v); resetPage() }}
+                <MultiSelect
+                  value={customerIds}
+                  onChange={v => { setCustomerIds(v); resetPage() }}
                   options={customers}
                   placeholder="Todos os clientes"
                 />
                 {executives.length > 0 && (
-                  <SearchSelect
-                    value={executiveId}
-                    onChange={v => { setExecutiveId(v); resetPage() }}
+                  <MultiSelect
+                    value={executiveIds}
+                    onChange={v => { setExecutiveIds(v); resetPage() }}
                     options={executives}
                     placeholder="Todos os executivos"
                   />
                 )}
-                <SearchSelect
-                  value={serviceTypeId}
-                  onChange={v => { setServiceTypeId(v); resetPage() }}
+                <MultiSelect
+                  value={serviceTypeIds}
+                  onChange={v => { setServiceTypeIds(v); resetPage() }}
                   options={serviceTypeList}
                   placeholder="Tipo de serviço"
                 />
-                <SearchSelect
-                  value={contractTypeId}
-                  onChange={v => { setContractTypeId(v); resetPage() }}
+                <MultiSelect
+                  value={contractTypeIds}
+                  onChange={v => { setContractTypeIds(v); resetPage() }}
                   options={contractTypeList}
                   placeholder="Tipo de contrato"
                 />
-                <Select value={origin} onChange={e => { setOrigin(e.target.value); resetPage() }}>
-                  {ORIGIN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </Select>
+                <MultiSelect
+                  value={origins}
+                  onChange={v => { setOrigins(v); resetPage() }}
+                  options={ORIGIN_OPTIONS.filter(o => o.value).map(o => ({ id: o.value, name: o.label }))}
+                  placeholder="Todas as origens"
+                />
                 <TextInput
                   placeholder="Nº ticket..."
                   value={ticket}
@@ -822,9 +825,9 @@ function TimesheetsPageContent() {
           <div className="flex items-center gap-1 p-1 rounded-xl w-fit mb-4"
             style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
             <button
-              onClick={() => { setContractTypeId(''); resetPage() }}
+              onClick={() => { setContractTypeIds([]); resetPage() }}
               className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all"
-              style={!contractTypeId
+              style={contractTypeIds.length === 0
                 ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
                 : { color: 'var(--brand-muted)', background: 'transparent' }
               }>
@@ -832,9 +835,9 @@ function TimesheetsPageContent() {
             </button>
             {clienteContractTypes.map(ct => (
               <button key={ct.id}
-                onClick={() => { setContractTypeId(String(ct.id)); resetPage() }}
+                onClick={() => { setContractTypeIds([String(ct.id)]); resetPage() }}
                 className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all"
-                style={contractTypeId === String(ct.id)
+                style={contractTypeIds.includes(String(ct.id))
                   ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
                   : { color: 'var(--brand-muted)', background: 'transparent' }
                 }>
