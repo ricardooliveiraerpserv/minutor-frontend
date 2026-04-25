@@ -3962,12 +3962,12 @@ function KanbanContent() {
                       <th className="text-center px-4 py-3 text-zinc-400 font-medium">HS Consumidas</th>
                       <th className="text-center px-4 py-3 text-zinc-400 font-medium">Saldo</th>
                       <th className="text-center px-4 py-3 text-zinc-400 font-medium">Status</th>
-                      <th className="px-4 py-3" />
+                      {!isCliente && <th className="px-4 py-3" />}
                     </tr>
                   </thead>
                   <tbody>
                     {allContracts.length === 0 && allProjects.length === 0 && (
-                      <tr><td colSpan={8} className="px-4 py-8 text-center text-zinc-600 text-xs">Nenhum item.</td></tr>
+                      <tr><td colSpan={isCliente ? 7 : 8} className="px-4 py-8 text-center text-zinc-600 text-xs">Nenhum item.</td></tr>
                     )}
                     {allContracts.map((c, i) => (
                       <tr key={`c-${c.id}`} onClick={() => setSelectedContract(c)} className="cursor-pointer hover:bg-zinc-800/40 transition-colors group/row"
@@ -3987,9 +3987,11 @@ function KanbanContent() {
                             <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: b.bg, color: b.color }}>{b.label}</span>
                           )})()}
                         </td>
-                        <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                          <ListActionMenu card={c} onAction={action => setContractAction({ card: c, action })} />
-                        </td>
+                        {!isCliente && (
+                          <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
+                            <ListActionMenu card={c} onAction={action => setContractAction({ card: c, action })} />
+                          </td>
+                        )}
                       </tr>
                     ))}
                     {allProjects.map((p, i) => {
@@ -4017,7 +4019,7 @@ function KanbanContent() {
                               <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: b.bg, color: b.color }}>{b.label}</span>
                             )})()}
                           </td>
-                          <td className="px-4 py-3" />
+                          {!isCliente && <td className="px-4 py-3" />}
                         </tr>
                       )
                     })}
