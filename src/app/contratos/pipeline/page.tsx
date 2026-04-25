@@ -3582,6 +3582,15 @@ function KanbanContent() {
   // IDs de contratos gerenciados por requisições — não exibir como card duplicado no pipeline
   const linkedContractIds = new Set(requestCards.map(r => r.linked_contract_id).filter(Boolean))
 
+  // IDs de contratos kanban-born que ainda não chegaram à coluna de coordenador (alocado)
+  // Projetos vinculados a esses contratos não devem aparecer no pipeline
+  const kanbanBornNotAllocatedIds = new Set(
+    [...demandCards, ...transitionCards]
+      .filter(c => !linkedContractIds.has(c.id))
+      .filter(c => c.kanban_status !== 'alocado')
+      .map(c => c.id)
+  )
+
   // IDs de contratos já em Início Autorizado — requisições novo_projeto vinculadas devem ser suprimidas
   // Suprime requisição novo_projeto quando o contrato já avançou (inicio_autorizado ou projeto gerado)
   const authorizedContractIds = new Set([
@@ -3636,6 +3645,7 @@ function KanbanContent() {
     projectCards
       .filter(p => projectColumnId(p) === colId)
       .filter(p => !p.contract_id || !sustContractIds.has(p.contract_id))
+      .filter(p => !p.contract_id || !kanbanBornNotAllocatedIds.has(p.contract_id))
       .filter(p => matchFilter(p.customer_name, p.project_name))
 
   const handleContractMove = async (cardId: number, card: ContractCard, fromCol: string, toCol: string, order = 0) => {
