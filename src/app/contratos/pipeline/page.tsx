@@ -3973,7 +3973,13 @@ function KanbanContent() {
             return col?.label ?? card.kanban_status ?? '—'
           }
           const sq = filterSearch.trim().toLowerCase()
+          const seenContractIds = new Set<number>()
           const allContracts = [...demandCards, ...transitionCards]
+            .filter(c => {
+              if (seenContractIds.has(c.id)) return false
+              seenContractIds.add(c.id)
+              return true
+            })
             .filter(c => c.categoria !== 'sustentacao' && !/sustenta/i.test(c.service_type ?? ''))
             .filter(c => {
               if (filterCustomer && c.customer_name !== filterCustomer) return false
