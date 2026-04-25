@@ -166,13 +166,22 @@ function NovaRequisicaoContent() {
     setForm(prev => ({ ...prev, [field]: value }))
 
   const isOutro = form.tipo_necessidade === 'outro'
-  const isValid = form.area_requisitante.trim() && form.tipo_necessidade && form.nivel_urgencia &&
+  const isValid =
+    form.area_requisitante.trim() &&
+    form.project_name.trim() &&
+    form.product_owner.trim() &&
+    form.modulo_tecnologia.trim() &&
+    form.tipo_necessidade &&
     (!isOutro || form.tipo_necessidade_outro.trim()) &&
+    form.nivel_urgencia &&
+    form.descricao.trim() &&
+    form.cenario_atual.trim() &&
+    form.cenario_desejado.trim() &&
     (isCliente || !!customerId)
 
   const handleSubmit = async () => {
     if (!isValid) {
-      toast.error('Preencha os campos obrigatórios: cliente, área requisitante, tipo de necessidade e urgência.')
+      toast.error('Preencha todos os campos obrigatórios antes de enviar.')
       return
     }
     setSaving(true)
@@ -247,7 +256,7 @@ function NovaRequisicaoContent() {
                 <SectionTitle number="1" title="Identificação da Requisição" />
                 <div className="space-y-4">
                   <div>
-                    <Label>Nome do Projeto</Label>
+                    <Label required>Nome do Projeto</Label>
                     <Input value={form.project_name} onChange={set('project_name')} placeholder="Ex: Implantação SIGAFIN, Migração ERP..." />
                   </div>
                   <div>
@@ -256,11 +265,11 @@ function NovaRequisicaoContent() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label>Product Owner</Label>
+                      <Label required>Product Owner</Label>
                       <Input value={form.product_owner} onChange={set('product_owner')} placeholder="Nome do responsável" />
                     </div>
                     <div>
-                      <Label>Módulo / Tecnologia</Label>
+                      <Label required>Módulo / Tecnologia</Label>
                       <Input value={form.modulo_tecnologia} onChange={set('modulo_tecnologia')} placeholder="Ex: SIGAFIN, Fluig..." />
                     </div>
                   </div>
@@ -346,15 +355,15 @@ function NovaRequisicaoContent() {
                 <SectionTitle number="6" title="Descrição da Necessidade" />
                 <div className="space-y-4">
                   <div>
-                    <Label>Descrição Geral</Label>
+                    <Label required>Descrição Geral</Label>
                     <Textarea value={form.descricao} onChange={set('descricao')} placeholder="Descreva de forma geral o que você precisa..." rows={3} />
                   </div>
                   <div>
-                    <Label>6.1 · Cenário Atual</Label>
+                    <Label required>6.1 · Cenário Atual</Label>
                     <Textarea value={form.cenario_atual} onChange={set('cenario_atual')} placeholder="Como o processo funciona hoje? Quais são as dificuldades?" rows={4} />
                   </div>
                   <div>
-                    <Label>6.2 · Cenário Desejado</Label>
+                    <Label required>6.2 · Cenário Desejado</Label>
                     <Textarea value={form.cenario_desejado} onChange={set('cenario_desejado')} placeholder="Como você gostaria que o processo funcionasse? Qual seria o resultado esperado?" rows={4} />
                   </div>
                 </div>
