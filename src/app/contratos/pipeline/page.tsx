@@ -3650,10 +3650,10 @@ function KanbanContent() {
   ].filter(Boolean))].sort() as string[]
 
   const allExecutivos = [...new Set([
-    ...demandCards.map(c => c.kanban_coordinator).filter(Boolean),
-    ...transitionCards.map(c => c.kanban_coordinator).filter(Boolean),
-    ...projectCards.flatMap(p => p.coordinators ?? []).filter(Boolean),
-  ])].sort() as string[]
+    ...demandCards.flatMap(c => c.kanban_coordinator ? [c.kanban_coordinator] : []),
+    ...transitionCards.flatMap(c => c.kanban_coordinator ? [c.kanban_coordinator] : []),
+    ...projectCards.flatMap(p => p.coordinators ?? []),
+  ])].sort()
 
   const matchExecutivo = (coordinator?: string | null, coordinators?: string[]): boolean => {
     if (!filterExecutivo) return true
@@ -3972,13 +3972,22 @@ function KanbanContent() {
             const col = [...DEMAND_COLS, TRANSITION_COL].find(c => c.id === contractColumnId(card))
             return col?.label ?? card.kanban_status ?? '—'
           }
+          const sq = filterSearch.trim().toLowerCase()
           const allContracts = [...demandCards, ...transitionCards]
             .filter(c => c.categoria !== 'sustentacao' && !/sustenta/i.test(c.service_type ?? ''))
-            .filter(c => matchFilter(c.customer_name, c.project_name))
-            .filter(c => matchExecutivo(c.kanban_coordinator))
+            .filter(c => {
+              if (filterCustomer && c.customer_name !== filterCustomer) return false
+              if (sq && !c.customer_name.toLowerCase().includes(sq) && !(c.project_name ?? '').toLowerCase().includes(sq)) return false
+              if (filterExecutivo && c.kanban_coordinator !== filterExecutivo) return false
+              return true
+            })
           const allProjects  = projectCards
-            .filter(p => matchFilter(p.customer_name, p.project_name))
-            .filter(p => matchExecutivo(undefined, p.coordinators))
+            .filter(p => {
+              if (filterCustomer && p.customer_name !== filterCustomer) return false
+              if (sq && !p.customer_name.toLowerCase().includes(sq) && !(p.project_name ?? '').toLowerCase().includes(sq)) return false
+              if (filterExecutivo && !(p.coordinators ?? []).includes(filterExecutivo)) return false
+              return true
+            })
           return (
             <div className="flex-1 overflow-y-auto p-4">
               <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--brand-border)' }}>
