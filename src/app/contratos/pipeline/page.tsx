@@ -1703,6 +1703,8 @@ const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }>
   em_revisao:             { label: 'Em Revisão',               color: '#c084fc', bg: 'rgba(168,85,247,0.12)'  },
   aprovado:               { label: 'Aprovado',                 color: '#4ade80', bg: 'rgba(34,197,94,0.12)'   },
   req_inicio_autorizado:  { label: 'Aguardando Início (Req.)', color: '#fb923c', bg: 'rgba(251,146,60,0.12)'  },
+  req_planejamento:       { label: 'Planejamento (Req.)',       color: '#60a5fa', bg: 'rgba(59,130,246,0.12)'  },
+  req_em_andamento:       { label: 'Em Andamento (Req.)',       color: '#818cf8', bg: 'rgba(99,102,241,0.12)'  },
   // transition
   inicio_autorizado:      { label: 'Início Autorizado',        color: '#eab308', bg: 'rgba(234,179,8,0.12)'   },
   alocado:                { label: 'Início Autorizado',        color: '#eab308', bg: 'rgba(234,179,8,0.12)'   },
@@ -3546,6 +3548,7 @@ function KanbanContent() {
   const [filterSearch,     setFilterSearch]     = useState('')
   const [filterCustomers,  setFilterCustomers]  = useState<string[]>([])
   const [filterExecutivos, setFilterExecutivos] = useState<string[]>([])
+  const [listTab,          setListTab]          = useState<'contratos' | 'projetos' | 'requisicoes'>('projetos')
 
   const isConsultor = userRole === 'consultor'
   const isCliente   = userRole === 'cliente'
@@ -3964,7 +3967,6 @@ function KanbanContent() {
 
         {/* List View */}
         {viewMode === 'list' && (() => {
-          const fmtMoney = (v: any) => v != null ? `R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'
           const colLabel = (card: ContractCard) => {
             const col = [...DEMAND_COLS, TRANSITION_COL].find(c => c.id === contractColumnId(card))
             return col?.label ?? card.kanban_status ?? '—'
@@ -3978,7 +3980,6 @@ function KanbanContent() {
               seenContractIds.add(c.id)
               return true
             })
-            // se o projeto vinculado já aparece como linha de projeto, ocultar o contrato para evitar duplicata
             .filter(c => !c.project_id || !listProjectIds.has(c.project_id))
             .filter(c => c.categoria !== 'sustentacao' && !/sustenta/i.test(c.service_type ?? ''))
             .filter(c => {
@@ -3990,90 +3991,203 @@ function KanbanContent() {
               }
               return true
             })
-          const allProjects  = projectCards
+          const allProjects = projectCards
             .filter(p => {
               if (filterCustomers.length > 0 && !filterCustomers.includes(p.customer_name)) return false
               if (sq && !p.customer_name.toLowerCase().includes(sq) && !(p.project_name ?? '').toLowerCase().includes(sq)) return false
               if (filterExecutivos.length > 0 && !(p.coordinators ?? []).some(e => filterExecutivos.includes(e))) return false
               return true
             })
+          const allRequests = requestCards
+            .filter(r => {
+              if (filterCustomers.length > 0 && !filterCustomers.includes(r.customer_name ?? '')) return false
+              if (sq && !(r.customer_name ?? '').toLowerCase().includes(sq) && !(r.project_name ?? '').toLowerCase().includes(sq)) return false
+              return true
+            })
+
+          const TABS: { id: typeof listTab; label: string; count: number }[] = [
+            { id: 'projetos',     label: 'Projetos',     count: allProjects.length },
+            { id: 'contratos',    label: 'Contratos',    count: allContracts.length },
+            { id: 'requisicoes',  label: 'Requisições',  count: allRequests.length },
+          ]
+
           return (
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--brand-border)' }}>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr style={{ background: 'var(--brand-surface)', borderBottom: '1px solid var(--brand-border)' }}>
-                      <th className="text-left px-4 py-3 text-zinc-400 font-medium">Cliente</th>
-                      <th className="text-left px-4 py-3 text-zinc-400 font-medium">Projeto / Tipo</th>
-                      <th className="text-left px-4 py-3 text-zinc-400 font-medium">Coluna</th>
-                      <th className="text-center px-4 py-3 text-zinc-400 font-medium">Horas</th>
-                      <th className="text-center px-4 py-3 text-zinc-400 font-medium">HS Consumidas</th>
-                      <th className="text-center px-4 py-3 text-zinc-400 font-medium">Saldo</th>
-                      <th className="text-center px-4 py-3 text-zinc-400 font-medium">Status</th>
-                      {!isCliente && <th className="px-4 py-3" />}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allContracts.length === 0 && allProjects.length === 0 && (
-                      <tr><td colSpan={isCliente ? 7 : 8} className="px-4 py-8 text-center text-zinc-600 text-xs">Nenhum item.</td></tr>
-                    )}
-                    {allContracts.map((c, i) => (
-                      <tr key={`c-${c.id}`} onClick={() => setSelectedContract(c)} className="cursor-pointer hover:bg-zinc-800/40 transition-colors group/row"
-                        style={{ borderTop: i > 0 || allProjects.length > 0 ? '1px solid var(--brand-border)' : undefined }}>
-                        <td className="px-4 py-3 text-white font-medium">{c.customer_name}</td>
-                        <td className="px-4 py-3 text-zinc-400 text-xs">
-                          {c.project_name && <p className="text-zinc-300 text-sm">{c.project_name}</p>}
-                          <span>{c.contract_type ?? '—'}</span>
-                          {c.tipo_faturamento && <span className="ml-1 text-zinc-500">· {c.tipo_faturamento}</span>}
-                        </td>
-                        <td className="px-4 py-3 text-zinc-400 text-xs">{colLabel(c)}</td>
-                        <td className="px-4 py-3 text-center text-zinc-300">{c.horas_contratadas != null ? `${c.horas_contratadas}h` : '—'}</td>
-                        <td className="px-4 py-3 text-center text-zinc-500">—</td>
-                        <td className="px-4 py-3 text-center text-zinc-500">—</td>
-                        <td className="px-4 py-3 text-center">
-                          {(() => { const b = STATUS_BADGE[c.kanban_status ?? c.status ?? ''] ?? STATUS_BADGE['backlog']; return (
-                            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: b.bg, color: b.color }}>{b.label}</span>
-                          )})()}
-                        </td>
-                        {!isCliente && (
-                          <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                            <ListActionMenu card={c} onAction={action => setContractAction({ card: c, action })} />
-                          </td>
-                        )}
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+              {/* Tabs */}
+              <div className="flex gap-1 p-1 rounded-xl w-fit" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+                {TABS.map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setListTab(tab.id)}
+                    className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
+                    style={listTab === tab.id
+                      ? { background: 'rgba(0,245,255,0.1)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.2)' }
+                      : { color: 'var(--brand-muted)', border: '1px solid transparent' }
+                    }
+                  >
+                    {tab.label}
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
+                      style={listTab === tab.id
+                        ? { background: 'rgba(0,245,255,0.15)', color: 'var(--brand-primary)' }
+                        : { background: 'rgba(255,255,255,0.06)', color: 'var(--brand-muted)' }
+                      }>
+                      {tab.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab: Projetos */}
+              {listTab === 'projetos' && (
+                <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--brand-border)' }}>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr style={{ background: 'var(--brand-surface)', borderBottom: '1px solid var(--brand-border)' }}>
+                        <th className="text-left px-4 py-3 text-zinc-400 font-medium">Cliente</th>
+                        <th className="text-left px-4 py-3 text-zinc-400 font-medium">Projeto</th>
+                        <th className="text-left px-4 py-3 text-zinc-400 font-medium">Fase</th>
+                        <th className="text-center px-4 py-3 text-zinc-400 font-medium">Horas</th>
+                        <th className="text-center px-4 py-3 text-zinc-400 font-medium">HS Consumidas</th>
+                        <th className="text-center px-4 py-3 text-zinc-400 font-medium">Saldo</th>
+                        <th className="text-center px-4 py-3 text-zinc-400 font-medium">Status</th>
+                        {!isCliente && <th className="px-4 py-3" />}
                       </tr>
-                    ))}
-                    {allProjects.map((p, i) => {
-                      const isClosed  = p.status === 'finished' || p.status === 'cancelled'
-                      const hideHours = isCliente && isClosed
-                      return (
-                        <tr key={`p-${p.id}`} onClick={() => setSelectedProject(p)} className="cursor-pointer hover:bg-zinc-800/40 transition-colors"
+                    </thead>
+                    <tbody>
+                      {allProjects.length === 0 && (
+                        <tr><td colSpan={isCliente ? 7 : 8} className="px-4 py-8 text-center text-zinc-600 text-xs">Nenhum projeto.</td></tr>
+                      )}
+                      {allProjects.map(p => {
+                        const isClosed  = p.status === 'finished' || p.status === 'cancelled'
+                        const hideHours = isCliente && isClosed
+                        return (
+                          <tr key={`p-${p.id}`} onClick={() => setSelectedProject(p)} className="cursor-pointer hover:bg-zinc-800/40 transition-colors"
+                            style={{ borderTop: '1px solid var(--brand-border)' }}>
+                            <td className="px-4 py-3 text-white font-medium">{p.customer_name}</td>
+                            <td className="px-4 py-3 text-zinc-300 text-xs">
+                              <p className="text-zinc-300 text-sm">{p.project_name}</p>
+                              <span className="font-mono text-cyan-400">{p.code}</span>
+                            </td>
+                            <td className="px-4 py-3 text-zinc-400 text-xs">{PROJECT_COLS.find(c => c.id === PROJECT_STATUS_TO_COL[p.status])?.label ?? 'Projeto'}</td>
+                            <td className="px-4 py-3 text-center text-zinc-300">{p.sold_hours != null ? `${p.sold_hours}h` : '—'}</td>
+                            <td className="px-4 py-3 text-center text-zinc-300">
+                              {hideHours ? '—' : p.consumed_hours != null ? `${p.consumed_hours.toFixed(1)}h` : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-center"
+                              style={{ color: !hideHours && (p.general_hours_balance ?? 0) < 0 ? '#ef4444' : 'rgb(212 212 216)' }}>
+                              {hideHours ? '—' : p.general_hours_balance != null ? `${p.general_hours_balance.toFixed(1)}h` : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {(() => { const b = STATUS_BADGE[p.status] ?? { label: p.status, color: '#94a3b8', bg: 'rgba(148,163,184,0.12)' }; return (
+                                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: b.bg, color: b.color }}>{b.label}</span>
+                              )})()}
+                            </td>
+                            {!isCliente && <td className="px-4 py-3" />}
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Tab: Contratos */}
+              {listTab === 'contratos' && (
+                <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--brand-border)' }}>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr style={{ background: 'var(--brand-surface)', borderBottom: '1px solid var(--brand-border)' }}>
+                        <th className="text-left px-4 py-3 text-zinc-400 font-medium">Cliente</th>
+                        <th className="text-left px-4 py-3 text-zinc-400 font-medium">Projeto / Tipo</th>
+                        <th className="text-left px-4 py-3 text-zinc-400 font-medium">Coluna</th>
+                        <th className="text-center px-4 py-3 text-zinc-400 font-medium">Horas</th>
+                        <th className="text-center px-4 py-3 text-zinc-400 font-medium">Status</th>
+                        {!isCliente && <th className="px-4 py-3" />}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allContracts.length === 0 && (
+                        <tr><td colSpan={isCliente ? 5 : 6} className="px-4 py-8 text-center text-zinc-600 text-xs">Nenhum contrato.</td></tr>
+                      )}
+                      {allContracts.map(c => (
+                        <tr key={`c-${c.id}`} onClick={() => setSelectedContract(c)} className="cursor-pointer hover:bg-zinc-800/40 transition-colors group/row"
                           style={{ borderTop: '1px solid var(--brand-border)' }}>
-                          <td className="px-4 py-3 text-white font-medium">{p.customer_name}</td>
-                          <td className="px-4 py-3 text-zinc-300 text-xs">
-                            <p className="text-zinc-300 text-sm">{p.project_name}</p>
-                            <span className="font-mono text-cyan-400">{p.code}</span>
+                          <td className="px-4 py-3 text-white font-medium">{c.customer_name}</td>
+                          <td className="px-4 py-3 text-zinc-400 text-xs">
+                            {c.project_name && <p className="text-zinc-300 text-sm">{c.project_name}</p>}
+                            <span>{c.contract_type ?? '—'}</span>
+                            {c.tipo_faturamento && <span className="ml-1 text-zinc-500">· {c.tipo_faturamento}</span>}
                           </td>
-                          <td className="px-4 py-3 text-zinc-400 text-xs">{PROJECT_COLS.find(c => c.id === PROJECT_STATUS_TO_COL[p.status])?.label ?? 'Projeto'}</td>
-                          <td className="px-4 py-3 text-center text-zinc-300">{p.sold_hours != null ? `${p.sold_hours}h` : '—'}</td>
-                          <td className="px-4 py-3 text-center text-zinc-300">
-                            {hideHours ? '—' : p.consumed_hours != null ? `${p.consumed_hours.toFixed(1)}h` : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-center"
-                            style={{ color: !hideHours && (p.general_hours_balance ?? 0) < 0 ? '#ef4444' : 'rgb(212 212 216)' }}>
-                            {hideHours ? '—' : p.general_hours_balance != null ? `${p.general_hours_balance.toFixed(1)}h` : '—'}
-                          </td>
+                          <td className="px-4 py-3 text-zinc-400 text-xs">{colLabel(c)}</td>
+                          <td className="px-4 py-3 text-center text-zinc-300">{c.horas_contratadas != null ? `${c.horas_contratadas}h` : '—'}</td>
                           <td className="px-4 py-3 text-center">
-                            {(() => { const b = STATUS_BADGE[p.status] ?? { label: p.status, color: '#94a3b8', bg: 'rgba(148,163,184,0.12)' }; return (
+                            {(() => { const b = STATUS_BADGE[c.kanban_status ?? c.status ?? ''] ?? STATUS_BADGE['backlog']; return (
                               <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: b.bg, color: b.color }}>{b.label}</span>
                             )})()}
                           </td>
-                          {!isCliente && <td className="px-4 py-3" />}
+                          {!isCliente && (
+                            <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
+                              <ListActionMenu card={c} onAction={action => setContractAction({ card: c, action })} />
+                            </td>
+                          )}
                         </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Tab: Requisições */}
+              {listTab === 'requisicoes' && (
+                <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--brand-border)' }}>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr style={{ background: 'var(--brand-surface)', borderBottom: '1px solid var(--brand-border)' }}>
+                        <th className="text-left px-4 py-3 text-zinc-400 font-medium">Cliente</th>
+                        <th className="text-left px-4 py-3 text-zinc-400 font-medium">Projeto / Área</th>
+                        <th className="text-left px-4 py-3 text-zinc-400 font-medium">Tipo</th>
+                        <th className="text-center px-4 py-3 text-zinc-400 font-medium">Urgência</th>
+                        <th className="text-center px-4 py-3 text-zinc-400 font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allRequests.length === 0 && (
+                        <tr><td colSpan={5} className="px-4 py-8 text-center text-zinc-600 text-xs">Nenhuma requisição.</td></tr>
+                      )}
+                      {allRequests.map(r => (
+                        <tr key={`r-${r.id}`}
+                          onClick={() => r.kanban_column === 'req_inicio_autorizado' && !r.req_decision ? setPlanDecisionCard(r) : setSelectedRequest(r)}
+                          className="cursor-pointer hover:bg-zinc-800/40 transition-colors"
+                          style={{ borderTop: '1px solid var(--brand-border)' }}>
+                          <td className="px-4 py-3 text-white font-medium">{r.customer_name}</td>
+                          <td className="px-4 py-3 text-zinc-400 text-xs">
+                            {r.project_name && <p className="text-zinc-300 text-sm">{r.project_name}</p>}
+                            <span>{r.area_requisitante}</span>
+                            {r.product_owner && <span className="ml-1 text-zinc-500">· {r.product_owner}</span>}
+                          </td>
+                          <td className="px-4 py-3 text-zinc-400 text-xs">
+                            {TIPO_NECESSIDADE_LABEL[r.tipo_necessidade] ?? r.tipo_necessidade}
+                            {r.tipo_necessidade === 'outro' && r.tipo_necessidade_outro && (
+                              <span className="ml-1 text-zinc-500">({r.tipo_necessidade_outro})</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                              style={{ background: `${URGENCIA_COLOR[r.nivel_urgencia]}1a`, color: URGENCIA_COLOR[r.nivel_urgencia] ?? '#94a3b8' }}>
+                              {URGENCIA_LABEL[r.nivel_urgencia] ?? r.nivel_urgencia}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {(() => { const b = STATUS_BADGE[r.kanban_column ?? ''] ?? { label: r.kanban_column ?? '—', color: '#94a3b8', bg: 'rgba(148,163,184,0.12)' }; return (
+                              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: b.bg, color: b.color }}>{b.label}</span>
+                            )})()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )
         })()}
