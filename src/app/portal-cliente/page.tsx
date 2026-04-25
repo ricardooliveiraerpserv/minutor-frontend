@@ -359,11 +359,13 @@ export default function PortalClientePage() {
   const [indHoursData, setIndHoursData] = useState<{ id: number; name: string; total_hours: number }[]>([])
   const [indHoursLoading, setIndHoursLoading] = useState(false)
   const indLoadedRef = useRef(false)
+  const execLoadedRef = useRef(false)
   const [indCFilter, setIndCFilter] = useState('')
   const [indPFilter, setIndPFilter] = useState('')
 
   const [indStatusFilter, setIndStatusFilter] = useState('')
   const [indExecFilter, setIndExecFilter] = useState('')
+  const [execFilter,    setExecFilter]    = useState('')
 
   // Para cliente: usa o customer_id do próprio usuário automaticamente
   useEffect(() => {
@@ -540,6 +542,21 @@ export default function PortalClientePage() {
     })
   }, [activeTab])
 
+  // Eager load indProjects for exec filter when in multi-mode (no need to open Indicadores tab)
+  useEffect(() => {
+    if (isCliente || execLoadedRef.current || indLoadedRef.current) return
+    if (!isMultiMode) return
+    execLoadedRef.current = true
+    api.get<any>('/projects?pageSize=300&gestao=true&with_team=false')
+      .then(res => {
+        const items = (res?.items ?? []).filter(
+          (p: any) => !IND_EXCLUDED.includes(normalizeInd(p.contract_type_display ?? ''))
+        )
+        setIndProjects(items); indCacheSet('ind_projects', items)
+      })
+      .catch(() => {})
+  }, [isCliente, isMultiMode])
+
   // ── Indicadores computed ──
   const indClienteOptions = useMemo(() => {
     const map = new Map<string, string>()
@@ -558,6 +575,23 @@ export default function PortalClientePage() {
     for (const p of indProjects) for (const c of p.coordinators ?? []) if (c.id && c.name) map.set(c.id, c.name)
     return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1])).map(([id, name]) => ({ value: String(id), label: name }))
   }, [indProjects])
+
+  const custToExecs = useMemo(() => {
+    const map = new Map<string, Set<number>>()
+    for (const p of indProjects) {
+      if (!p.customer?.id) continue
+      const cid = String(p.customer.id)
+      if (!map.has(cid)) map.set(cid, new Set())
+      for (const c of p.coordinators ?? []) if (c.id) map.get(cid)!.add(c.id)
+    }
+    return map
+  }, [indProjects])
+
+  const filteredMultiData = useMemo(() => {
+    let base = healthFilter === 'all' ? multiData : multiData.filter(md => md.overview?.status === healthFilter)
+    if (execFilter) base = base.filter(md => custToExecs.get(md._cid)?.has(Number(execFilter)) ?? false)
+    return base
+  }, [multiData, healthFilter, execFilter, custToExecs])
 
   const IND_STATUS_LABELS: Record<string, string> = {
     active: 'Ativo', awaiting_start: 'Aguardando início', started: 'Iniciado',
@@ -723,6 +757,14 @@ export default function PortalClientePage() {
                   )
                 })}
               </div>
+              {indExecOptions.length > 0 && (
+                <IndSearchSelect
+                  value={execFilter}
+                  onChange={setExecFilter}
+                  placeholder="Todos os executivos"
+                  options={indExecOptions}
+                />
+              )}
               <div className="flex items-center rounded-xl overflow-hidden" style={{ border: '1px solid var(--brand-border)' }}>
                 <button type="button" onClick={() => setViewMode('card')} className="p-2.5 transition-all"
                   style={viewMode === 'card' ? { background: 'var(--brand-primary)', color: '#0A0A0B' } : { background: 'rgba(255,255,255,0.04)', color: 'var(--brand-subtle)' }}>
@@ -754,7 +796,7 @@ export default function PortalClientePage() {
               ) : viewMode === 'card' ? (
                 /* ── Card grid ── */
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {(healthFilter === 'all' ? multiData : multiData.filter(md => md.overview?.status === healthFilter)).map(md => {
+                  {filteredMultiData.map(md => {
                     const ov = md.overview
                     const pct = ov?.consumption_pct ?? 0
                     const statusColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#22c55e'
@@ -806,7 +848,7 @@ export default function PortalClientePage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(healthFilter === 'all' ? multiData : multiData.filter(md => md.overview?.status === healthFilter)).map((md, i) => {
+                      {filteredMultiData.map((md, i) => {
                         const ov = md.overview
                         const pct = ov?.consumption_pct ?? 0
                         const sc = HC[ov?.status as keyof typeof HC] ?? HC.ok
