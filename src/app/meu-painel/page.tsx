@@ -1366,6 +1366,7 @@ export default function MeuPainelPage() {
   const [tsModal,    setTsModal]    = useState<{ open: boolean; item?: TimesheetItem }>({ open: false })
   const [tsViewItem, setTsViewItem] = useState<TimesheetItem | null>(null)
   const [tsForm,     setTsForm]     = useState({ ...EMPTY_TS })
+  const [tsModeTotal, setTsModeTotal] = useState(false)
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; message: string; onConfirm: () => void } | null>(null)
   const [tsSaving,   setTsSaving]   = useState(false)
   const [tsFile,     setTsFile]     = useState<File | null>(null)
@@ -1578,6 +1579,7 @@ export default function MeuPainelPage() {
 
   const openCreateTs = () => {
     setTsForm({ ...EMPTY_TS, date: todayISO() })
+    setTsModeTotal(false)
     setTsFile(null)
     setTsModal({ open: true })
   }
@@ -1587,6 +1589,7 @@ export default function MeuPainelPage() {
     const derivedTotal = item.start_time && item.end_time
       ? String(Math.round(timeDiffHours(item.start_time, item.end_time) * 10) / 10)
       : item.effort_hours ? String(Math.round(parseFloat(item.effort_hours) * 10) / 10) : ''
+    setTsModeTotal(!item.start_time && !!item.effort_hours)
     setTsForm({
       customer_id: proj?.customer ? String(proj.customer.id) : '',
       project_id:  String(item.project_id),
@@ -3482,55 +3485,92 @@ export default function MeuPainelPage() {
                 className="mt-1.5 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <Label className="text-xs text-zinc-400">Início</Label>
-                <Input type="time" value={tsForm.start_time}
-                  onChange={e => {
-                    const start = e.target.value
-                    setTsForm(f => {
-                      const hours = parseFloat(f.total_hours)
-                      const end = !isNaN(hours) && hours > 0 && start
-                        ? addHoursToTime(start, hours)
-                        : f.end_time
-                      return { ...f, start_time: start, end_time: end }
-                    })
-                  }}
-                  className="mt-1.5 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
-              </div>
-              <div>
-                <Label className="text-xs text-zinc-400">Fim</Label>
-                <Input type="time" value={tsForm.end_time}
-                  onChange={e => {
-                    const end = e.target.value
-                    setTsForm(f => {
-                      const total = f.start_time && end
-                        ? String(Math.round(timeDiffHours(f.start_time, end) * 10) / 10)
-                        : f.total_hours
-                      return { ...f, end_time: end, total_hours: total }
-                    })
-                  }}
-                  className="mt-1.5 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
-              </div>
-              <div>
-                <Label className="text-xs text-zinc-400">Total (h)</Label>
-                <Input
-                  type="number" min="0.5" max="24" step="0.5"
-                  value={tsForm.total_hours}
-                  onChange={e => {
-                    const val = e.target.value
-                    setTsForm(f => {
-                      const hours = parseFloat(val)
-                      const end = !isNaN(hours) && hours > 0 && f.start_time
-                        ? addHoursToTime(f.start_time, hours)
-                        : f.end_time
-                      return { ...f, total_hours: val, end_time: end }
-                    })
-                  }}
-                  placeholder="–"
-                  className="mt-1.5 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
-              </div>
+            {/* Toggle Horário / Total de Horas */}
+            <div className="flex items-center gap-2">
+              {(['Horário', 'Total de Horas'] as const).map((label, i) => {
+                const active = i === 0 ? !tsModeTotal : tsModeTotal
+                return (
+                  <button key={label} type="button"
+                    onClick={() => setTsModeTotal(i === 1)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                    style={active
+                      ? { background: 'var(--brand-primary)', color: '#0A0A0B' }
+                      : { background: 'rgba(0,245,255,0.08)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.2)' }
+                    }>{label}</button>
+                )
+              })}
             </div>
+
+            {/* Modo Horário */}
+            {!tsModeTotal && (
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-xs text-zinc-400">Início</Label>
+                  <Input type="time" value={tsForm.start_time}
+                    onChange={e => {
+                      const start = e.target.value
+                      setTsForm(f => {
+                        const hours = parseFloat(f.total_hours)
+                        const end = !isNaN(hours) && hours > 0 && start
+                          ? addHoursToTime(start, hours)
+                          : f.end_time
+                        return { ...f, start_time: start, end_time: end }
+                      })
+                    }}
+                    className="mt-1.5 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
+                </div>
+                <div>
+                  <Label className="text-xs text-zinc-400">Fim</Label>
+                  <Input type="time" value={tsForm.end_time}
+                    onChange={e => {
+                      const end = e.target.value
+                      setTsForm(f => {
+                        const total = f.start_time && end
+                          ? String(Math.round(timeDiffHours(f.start_time, end) * 10) / 10)
+                          : f.total_hours
+                        return { ...f, end_time: end, total_hours: total }
+                      })
+                    }}
+                    className="mt-1.5 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
+                </div>
+                <div>
+                  <Label className="text-xs text-zinc-400">Total (h)</Label>
+                  <Input
+                    type="number" min="0.5" max="24" step="0.5"
+                    value={tsForm.total_hours}
+                    onChange={e => {
+                      const val = e.target.value
+                      setTsForm(f => {
+                        const hours = parseFloat(val)
+                        const end = !isNaN(hours) && hours > 0 && f.start_time
+                          ? addHoursToTime(f.start_time, hours)
+                          : f.end_time
+                        return { ...f, total_hours: val, end_time: end }
+                      })
+                    }}
+                    placeholder="–"
+                    className="mt-1.5 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
+                </div>
+              </div>
+            )}
+
+            {/* Modo Total de Horas */}
+            {tsModeTotal && (
+              <div className="space-y-3">
+                <div className="rounded-lg px-3 py-2.5 text-xs" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)', color: '#ca8a04' }}>
+                  <span className="font-semibold">Atenção:</span> O lançamento por &quot;Total de Horas&quot; deve ser realizado em comum acordo com o coordenador responsável.
+                </div>
+                <div>
+                  <Label className="text-xs text-zinc-400">Total de Horas *</Label>
+                  <Input
+                    type="number" min="0.5" max="24" step="0.5"
+                    value={tsForm.total_hours}
+                    onChange={e => setTsForm(f => ({ ...f, total_hours: e.target.value, start_time: '', end_time: '' }))}
+                    placeholder="ex: 2.5"
+                    className="mt-1.5 bg-zinc-800 border-zinc-700 text-white h-9 text-xs" />
+                </div>
+              </div>
+            )}
 
             <div>
               <div className="flex items-center justify-between">
