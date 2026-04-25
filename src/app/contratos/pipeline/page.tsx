@@ -3925,7 +3925,8 @@ function KanbanContent() {
             const col = [...DEMAND_COLS, TRANSITION_COL].find(c => c.id === contractColumnId(card))
             return col?.label ?? card.kanban_status ?? '—'
           }
-          const allContracts = [...demandCards, ...transitionCards].filter(c => c.categoria !== 'sustentacao')
+          const allContracts = [...demandCards, ...transitionCards]
+            .filter(c => c.categoria !== 'sustentacao' && !/sustenta/i.test(c.service_type ?? ''))
           const allProjects  = projectCards
           return (
             <div className="flex-1 overflow-y-auto p-4">
