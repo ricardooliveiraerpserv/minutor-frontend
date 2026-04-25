@@ -3544,6 +3544,7 @@ function KanbanContent() {
   const [contractAction,   setContractAction]   = useState<{ card: ContractCard; action: string } | null>(null)
   const [filterSearch,     setFilterSearch]     = useState('')
   const [filterCustomer,   setFilterCustomer]   = useState('')
+  const [filterExecutivo,  setFilterExecutivo]  = useState('')
 
   const isConsultor = userRole === 'consultor'
   const isCliente   = userRole === 'cliente'
@@ -3648,6 +3649,18 @@ function KanbanContent() {
     ...requestCards.map(r => r.customer_name ?? ''),
   ].filter(Boolean))].sort() as string[]
 
+  const allExecutivos = [...new Set([
+    ...demandCards.map(c => c.kanban_coordinator).filter(Boolean),
+    ...transitionCards.map(c => c.kanban_coordinator).filter(Boolean),
+    ...projectCards.flatMap(p => p.coordinators ?? []).filter(Boolean),
+  ])].sort() as string[]
+
+  const matchExecutivo = (coordinator?: string | null, coordinators?: string[]): boolean => {
+    if (!filterExecutivo) return true
+    if (coordinators) return coordinators.includes(filterExecutivo)
+    return (coordinator ?? '') === filterExecutivo
+  }
+
   // IDs de projetos já visíveis em colunas de execução — evita duplicar contrato + projeto
   const visibleProjectIds = new Set(projectCards.map(p => p.id))
 
@@ -3661,6 +3674,7 @@ function KanbanContent() {
     return base
       .filter(c => c.categoria !== 'sustentacao')
       .filter(c => matchFilter(c.customer_name, c.project_name))
+      .filter(c => matchExecutivo(c.kanban_coordinator))
       .sort((a, b) => a.kanban_order - b.kanban_order)
   }
 
@@ -3670,6 +3684,7 @@ function KanbanContent() {
       .filter(p => !p.contract_id || !sustContractIds.has(p.contract_id))
       .filter(p => !p.contract_id || !kanbanBornNotAllocatedIds.has(p.contract_id))
       .filter(p => matchFilter(p.customer_name, p.project_name))
+      .filter(p => matchExecutivo(undefined, p.coordinators))
 
   const handleContractMove = async (cardId: number, card: ContractCard, fromCol: string, toCol: string, order = 0) => {
     if (toCol === 'req_inicio_autorizado') {
@@ -3930,8 +3945,19 @@ function KanbanContent() {
               {allCustomers.map(name => <option key={name} value={name}>{name}</option>)}
             </select>
           )}
-          {(filterSearch || filterCustomer) && (
-            <button onClick={() => { setFilterSearch(''); setFilterCustomer('') }}
+          {!isCliente && allExecutivos.length > 0 && (
+            <select
+              value={filterExecutivo}
+              onChange={e => setFilterExecutivo(e.target.value)}
+              className="py-1.5 px-2 rounded-lg text-xs outline-none"
+              style={{ background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: filterExecutivo ? 'var(--brand-text)' : 'var(--brand-subtle)' }}
+            >
+              <option value="">Todos os executivos</option>
+              {allExecutivos.map(name => <option key={name} value={name}>{name}</option>)}
+            </select>
+          )}
+          {(filterSearch || filterCustomer || filterExecutivo) && (
+            <button onClick={() => { setFilterSearch(''); setFilterCustomer(''); setFilterExecutivo('') }}
               className="text-xs px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
               style={{ color: 'var(--brand-subtle)' }}>
               Limpar
@@ -3948,7 +3974,11 @@ function KanbanContent() {
           }
           const allContracts = [...demandCards, ...transitionCards]
             .filter(c => c.categoria !== 'sustentacao' && !/sustenta/i.test(c.service_type ?? ''))
+            .filter(c => matchFilter(c.customer_name, c.project_name))
+            .filter(c => matchExecutivo(c.kanban_coordinator))
           const allProjects  = projectCards
+            .filter(p => matchFilter(p.customer_name, p.project_name))
+            .filter(p => matchExecutivo(undefined, p.coordinators))
           return (
             <div className="flex-1 overflow-y-auto p-4">
               <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--brand-border)' }}>
