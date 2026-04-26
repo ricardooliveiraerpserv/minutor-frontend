@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { toast } from 'sonner'
-import { Plus, Pencil, Eye, ChevronLeft, ChevronRight, LayoutGrid, Download, FileText, MoreVertical, CheckCircle, Rocket, X, Layers, DollarSign, Clock, BarChart2, TrendingUp, Users, MessageSquare } from 'lucide-react'
+import { Plus, Pencil, Eye, ChevronLeft, ChevronRight, LayoutGrid, Download, FileText, MoreVertical, CheckCircle, Rocket, X, Layers, DollarSign, Clock, BarChart2, TrendingUp, Users, MessageSquare, Trash2 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { ContractFormModal } from '@/components/contracts/ContractFormModal'
 
@@ -134,6 +134,8 @@ export default function ContratosPage() {
 
   // Project action state (aba Projetos)
   const [projectAction, setProjectAction] = useState<{ contract: Contract; action: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string; type: 'contract' | 'project' } | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Row dropdown
   const [openDropdown, setOpenDropdown] = useState<number | null>(null)
@@ -277,30 +279,27 @@ export default function ContratosPage() {
 
   // ─── Project menu items (aba Projetos, admin/coordenador) ────────────────
   const PROJECT_MENU_ITEMS = [
-    { action: 'view',       label: 'Visualizar',       icon: Eye        },
-    { action: 'edit',       label: 'Editar',            icon: Pencil     },
-    { action: 'status',     label: 'Alterar Status',    icon: Layers     },
-    { action: 'cost',       label: 'Custo',             icon: DollarSign },
-    { action: 'timesheets', label: 'Apontamentos',      icon: Clock      },
-    { action: 'expenses',   label: 'Despesas',          icon: BarChart2  },
-    { action: 'aportes',    label: 'Aportes',           icon: TrendingUp },
-    { action: 'team',       label: 'Selecionar Equipe', icon: Users      },
+    { action: 'view',       label: 'Visualizar',       icon: Eye,      del: false },
+    { action: 'edit',       label: 'Editar',            icon: Pencil,   del: false },
+    { action: 'status',     label: 'Alterar Status',    icon: Layers,   del: false },
+    { action: 'cost',       label: 'Custo',             icon: DollarSign, del: false },
+    { action: 'timesheets', label: 'Apontamentos',      icon: Clock,    del: false },
+    { action: 'expenses',   label: 'Despesas',          icon: BarChart2, del: false },
+    { action: 'aportes',    label: 'Aportes',           icon: TrendingUp, del: false },
+    { action: 'team',       label: 'Selecionar Equipe', icon: Users,    del: false },
+    { action: 'delete',     label: 'Excluir',           icon: Trash2,   del: true  },
   ] as const
 
   const handleProjectAction = (contract: Contract, action: string) => {
     const pid = contract.project_id!
     if (action === 'timesheets') { router.push(`/timesheets?project_id=${pid}`); return }
     if (action === 'expenses')   { router.push(`/expenses?project_id=${pid}`);   return }
+    if (action === 'cost')       { router.push(`/gestao-projetos`); return }
+    if (action === 'aportes')    { router.push(`/gestao-projetos`); return }
+    if (action === 'team')       { router.push(`/gestao-projetos`); return }
+    if (action === 'delete')     { setDeleteTarget({ id: pid, name: contract.project?.name ?? contract.project?.code ?? `Projeto #${pid}`, type: 'project' }); return }
     setProjectAction({ contract, action })
   }
-
-  // Project status options
-  const PROJECT_STATUS_OPTIONS = [
-    { value: 'active',    label: 'Ativo'       },
-    { value: 'on_hold',   label: 'Em Espera'   },
-    { value: 'finished',  label: 'Encerrado'   },
-    { value: 'cancelled', label: 'Cancelado'   },
-  ]
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -375,7 +374,7 @@ export default function ContratosPage() {
       </div>
 
       {/* ── Table ── */}
-      <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--brand-border)' }}>
+      <div className="rounded-xl border" style={{ borderColor: 'var(--brand-border)' }}>
         <table className="w-full text-sm">
           <thead>
             <tr style={{ background: 'var(--brand-surface)', borderBottom: '1px solid var(--brand-border)' }}>
@@ -400,33 +399,38 @@ export default function ContratosPage() {
               <tr key={c.id} style={{ borderTop: i > 0 ? '1px solid var(--brand-border)' : undefined, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
                 <td className="w-10 px-2 py-3 text-center relative">
                   <button
-                    onClick={() => setOpenDropdown(openDropdown === c.id ? null : c.id)}
+                    onClick={e => { e.stopPropagation(); setOpenDropdown(openDropdown === c.id ? null : c.id) }}
                     className="p-1 rounded-md transition-colors hover:bg-zinc-700/60 text-zinc-500 hover:text-zinc-300">
                     <MoreVertical size={15} />
                   </button>
                   {openDropdown === c.id && (
-                    <div ref={dropdownRef} className="absolute left-8 top-1/2 -translate-y-1/2 z-50 rounded-xl overflow-hidden shadow-xl"
-                      style={{ background: '#1c1c1e', border: '1px solid var(--brand-border)', width: listTab === 'projetos' && isAdminOrCoord ? 168 : 160 }}>
+                    <div ref={dropdownRef} className="absolute left-8 top-8 z-[200] rounded-xl overflow-hidden shadow-xl"
+                      style={{ background: '#1c1c1e', border: '1px solid var(--brand-border)', minWidth: 168 }}>
                       {listTab === 'projetos' && isAdminOrCoord ? (
                         PROJECT_MENU_ITEMS.map(item => {
                           const Icon = item.icon
                           return (
                             <button key={item.action}
-                              onClick={() => { setOpenDropdown(null); handleProjectAction(c, item.action) }}
-                              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-zinc-700/50" style={{ color: 'var(--brand-text)' }}>
-                              <Icon size={14} className="text-zinc-400 shrink-0" /> {item.label}
+                              onClick={e => { e.stopPropagation(); setOpenDropdown(null); handleProjectAction(c, item.action) }}
+                              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-zinc-700/50"
+                              style={{ color: item.action === 'delete' ? '#f87171' : 'var(--brand-text)' }}>
+                              <Icon size={14} className="shrink-0" style={{ color: item.action === 'delete' ? '#f87171' : '#a1a1aa' }} /> {item.label}
                             </button>
                           )
                         })
                       ) : (
                         <>
-                          <button onClick={() => { setOpenDropdown(null); openView(c) }}
+                          <button onClick={e => { e.stopPropagation(); setOpenDropdown(null); openView(c) }}
                             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-zinc-700/50" style={{ color: 'var(--brand-text)' }}>
                             <Eye size={14} className="text-zinc-400" /> Visualizar
                           </button>
-                          <button onClick={() => { setOpenDropdown(null); openEdit(c) }}
+                          <button onClick={e => { e.stopPropagation(); setOpenDropdown(null); openEdit(c) }}
                             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-zinc-700/50" style={{ color: 'var(--brand-text)' }}>
                             <Pencil size={14} className="text-zinc-400" /> Editar
+                          </button>
+                          <button onClick={e => { e.stopPropagation(); setOpenDropdown(null); setDeleteTarget({ id: c.id, name: c.customer?.name ?? `Contrato #${c.id}`, type: 'contract' }) }}
+                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-zinc-700/50" style={{ color: '#f87171' }}>
+                            <Trash2 size={14} style={{ color: '#f87171' }} /> Excluir
                           </button>
                         </>
                       )}
@@ -660,39 +664,11 @@ export default function ContratosPage() {
         const pid = c.project_id!
         const pname = c.project?.name ?? c.project?.code ?? ''
 
-        if (action === 'view') return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
-            <div className="rounded-2xl w-full max-w-md overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-              <div className="px-6 py-5 border-b" style={{ borderColor: 'var(--brand-border)' }}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-base font-bold text-white">{pname}</p>
-                    <p className="text-xs text-zinc-500 mt-0.5">{c.customer?.name}</p>
-                  </div>
-                  <button onClick={close} className="p-1 rounded-lg hover:bg-white/10 transition-colors text-zinc-400"><X size={16} /></button>
-                </div>
-              </div>
-              <div className="px-6 py-5 flex flex-col gap-3">
-                <p className="text-sm text-zinc-400">Para ver detalhes completos do projeto, acesse a gestão de projetos.</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => { close(); router.push(`/gestao-projetos`) }}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
-                    style={{ background: 'rgba(0,245,255,0.08)', border: '1px solid rgba(0,245,255,0.2)', color: 'var(--brand-primary)' }}>
-                    <Eye size={14} /> Ver Projeto
-                  </button>
-                  <button onClick={() => { close(); router.push(`/timesheets?project_id=${pid}`) }}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}>
-                    <Clock size={14} /> Apontamentos
-                  </button>
-                </div>
-              </div>
-              <div className="flex justify-end px-6 py-4 border-t" style={{ borderColor: 'var(--brand-border)' }}>
-                <button onClick={close} className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white transition-colors">Fechar</button>
-              </div>
-            </div>
-          </div>
-        )
+        if (action === 'view') {
+          router.push(`/gestao-projetos`)
+          close()
+          return null
+        }
 
         if (action === 'edit') {
           openEdit(c)
@@ -704,36 +680,52 @@ export default function ContratosPage() {
           <ProjectStatusModal projectId={pid} projectName={pname} onClose={close} onSaved={close} />
         )
 
-        if (action === 'cost' || action === 'aportes' || action === 'team') return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
-            <div className="rounded-2xl w-full max-w-sm overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
-              <div className="px-6 py-5 border-b" style={{ borderColor: 'var(--brand-border)' }}>
-                <div className="flex items-center justify-between">
-                  <p className="text-base font-bold text-white">{pname}</p>
-                  <button onClick={close} className="p-1 rounded-lg hover:bg-white/10 transition-colors text-zinc-400"><X size={16} /></button>
-                </div>
-              </div>
-              <div className="px-6 py-5 flex flex-col gap-3">
-                <p className="text-sm text-zinc-400">
-                  {action === 'cost'    && 'Para gerenciar custos do projeto, acesse a gestão de projetos.'}
-                  {action === 'aportes' && 'Para gerenciar aportes do projeto, acesse a gestão de projetos.'}
-                  {action === 'team'    && 'Para selecionar a equipe do projeto, acesse a gestão de projetos.'}
-                </p>
-                <button onClick={() => { close(); router.push(`/gestao-projetos`) }}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
-                  style={{ background: 'rgba(0,245,255,0.08)', border: '1px solid rgba(0,245,255,0.2)', color: 'var(--brand-primary)' }}>
-                  Ir para Gestão de Projetos
-                </button>
-              </div>
-              <div className="flex justify-end px-6 py-4 border-t" style={{ borderColor: 'var(--brand-border)' }}>
-                <button onClick={close} className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white transition-colors">Fechar</button>
-              </div>
-            </div>
-          </div>
-        )
-
         return null
       })()}
+
+      {/* ── Delete confirmation modal ── */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70">
+          <div className="rounded-2xl w-full max-w-sm overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid rgba(239,68,68,0.4)' }}>
+            <div className="px-6 py-5 flex items-center gap-3">
+              <Trash2 size={20} className="text-red-400 shrink-0" />
+              <div>
+                <p className="font-semibold text-white">Excluir {deleteTarget.type === 'project' ? 'Projeto' : 'Contrato'}</p>
+                <p className="text-xs text-zinc-400 mt-0.5">{deleteTarget.name}</p>
+              </div>
+            </div>
+            <div className="px-6 pb-4">
+              <p className="text-sm text-zinc-300">Tem certeza? Esta ação não pode ser desfeita.</p>
+            </div>
+            <div className="flex justify-end gap-2 px-6 py-4 border-t" style={{ borderColor: 'var(--brand-border)' }}>
+              <button onClick={() => setDeleteTarget(null)} disabled={deleting}
+                className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white transition-colors">
+                Cancelar
+              </button>
+              <button disabled={deleting} onClick={async () => {
+                setDeleting(true)
+                try {
+                  if (deleteTarget.type === 'contract') {
+                    await api.delete(`/contracts/${deleteTarget.id}`)
+                    toast.success('Contrato excluído')
+                  } else {
+                    await api.delete(`/projects/${deleteTarget.id}`)
+                    toast.success('Projeto excluído')
+                  }
+                  setDeleteTarget(null)
+                  loadContracts()
+                } catch (e: any) {
+                  toast.error(e?.message ?? 'Erro ao excluir')
+                } finally { setDeleting(false) }
+              }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}>
+                <Trash2 size={14} /> {deleting ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </AppLayout>
   )
