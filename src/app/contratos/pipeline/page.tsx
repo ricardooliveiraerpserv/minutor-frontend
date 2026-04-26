@@ -479,6 +479,43 @@ function ListActionMenu({ card, onAction }: { card: ContractCard; onAction: (act
   )
 }
 
+function ListProjectActionMenu({ onAction }: { onAction: (action: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button onClick={e => { e.stopPropagation(); setOpen(v => !v) }}
+        className="p-1.5 rounded-lg opacity-0 group-hover/row:opacity-100 transition-opacity hover:bg-white/10"
+        style={{ color: 'var(--brand-subtle)' }}>
+        <MoreVertical size={14} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-7 z-[100] w-48 rounded-xl overflow-hidden shadow-2xl"
+          style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+          {PROJECT_MENU_ITEMS.map(item => {
+            const Icon = item.icon
+            return (
+              <button key={item.action}
+                onClick={e => { e.stopPropagation(); setOpen(false); onAction(item.action) }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-left transition-colors hover:bg-white/5"
+                style={{ color: 'var(--brand-text)' }}>
+                <Icon size={13} style={{ color: 'var(--brand-subtle)' }} />
+                {item.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Project Card ─────────────────────────────────────────────────────────────
 
 const CONTRACT_MENU_ITEMS = [
@@ -4085,7 +4122,11 @@ function KanbanContent() {
                                 <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: b.bg, color: b.color }}>{b.label}</span>
                               )})()}
                             </td>
-                            {!isCliente && <td className="px-4 py-3" />}
+                            {!isCliente && (
+                              <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
+                                <ListProjectActionMenu onAction={action => setProjectAction({ card: p, action })} />
+                              </td>
+                            )}
                           </tr>
                         )
                       })}
