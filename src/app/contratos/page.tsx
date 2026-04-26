@@ -48,7 +48,16 @@ interface Contract {
   vendedor?: { id: number; name: string }
   observacoes: string | null
   project_id: number | null
-  project?: { id: number; code: string; name: string }
+  project?: {
+    id: number
+    code: string
+    name: string
+    status?: string
+    sold_hours?: number | null
+    hour_contribution?: number | null
+    consumed_hours?: number | null
+    general_hours_balance?: number | null
+  }
   generated_at: string | null
   contacts: { id?: number; name: string; cargo: string; email: string; phone: string }[]
   attachments: ContractAttachment[]
@@ -129,7 +138,8 @@ export default function ContratosPage() {
   // Master data (apenas customers para filtro)
   const [customers, setCustomers] = useState<SelectOption[]>([])
 
-  const isSustAdmin = user?.type === 'admin' || (user?.type === 'coordenador' && (user as any).coordinator_type === 'sustentacao')
+  const isCliente      = user?.type === 'cliente'
+  const isSustAdmin    = user?.type === 'admin' || (user?.type === 'coordenador' && (user as any).coordinator_type === 'sustentacao')
   const isAdminOrCoord = user?.type === 'admin' || user?.type === 'coordenador'
 
   // Project action state (aba Projetos)
@@ -386,15 +396,19 @@ export default function ContratosPage() {
               <th className="text-center px-4 py-3 text-zinc-400 font-medium">Horas</th>
               <th className="text-left px-4 py-3 text-zinc-400 font-medium">Expectativa</th>
               <th className="text-center px-4 py-3 text-zinc-400 font-medium">Status</th>
-              <th className="text-center px-4 py-3 text-zinc-400 font-medium">Projeto</th>
+              <th className="text-left px-4 py-3 text-zinc-400 font-medium">Projeto</th>
+              {listTab === 'projetos' && <>
+                <th className="text-center px-4 py-3 text-zinc-400 font-medium">HS Consumidas</th>
+                <th className="text-center px-4 py-3 text-zinc-400 font-medium">Saldo</th>
+              </>}
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={9} className="px-4 py-8 text-center text-zinc-500 text-xs">Carregando...</td></tr>
+              <tr><td colSpan={listTab === 'projetos' ? 11 : 9} className="px-4 py-8 text-center text-zinc-500 text-xs">Carregando...</td></tr>
             )}
             {!loading && visibleContracts.length === 0 && (
-              <tr><td colSpan={9} className="px-4 py-8 text-center text-zinc-600 text-xs">Nenhum item encontrado.</td></tr>
+              <tr><td colSpan={listTab === 'projetos' ? 11 : 9} className="px-4 py-8 text-center text-zinc-600 text-xs">Nenhum item encontrado.</td></tr>
             )}
             {!loading && visibleContracts.map((c, i) => (
               <tr key={c.id} style={{ borderTop: i > 0 ? '1px solid var(--brand-border)' : undefined, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
@@ -450,11 +464,28 @@ export default function ContratosPage() {
                     {STATUS_LABEL[c.status]}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-center text-xs">
-                  {c.project
-                    ? <span className="text-cyan-400 font-mono">{c.project.code}</span>
-                    : <span className="text-zinc-600">—</span>}
+                <td className="px-4 py-3 text-xs">
+                  {c.project ? (
+                    <div>
+                      <p className="text-zinc-300 text-sm leading-tight">{c.project.name}</p>
+                      <span className="text-cyan-400 font-mono">{c.project.code}</span>
+                    </div>
+                  ) : <span className="text-zinc-600">—</span>}
                 </td>
+                {listTab === 'projetos' && (() => {
+                  const isClosed  = c.project?.status === 'finished' || c.project?.status === 'cancelled'
+                  const hideHours = isCliente && isClosed
+                  const bal       = c.project?.general_hours_balance
+                  return (<>
+                    <td className="px-4 py-3 text-center text-zinc-300 text-xs">
+                      {!c.project ? '—' : hideHours ? '—' : c.project.consumed_hours != null ? `${c.project.consumed_hours.toFixed(1)}h` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-center text-xs"
+                      style={{ color: !hideHours && c.project && (bal ?? 0) < 0 ? '#ef4444' : 'rgb(212 212 216)' }}>
+                      {!c.project ? '—' : hideHours ? '—' : bal != null ? `${bal.toFixed(1)}h` : '—'}
+                    </td>
+                  </>)
+                })()}
               </tr>
             ))}
           </tbody>
