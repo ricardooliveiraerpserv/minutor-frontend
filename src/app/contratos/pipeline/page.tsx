@@ -1175,7 +1175,9 @@ function ProjectDetailModal({ card, onClose, userRole, initialTab }: { card: Pro
           </>
         ) : (
           <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-            <ProjectMessages projectId={card.id} userRole={userRole} />
+            {card.contract_id
+              ? <ContractMessages contractId={card.contract_id} userRole={userRole} />
+              : <ProjectMessages projectId={card.id} userRole={userRole} />}
           </div>
         )}
       </div>
