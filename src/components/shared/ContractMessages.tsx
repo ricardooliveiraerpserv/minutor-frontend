@@ -113,12 +113,10 @@ export function ContractMessages({ contractId, userRole }: Props) {
   const bottomRef   = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!isCliente) {
-      api.get<MentionUser[]>(`/contracts/${contractId}/mentionable-users`)
-        .then(r => setMentionUsers(Array.isArray(r) ? r : []))
-        .catch(() => {})
-    }
-  }, [contractId, isCliente])
+    api.get<MentionUser[]>(`/contracts/${contractId}/mentionable-users`)
+      .then(r => setMentionUsers(Array.isArray(r) ? r : []))
+      .catch(() => {})
+  }, [contractId])
 
   const load = useCallback(() => {
     setLoading(true)

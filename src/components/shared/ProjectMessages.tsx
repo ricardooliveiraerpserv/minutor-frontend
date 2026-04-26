@@ -116,12 +116,10 @@ export function ProjectMessages({ projectId, userRole }: Props) {
   const bottomRef   = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!isCliente) {
-      api.get<MentionUser[]>(`/messages/mentionable-users?project_id=${projectId}`)
-        .then(r => setMentionUsers(Array.isArray(r) ? r : []))
-        .catch(() => {})
-    }
-  }, [projectId, isCliente])
+    api.get<MentionUser[]>(`/messages/mentionable-users?project_id=${projectId}`)
+      .then(r => setMentionUsers(Array.isArray(r) ? r : []))
+      .catch(() => {})
+  }, [projectId])
 
   const load = useCallback(() => {
     setLoading(true)
