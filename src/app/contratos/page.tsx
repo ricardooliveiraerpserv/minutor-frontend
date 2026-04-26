@@ -382,6 +382,7 @@ export default function ContratosPage() {
               <th className="text-left px-4 py-3 text-zinc-400 font-medium">Cliente</th>
               <th className="text-left px-4 py-3 text-zinc-400 font-medium">Categoria</th>
               <th className="text-left px-4 py-3 text-zinc-400 font-medium">Tipo de Contrato</th>
+              <th className="text-left px-4 py-3 text-zinc-400 font-medium">Tipo de Serviço</th>
               <th className="text-center px-4 py-3 text-zinc-400 font-medium">Horas</th>
               <th className="text-left px-4 py-3 text-zinc-400 font-medium">Expectativa</th>
               <th className="text-center px-4 py-3 text-zinc-400 font-medium">Status</th>
@@ -390,10 +391,10 @@ export default function ContratosPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-zinc-500 text-xs">Carregando...</td></tr>
+              <tr><td colSpan={9} className="px-4 py-8 text-center text-zinc-500 text-xs">Carregando...</td></tr>
             )}
             {!loading && visibleContracts.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-zinc-600 text-xs">Nenhum item encontrado.</td></tr>
+              <tr><td colSpan={9} className="px-4 py-8 text-center text-zinc-600 text-xs">Nenhum item encontrado.</td></tr>
             )}
             {!loading && visibleContracts.map((c, i) => (
               <tr key={c.id} style={{ borderTop: i > 0 ? '1px solid var(--brand-border)' : undefined, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
@@ -440,6 +441,7 @@ export default function ContratosPage() {
                 <td className="px-4 py-3 text-white font-medium">{c.customer?.name ?? '—'}</td>
                 <td className="px-4 py-3 text-zinc-300">{CATEGORIA_LABEL[c.categoria]}</td>
                 <td className="px-4 py-3 text-zinc-400 text-xs">{c.contract_type?.name ?? '—'}</td>
+                <td className="px-4 py-3 text-zinc-400 text-xs">{c.service_type?.name ?? '—'}</td>
                 <td className="px-4 py-3 text-center text-zinc-300">{c.horas_contratadas}h</td>
                 <td className="px-4 py-3 text-zinc-400 text-xs">{fmtDate(c.expectativa_inicio)}</td>
                 <td className="px-4 py-3 text-center">

@@ -60,6 +60,8 @@ interface ProjectCard {
   coordinator_ids?: number[]
   coordinators?: string[]
   consultants?: string[]
+  contract_type?: string | null
+  service_type?: string | null
 }
 
 interface ContractRequestDetail {
@@ -4085,6 +4087,8 @@ function KanbanContent() {
                       <tr style={{ background: 'var(--brand-surface)', borderBottom: '1px solid var(--brand-border)' }}>
                         <th className="text-left px-4 py-3 text-zinc-400 font-medium">Cliente</th>
                         <th className="text-left px-4 py-3 text-zinc-400 font-medium">Projeto</th>
+                        <th className="text-left px-4 py-3 text-zinc-400 font-medium">Tipo Contrato</th>
+                        <th className="text-left px-4 py-3 text-zinc-400 font-medium">Tipo Serviço</th>
                         <th className="text-left px-4 py-3 text-zinc-400 font-medium">Fase</th>
                         <th className="text-center px-4 py-3 text-zinc-400 font-medium">Horas</th>
                         <th className="text-center px-4 py-3 text-zinc-400 font-medium">HS Consumidas</th>
@@ -4108,6 +4112,8 @@ function KanbanContent() {
                               <p className="text-zinc-300 text-sm">{p.project_name}</p>
                               <span className="font-mono text-cyan-400">{p.code}</span>
                             </td>
+                            <td className="px-4 py-3 text-zinc-400 text-xs">{p.contract_type ?? '—'}</td>
+                            <td className="px-4 py-3 text-zinc-400 text-xs">{p.service_type ?? '—'}</td>
                             <td className="px-4 py-3 text-zinc-400 text-xs">{PROJECT_COLS.find(c => c.id === PROJECT_STATUS_TO_COL[p.status])?.label ?? 'Projeto'}</td>
                             <td className="px-4 py-3 text-center text-zinc-300">{p.sold_hours != null ? `${p.sold_hours}h` : '—'}</td>
                             <td className="px-4 py-3 text-center text-zinc-300">
@@ -4143,6 +4149,8 @@ function KanbanContent() {
                       <tr style={{ background: 'var(--brand-surface)', borderBottom: '1px solid var(--brand-border)' }}>
                         <th className="text-left px-4 py-3 text-zinc-400 font-medium">Cliente</th>
                         <th className="text-left px-4 py-3 text-zinc-400 font-medium">Projeto / Tipo</th>
+                        <th className="text-left px-4 py-3 text-zinc-400 font-medium">Tipo Contrato</th>
+                        <th className="text-left px-4 py-3 text-zinc-400 font-medium">Tipo Serviço</th>
                         <th className="text-left px-4 py-3 text-zinc-400 font-medium">Coluna</th>
                         <th className="text-center px-4 py-3 text-zinc-400 font-medium">Horas</th>
                         <th className="text-center px-4 py-3 text-zinc-400 font-medium">Status</th>
@@ -4162,6 +4170,8 @@ function KanbanContent() {
                             <span>{c.contract_type ?? '—'}</span>
                             {c.tipo_faturamento && <span className="ml-1 text-zinc-500">· {c.tipo_faturamento}</span>}
                           </td>
+                          <td className="px-4 py-3 text-zinc-400 text-xs">{c.contract_type ?? '—'}</td>
+                          <td className="px-4 py-3 text-zinc-400 text-xs">{c.service_type ?? '—'}</td>
                           <td className="px-4 py-3 text-zinc-400 text-xs">{colLabel(c)}</td>
                           <td className="px-4 py-3 text-center text-zinc-300">{c.horas_contratadas != null ? `${c.horas_contratadas}h` : '—'}</td>
                           <td className="px-4 py-3 text-center">
