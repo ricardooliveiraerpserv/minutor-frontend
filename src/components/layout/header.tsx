@@ -21,9 +21,11 @@ interface HeaderProps {
 
 interface Notification {
   id: number
-  project_id: number
+  project_id?: number
+  contract_id?: number
   project_name: string
-  project_code: string
+  project_code?: string
+  customer_name?: string
   author_name: string
   preview: string
   created_at: string
@@ -38,8 +40,11 @@ export function Header({ title, actions }: HeaderProps) {
   const bellRef = useRef<HTMLDivElement>(null)
 
   const fetchNotifications = () => {
-    if (!user || (user.type !== 'admin' && user.type !== 'coordenador')) return
-    api.get<Notification[]>('/messages/notifications')
+    if (!user) return
+    const endpoint = user.type === 'cliente'
+      ? '/contract-messages/notifications'
+      : '/messages/notifications'
+    api.get<Notification[]>(endpoint)
       .then(r => {
         const list = Array.isArray(r) ? r : []
         setNotifications(list)
@@ -140,22 +145,23 @@ export function Header({ title, actions }: HeaderProps) {
                   ) : (
                     <>
                       {notifications.map(n => (
-                        <a
+                        <div
                           key={n.id}
-                          href={`/gestao-projetos?messages=${n.project_id}`}
                           onClick={() => setBellOpen(false)}
-                          className="flex flex-col px-4 py-3 hover:bg-white/5 transition-colors border-b gap-0.5"
-                          style={{ borderColor: 'var(--brand-border)', textDecoration: 'none' }}
+                          className="flex flex-col px-4 py-3 hover:bg-white/5 transition-colors border-b gap-0.5 cursor-pointer"
+                          style={{ borderColor: 'var(--brand-border)' }}
                         >
                           <div className="flex items-center justify-between w-full">
-                            <span className="text-[10px] font-mono" style={{ color: '#00F5FF' }}>{n.project_code}</span>
+                            <span className="text-[10px] font-mono" style={{ color: '#00F5FF' }}>
+                              {n.project_code ?? n.customer_name ?? ''}
+                            </span>
                             <span className="text-[9px]" style={{ color: 'var(--brand-muted)' }}>
                               {new Date(n.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
                           <p className="text-[10px] font-semibold truncate" style={{ color: '#71717A' }}>{n.author_name} · {n.project_name}</p>
                           <p className="text-xs truncate" style={{ color: '#FAFAFA' }}>{n.preview}</p>
-                        </a>
+                        </div>
                       ))}
                       <a
                         href="/gestao-projetos"

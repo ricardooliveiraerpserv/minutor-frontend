@@ -558,9 +558,9 @@ function endDateStyle(dateStr: string): { color: string; bg: string; label: stri
 }
 
 function ProjectKanbanCard({
-  card, index, canDrag, onClick, onAction, onMove, availableColumns, isCliente,
+  card, index, canDrag, onClick, onAction, onMove, availableColumns, isCliente, hasUnread,
 }: { card: ProjectCard; index: number; canDrag: boolean; onClick: () => void; onAction: (action: string) => void
-    onMove?: (toCol: string) => void; availableColumns?: { id: string; label: string }[]; isCliente?: boolean }) {
+    onMove?: (toCol: string) => void; availableColumns?: { id: string; label: string }[]; isCliente?: boolean; hasUnread?: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -661,9 +661,12 @@ function ProjectKanbanCard({
             </div>
             <div className="flex items-center gap-1">
               <button onClick={e => { e.stopPropagation(); onAction('chat') }}
-                className="p-1 rounded-md hover:bg-white/10 transition-colors" title="Abrir Chat"
-                style={{ color: 'var(--brand-subtle)' }}>
+                className="relative p-1 rounded-md hover:bg-white/10 transition-colors" title="Abrir Chat"
+                style={{ color: hasUnread ? '#00F5FF' : 'var(--brand-subtle)' }}>
                 <MessageSquare size={11} />
+                {hasUnread && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full" style={{ background: '#00F5FF' }} />
+                )}
               </button>
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: 'rgba(99,102,241,0.12)', color: '#818cf8' }}>
                 {card.code}
@@ -3393,7 +3396,7 @@ function RequestDetailModal({ card, onClose }: { card: RequestCard; onClose: () 
 // ─── Column Component ─────────────────────────────────────────────────────────
 
 function KanbanColumn({
-  col, contractCards, projectCards, requestCards = [], canDrag, canDrop, isCliente,
+  col, contractCards, projectCards, requestCards = [], canDrag, canDrop, isCliente, unreadContractIds,
   onContractClick, onProjectClick, onRequestClick, onRequestView, onProjectAction, onContractAction,
   onContractMove, onProjectMove, getContractCols, getProjectCols,
 }: {
@@ -3404,6 +3407,7 @@ function KanbanColumn({
   canDrag: boolean
   canDrop: boolean
   isCliente?: boolean
+  unreadContractIds?: number[]
   onContractClick: (card: ContractCard) => void
   onProjectClick: (card: ProjectCard) => void
   onRequestClick?: (card: RequestCard) => void
@@ -3544,6 +3548,7 @@ function KanbanColumn({
                 <ProjectKanbanCard key={uniqueCardId(card)} card={card} index={requestCards.length + contractCards.length + idx}
                   canDrag={canDrag}
                   isCliente={isCliente}
+                  hasUnread={card.contract_id ? unreadContractIds?.includes(card.contract_id) : false}
                   onClick={() => onProjectClick(card)}
                   onAction={action => onProjectAction?.(card, action)}
                   onMove={onProjectMove ? toCol => onProjectMove(card, toCol) : undefined}
@@ -3609,6 +3614,7 @@ function KanbanContent() {
   const [filterCustomers,  setFilterCustomers]  = useState<string[]>([])
   const [filterExecutivos, setFilterExecutivos] = useState<string[]>([])
   const [listTab,          setListTab]          = useState<'contratos' | 'projetos' | 'requisicoes'>('projetos')
+  const [unreadContractIds, setUnreadContractIds] = useState<number[]>([])
 
   const isConsultor = userRole === 'consultor'
   const isCliente   = userRole === 'cliente'
@@ -3653,6 +3659,17 @@ function KanbanContent() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    const fetchUnread = () => {
+      api.get<{ contract_ids: number[] }>('/contract-messages/unread-contracts')
+        .then(r => setUnreadContractIds(r.contract_ids ?? []))
+        .catch(() => {})
+    }
+    fetchUnread()
+    const id = setInterval(fetchUnread, 60_000)
+    return () => clearInterval(id)
+  }, [])
 
   // Compute visible columns based on role
   const visibleDemandCols = isConsultor ? [] : DEMAND_COLS
@@ -4285,6 +4302,7 @@ function KanbanContent() {
                   canDrag={colCanDrag(col.id)}
                   canDrop={colCanDrop(col.id)}
                   isCliente={isCliente}
+                  unreadContractIds={unreadContractIds}
                   onContractClick={setSelectedContract}
                   onContractAction={(card, action) => setContractAction({ card, action })}
                   onProjectClick={setSelectedProject}
@@ -4322,6 +4340,7 @@ function KanbanContent() {
                     canDrag={colCanDrag('inicio_autorizado')}
                     canDrop={colCanDrop('inicio_autorizado')}
                     isCliente={isCliente}
+                    unreadContractIds={unreadContractIds}
                     onContractClick={card => {
                       if (card.kanban_status === 'inicio_autorizado' && !card.project_id) {
                         setGenerateTarget(card)
@@ -4350,6 +4369,7 @@ function KanbanContent() {
                   canDrag={!isConsultor && !isCliente}
                   canDrop={!isConsultor && !isCliente}
                   isCliente={isCliente}
+                  unreadContractIds={unreadContractIds}
                   onContractClick={setSelectedContract}
                   onProjectClick={setSelectedProject}
                   onProjectAction={(card, action) => setProjectAction({ card, action })}
@@ -4548,7 +4568,7 @@ function KanbanContent() {
         if (action === 'expenses')   return <ProjectExpensesModal projectId={card.id} projectName={card.project_name} onClose={close} />
         if (action === 'aportes')    return <ProjectAportesModal projectId={card.id} projectName={card.project_name} onClose={close} />
         if (action === 'team')       return <ProjectTeamModal projectId={card.id} projectName={card.project_name} onClose={close} onSaved={close} />
-        if (action === 'chat')       return <ProjectDetailModal card={card} onClose={close} userRole={userRole} initialTab="chat" />
+        if (action === 'chat')       return <ProjectDetailModal card={card} onClose={() => { close(); if (card.contract_id) setUnreadContractIds(prev => prev.filter(id => id !== card.contract_id)) }} userRole={userRole} initialTab="chat" />
         return null
       })()}
 

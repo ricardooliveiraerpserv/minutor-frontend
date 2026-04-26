@@ -129,7 +129,10 @@ export function ContractMessages({ contractId, userRole }: Props) {
       .finally(() => setLoading(false))
   }, [contractId])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+    api.post(`/contracts/${contractId}/messages/mark-read`, {}).catch(() => {})
+  }, [contractId, load])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
