@@ -4007,7 +4007,7 @@ function KanbanContent() {
 
           const TABS: { id: typeof listTab; label: string; count: number }[] = [
             { id: 'projetos',     label: 'Projetos',     count: allProjects.length },
-            { id: 'contratos',    label: 'Contratos',    count: allContracts.length },
+            ...(!isCliente ? [{ id: 'contratos' as const,   label: 'Contratos',    count: allContracts.length }] : []),
             { id: 'requisicoes',  label: 'Requisições',  count: allRequests.length },
           ]
 
