@@ -236,12 +236,13 @@ interface ProjectRowProps {
   canChangeStatus?: boolean
   onEdit?: (project: ProjectWithTeam) => void
   onChangeStatus?: (project: ProjectWithTeam) => void
+  onDelete?: (project: ProjectWithTeam) => void
   treeRow?: TreeRow
   onTreeToggle?: () => void
   hasUnread?: boolean
 }
 
-function ProjectRow({ project, expanded, onToggle, onMenuAction, canEdit, canChangeStatus, onEdit, onChangeStatus, treeRow, onTreeToggle, hasUnread }: ProjectRowProps) {
+function ProjectRow({ project, expanded, onToggle, onMenuAction, canEdit, canChangeStatus, onEdit, onChangeStatus, onDelete, treeRow, onTreeToggle, hasUnread }: ProjectRowProps) {
   const consumedHours = project.consumed_hours ?? (project.total_logged_minutes != null ? project.total_logged_minutes / 60 : 0)
   const pct   = project.sold_hours ? (consumedHours / project.sold_hours) * 100 : 0
   const color = healthColor(pct)
@@ -306,6 +307,7 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, canEdit, canCha
               { label: 'Despesas',          icon: <BarChart2   size={12} />, onClick: () => onMenuAction('expenses',   project) },
               { label: 'Aportes',           icon: <TrendingUp  size={12} />, onClick: () => onMenuAction('aportes',    project) },
               { label: 'Selecionar Equipe', icon: <Users       size={12} />, onClick: () => onMenuAction('team',       project) },
+              ...(onDelete ? [{ label: 'Excluir', icon: <Trash2 size={12} className="text-red-400" />, onClick: () => onDelete(project), danger: true }] : []),
             ]} />
             <button
               onClick={() => onMenuAction('messages', project)}
@@ -863,9 +865,11 @@ export default function GestaoProjetosPage() {
   const { user } = useAuth()
   const isAdmin = user?.type === 'admin'
   const isCoordenador = user?.type === 'coordenador'
+  const isCliente = user?.type === 'cliente'
   const ep = user?.extra_permissions ?? []
-  const canEdit = isAdmin || ep.includes('gestao_projetos.update')
-  const canChangeStatus = isAdmin || isCoordenador
+  const canEdit = !isCliente
+  const canChangeStatus = !isCliente
+  const canDelete = isAdmin || isCoordenador
 
   const [projects, setProjects]   = useState<ProjectWithTeam[]>([])
   const [loading, setLoading]     = useState(true)
@@ -902,6 +906,10 @@ export default function GestaoProjetosPage() {
   // Modal de alteração de status
   const [statusModal, setStatusModal] = useState<{ open: boolean; project: ProjectWithTeam | null; newStatus: string }>({ open: false, project: null, newStatus: '' })
   const [statusSaving, setStatusSaving] = useState(false)
+
+  // Modal de exclusão de projeto
+  const [deleteProject, setDeleteProject] = useState<ProjectWithTeam | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Projetos com mensagens não lidas
   const [unreadProjectIds, setUnreadProjectIds] = useState<Set<number>>(new Set())
@@ -1396,6 +1404,7 @@ export default function GestaoProjetosPage() {
                       canChangeStatus={canChangeStatus}
                       onEdit={p => setEditProjectId(p.id)}
                       onChangeStatus={p => setStatusModal({ open: true, project: p, newStatus: p.status ?? '' })}
+                      onDelete={canDelete ? p => setDeleteProject(p) : undefined}
                       hasUnread={unreadProjectIds.has(project.id)}
                       treeRow={tr}
                       onTreeToggle={tr ? () => toggleTree(tr) : undefined}
@@ -2100,6 +2109,45 @@ export default function GestaoProjetosPage() {
           onClose={() => setEditProjectId(null)}
           onSaved={() => { setEditProjectId(null); setRefreshKey(k => k + 1) }}
         />
+      )}
+
+      {/* ── Modal de Exclusão de Projeto ── */}
+      {deleteProject && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70">
+          <div className="rounded-2xl w-full max-w-sm overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid rgba(239,68,68,0.4)' }}>
+            <div className="px-6 py-5 flex items-center gap-3">
+              <Trash2 size={20} className="text-red-400 shrink-0" />
+              <div>
+                <p className="font-semibold text-white">Excluir Projeto</p>
+                <p className="text-xs text-zinc-400 mt-0.5">{deleteProject.name} · {deleteProject.code}</p>
+              </div>
+            </div>
+            <div className="px-6 pb-4">
+              <p className="text-sm text-zinc-300">Tem certeza? Esta ação não pode ser desfeita.</p>
+            </div>
+            <div className="flex justify-end gap-2 px-6 py-4 border-t" style={{ borderColor: 'var(--brand-border)' }}>
+              <button onClick={() => setDeleteProject(null)} disabled={deleting}
+                className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white transition-colors">
+                Cancelar
+              </button>
+              <button disabled={deleting} onClick={async () => {
+                setDeleting(true)
+                try {
+                  await api.delete(`/projects/${deleteProject.id}`)
+                  toast.success('Projeto excluído')
+                  setDeleteProject(null)
+                  setRefreshKey(k => k + 1)
+                } catch (e: any) {
+                  toast.error(e?.message ?? 'Erro ao excluir projeto')
+                } finally { setDeleting(false) }
+              }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}>
+                <Trash2 size={14} /> {deleting ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </AppLayout>
