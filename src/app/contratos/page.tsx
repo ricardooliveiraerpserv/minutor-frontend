@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { toast } from 'sonner'
-import { Plus, Pencil, Eye, ChevronLeft, ChevronRight, LayoutGrid, Download, FileText, MoreVertical, CheckCircle, Rocket, X } from 'lucide-react'
+import { Plus, Pencil, Eye, ChevronLeft, ChevronRight, LayoutGrid, Download, FileText, MoreVertical, CheckCircle, Rocket, X, Layers, DollarSign, Clock, BarChart2, TrendingUp, Users, MessageSquare } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { ContractFormModal } from '@/components/contracts/ContractFormModal'
 
@@ -130,6 +130,10 @@ export default function ContratosPage() {
   const [customers, setCustomers] = useState<SelectOption[]>([])
 
   const isSustAdmin = user?.type === 'admin' || (user?.type === 'coordenador' && (user as any).coordinator_type === 'sustentacao')
+  const isAdminOrCoord = user?.type === 'admin' || user?.type === 'coordenador'
+
+  // Project action state (aba Projetos)
+  const [projectAction, setProjectAction] = useState<{ contract: Contract; action: string } | null>(null)
 
   // Row dropdown
   const [openDropdown, setOpenDropdown] = useState<number | null>(null)
@@ -271,6 +275,33 @@ export default function ContratosPage() {
     URL.revokeObjectURL(url)
   }
 
+  // ─── Project menu items (aba Projetos, admin/coordenador) ────────────────
+  const PROJECT_MENU_ITEMS = [
+    { action: 'view',       label: 'Visualizar',       icon: Eye        },
+    { action: 'edit',       label: 'Editar',            icon: Pencil     },
+    { action: 'status',     label: 'Alterar Status',    icon: Layers     },
+    { action: 'cost',       label: 'Custo',             icon: DollarSign },
+    { action: 'timesheets', label: 'Apontamentos',      icon: Clock      },
+    { action: 'expenses',   label: 'Despesas',          icon: BarChart2  },
+    { action: 'aportes',    label: 'Aportes',           icon: TrendingUp },
+    { action: 'team',       label: 'Selecionar Equipe', icon: Users      },
+  ] as const
+
+  const handleProjectAction = (contract: Contract, action: string) => {
+    const pid = contract.project_id!
+    if (action === 'timesheets') { router.push(`/timesheets?project_id=${pid}`); return }
+    if (action === 'expenses')   { router.push(`/expenses?project_id=${pid}`);   return }
+    setProjectAction({ contract, action })
+  }
+
+  // Project status options
+  const PROJECT_STATUS_OPTIONS = [
+    { value: 'active',    label: 'Ativo'       },
+    { value: 'on_hold',   label: 'Em Espera'   },
+    { value: 'finished',  label: 'Encerrado'   },
+    { value: 'cancelled', label: 'Cancelado'   },
+  ]
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   const tabContratos = contracts.filter(c => !c.project_id)
@@ -374,16 +405,31 @@ export default function ContratosPage() {
                     <MoreVertical size={15} />
                   </button>
                   {openDropdown === c.id && (
-                    <div ref={dropdownRef} className="absolute left-8 top-1/2 -translate-y-1/2 z-50 w-40 rounded-xl overflow-hidden shadow-xl"
-                      style={{ background: '#1c1c1e', border: '1px solid var(--brand-border)' }}>
-                      <button onClick={() => { setOpenDropdown(null); openView(c) }}
-                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-zinc-700/50" style={{ color: 'var(--brand-text)' }}>
-                        <Eye size={14} className="text-zinc-400" /> Visualizar
-                      </button>
-                      <button onClick={() => { setOpenDropdown(null); openEdit(c) }}
-                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-zinc-700/50" style={{ color: 'var(--brand-text)' }}>
-                        <Pencil size={14} className="text-zinc-400" /> Editar
-                      </button>
+                    <div ref={dropdownRef} className="absolute left-8 top-1/2 -translate-y-1/2 z-50 rounded-xl overflow-hidden shadow-xl"
+                      style={{ background: '#1c1c1e', border: '1px solid var(--brand-border)', width: listTab === 'projetos' && isAdminOrCoord ? 168 : 160 }}>
+                      {listTab === 'projetos' && isAdminOrCoord ? (
+                        PROJECT_MENU_ITEMS.map(item => {
+                          const Icon = item.icon
+                          return (
+                            <button key={item.action}
+                              onClick={() => { setOpenDropdown(null); handleProjectAction(c, item.action) }}
+                              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-zinc-700/50" style={{ color: 'var(--brand-text)' }}>
+                              <Icon size={14} className="text-zinc-400 shrink-0" /> {item.label}
+                            </button>
+                          )
+                        })
+                      ) : (
+                        <>
+                          <button onClick={() => { setOpenDropdown(null); openView(c) }}
+                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-zinc-700/50" style={{ color: 'var(--brand-text)' }}>
+                            <Eye size={14} className="text-zinc-400" /> Visualizar
+                          </button>
+                          <button onClick={() => { setOpenDropdown(null); openEdit(c) }}
+                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-zinc-700/50" style={{ color: 'var(--brand-text)' }}>
+                            <Pencil size={14} className="text-zinc-400" /> Editar
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
                 </td>
@@ -607,6 +653,159 @@ export default function ContratosPage() {
           </div>
         </div>
       )}
+      {/* ── Project action modals (aba Projetos, admin/coordenador) ── */}
+      {projectAction && (() => {
+        const { contract: c, action } = projectAction
+        const close = () => setProjectAction(null)
+        const pid = c.project_id!
+        const pname = c.project?.name ?? c.project?.code ?? ''
+
+        if (action === 'view') return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+            <div className="rounded-2xl w-full max-w-md overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+              <div className="px-6 py-5 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-base font-bold text-white">{pname}</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">{c.customer?.name}</p>
+                  </div>
+                  <button onClick={close} className="p-1 rounded-lg hover:bg-white/10 transition-colors text-zinc-400"><X size={16} /></button>
+                </div>
+              </div>
+              <div className="px-6 py-5 flex flex-col gap-3">
+                <p className="text-sm text-zinc-400">Para ver detalhes completos do projeto, acesse a gestão de projetos.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => { close(); router.push(`/gestao-projetos`) }}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                    style={{ background: 'rgba(0,245,255,0.08)', border: '1px solid rgba(0,245,255,0.2)', color: 'var(--brand-primary)' }}>
+                    <Eye size={14} /> Ver Projeto
+                  </button>
+                  <button onClick={() => { close(); router.push(`/timesheets?project_id=${pid}`) }}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }}>
+                    <Clock size={14} /> Apontamentos
+                  </button>
+                </div>
+              </div>
+              <div className="flex justify-end px-6 py-4 border-t" style={{ borderColor: 'var(--brand-border)' }}>
+                <button onClick={close} className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white transition-colors">Fechar</button>
+              </div>
+            </div>
+          </div>
+        )
+
+        if (action === 'edit') {
+          openEdit(c)
+          close()
+          return null
+        }
+
+        if (action === 'status') return (
+          <ProjectStatusModal projectId={pid} projectName={pname} onClose={close} onSaved={close} />
+        )
+
+        if (action === 'cost' || action === 'aportes' || action === 'team') return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+            <div className="rounded-2xl w-full max-w-sm overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+              <div className="px-6 py-5 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+                <div className="flex items-center justify-between">
+                  <p className="text-base font-bold text-white">{pname}</p>
+                  <button onClick={close} className="p-1 rounded-lg hover:bg-white/10 transition-colors text-zinc-400"><X size={16} /></button>
+                </div>
+              </div>
+              <div className="px-6 py-5 flex flex-col gap-3">
+                <p className="text-sm text-zinc-400">
+                  {action === 'cost'    && 'Para gerenciar custos do projeto, acesse a gestão de projetos.'}
+                  {action === 'aportes' && 'Para gerenciar aportes do projeto, acesse a gestão de projetos.'}
+                  {action === 'team'    && 'Para selecionar a equipe do projeto, acesse a gestão de projetos.'}
+                </p>
+                <button onClick={() => { close(); router.push(`/gestao-projetos`) }}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                  style={{ background: 'rgba(0,245,255,0.08)', border: '1px solid rgba(0,245,255,0.2)', color: 'var(--brand-primary)' }}>
+                  Ir para Gestão de Projetos
+                </button>
+              </div>
+              <div className="flex justify-end px-6 py-4 border-t" style={{ borderColor: 'var(--brand-border)' }}>
+                <button onClick={close} className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white transition-colors">Fechar</button>
+              </div>
+            </div>
+          </div>
+        )
+
+        return null
+      })()}
+
     </AppLayout>
+  )
+}
+
+// ─── ProjectStatusModal ───────────────────────────────────────────────────────
+
+function ProjectStatusModal({ projectId, projectName, onClose, onSaved }: {
+  projectId: number
+  projectName: string
+  onClose: () => void
+  onSaved: (status: string) => void
+}) {
+  const PROJECT_STATUSES = [
+    { value: 'active',    label: 'Ativo',      color: '#22c55e' },
+    { value: 'on_hold',   label: 'Em Espera',  color: '#eab308' },
+    { value: 'finished',  label: 'Encerrado',  color: '#6366f1' },
+    { value: 'cancelled', label: 'Cancelado',  color: '#ef4444' },
+  ]
+  const [selected, setSelected] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    if (!selected) return
+    setSaving(true)
+    try {
+      await api.patch(`/projects/${projectId}/status`, { status: selected })
+      toast.success('Status do projeto atualizado')
+      onSaved(selected)
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Erro ao alterar status')
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+      <div className="rounded-2xl w-full max-w-sm overflow-hidden" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+        <div className="px-6 py-5 border-b" style={{ borderColor: 'var(--brand-border)' }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-base font-bold text-white">Alterar Status</p>
+              <p className="text-xs text-zinc-500 mt-0.5">{projectName}</p>
+            </div>
+            <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 transition-colors text-zinc-400"><X size={16} /></button>
+          </div>
+        </div>
+        <div className="px-6 py-4 space-y-2">
+          {PROJECT_STATUSES.map(s => (
+            <button key={s.value} type="button"
+              onClick={() => setSelected(s.value)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left"
+              style={{
+                background: selected === s.value ? `${s.color}12` : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${selected === s.value ? s.color : 'var(--brand-border)'}`,
+                color: selected === s.value ? s.color : 'var(--brand-text)',
+              }}>
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
+              {s.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex justify-end gap-3 px-6 py-4 border-t" style={{ borderColor: 'var(--brand-border)' }}>
+          <button onClick={onClose} disabled={saving} className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white transition-colors">
+            Cancelar
+          </button>
+          <button onClick={save} disabled={saving || !selected}
+            className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+            style={{ background: 'rgba(0,245,255,0.12)', border: '1px solid rgba(0,245,255,0.3)', color: '#00F5FF' }}>
+            {saving ? 'Salvando...' : 'Confirmar'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
