@@ -354,11 +354,20 @@ function ContractKanbanCard({
                 <span>R$ {Number(card.valor_projeto).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</span>
               )}
             </div>
-            {card.project_code && (
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: 'var(--brand-bg)', color: 'var(--brand-primary)' }}>
-                {card.project_code}
-              </span>
-            )}
+            <div className="flex items-center gap-1">
+              {onAction && (
+                <button onClick={e => { e.stopPropagation(); onAction('chat') }}
+                  className="p-1 rounded-md hover:bg-white/10 transition-colors" title="Abrir Chat"
+                  style={{ color: 'var(--brand-subtle)' }}>
+                  <MessageSquare size={11} />
+                </button>
+              )}
+              {card.project_code && (
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: 'var(--brand-bg)', color: 'var(--brand-primary)' }}>
+                  {card.project_code}
+                </span>
+              )}
+            </div>
           </div>
           {availableColumns && availableColumns.length > 0 && (
             <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--brand-border)' }}
@@ -650,9 +659,16 @@ function ProjectKanbanCard({
                 </span>
               )}
             </div>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: 'rgba(99,102,241,0.12)', color: '#818cf8' }}>
-              {card.code}
-            </span>
+            <div className="flex items-center gap-1">
+              <button onClick={e => { e.stopPropagation(); onAction('chat') }}
+                className="p-1 rounded-md hover:bg-white/10 transition-colors" title="Abrir Chat"
+                style={{ color: 'var(--brand-subtle)' }}>
+                <MessageSquare size={11} />
+              </button>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: 'rgba(99,102,241,0.12)', color: '#818cf8' }}>
+                {card.code}
+              </span>
+            </div>
           </div>
           {availableColumns && availableColumns.length > 0 && (
             <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(99,102,241,0.15)' }}

@@ -152,6 +152,7 @@ function endDateStyle(dateStr: string): { color: string; bg: string; label: stri
 const PROJECT_MENU_ITEMS = [
   { action: 'view',       label: 'Visualizar',       icon: Eye },
   { action: 'edit',       label: 'Editar',            icon: Pencil },
+  { action: 'chat',       label: 'Chat',              icon: MessageSquare },
   { action: 'status',     label: 'Alterar Status',    icon: Layers },
   { action: 'cost',       label: 'Custo',             icon: DollarSign },
   { action: 'timesheets', label: 'Apontamentos',      icon: Clock },
@@ -1214,11 +1215,20 @@ function ContractKanbanCard({ card, index, onClick, onAction, onMove, availableC
                 <span>R$ {Number(card.valor_projeto).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</span>
               )}
             </div>
-            {card.project_code && (
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: 'var(--brand-bg)', color: 'var(--brand-primary)' }}>
-                {card.project_code}
-              </span>
-            )}
+            <div className="flex items-center gap-1">
+              {onAction && (
+                <button onClick={e => { e.stopPropagation(); onAction('chat') }}
+                  className="p-1 rounded-md hover:bg-white/10 transition-colors" title="Abrir Chat"
+                  style={{ color: 'var(--brand-subtle)' }}>
+                  <MessageSquare size={11} />
+                </button>
+              )}
+              {card.project_code && (
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: 'var(--brand-bg)', color: 'var(--brand-primary)' }}>
+                  {card.project_code}
+                </span>
+              )}
+            </div>
           </div>
           {availableColumns && availableColumns.length > 0 && (
             <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--brand-border)' }}
@@ -1330,9 +1340,18 @@ function ProjectKanbanCard({ card, index, onClick, onAction, onMove, availableCo
             <span className="text-[10px]" style={{ color: 'var(--brand-subtle)' }}>
               {card.coordinators?.[0] ? `👤 ${card.coordinators[0]}` : ''}
             </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: `${color}12`, color }}>
-              {card.code}
-            </span>
+            <div className="flex items-center gap-1">
+              {onAction && (
+                <button onClick={e => { e.stopPropagation(); onAction('chat') }}
+                  className="p-1 rounded-md hover:bg-white/10 transition-colors" title="Abrir Chat"
+                  style={{ color: 'var(--brand-subtle)' }}>
+                  <MessageSquare size={11} />
+                </button>
+              )}
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: `${color}12`, color }}>
+                {card.code}
+              </span>
+            </div>
           </div>
           {availableColumns && availableColumns.length > 0 && (
             <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${color}20` }}
@@ -2186,6 +2205,10 @@ function KanbanContent() {
         if (action === 'cost')       return <ProjectViewModal projectId={card.id} onClose={close} userRole={userType} initialTab="consultants" />
         if (action === 'timesheets') return <ProjectViewModal projectId={card.id} onClose={close} userRole={userType} initialTab="timesheets" />
         if (action === 'team')       return <ProjectTeamModal projectId={card.id} projectName={card.project_name} onClose={close} onSaved={close} />
+        if (action === 'chat' && card.contract_id) {
+          const chatCard = { id: card.contract_id, customer_name: card.customer_name, project_name: card.project_name } as any
+          return <CardDetailModal card={chatCard} onClose={close} initialTab="chat" />
+        }
         return null
       })()}
     </AppLayout>
