@@ -888,8 +888,8 @@ function ContractDetailModal({ card, onClose, onGenerate, coordinators, canGener
   )
 }
 
-function ProjectDetailModal({ card, onClose, userRole }: { card: ProjectCard; onClose: () => void; userRole: string }) {
-  const [tab, setTab]             = useState<'details' | 'req' | 'chat' | 'log'>('details')
+function ProjectDetailModal({ card, onClose, userRole, initialTab }: { card: ProjectCard; onClose: () => void; userRole: string; initialTab?: 'details' | 'req' | 'chat' | 'log' }) {
+  const [tab, setTab]             = useState<'details' | 'req' | 'chat' | 'log'>(initialTab ?? 'details')
   const [logs, setLogs]           = useState<KanbanLogEntry[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
   const [logsLoaded, setLogsLoaded]   = useState(false)
@@ -4546,6 +4546,7 @@ function KanbanContent() {
         if (action === 'expenses')   return <ProjectExpensesModal projectId={card.id} projectName={card.project_name} onClose={close} />
         if (action === 'aportes')    return <ProjectAportesModal projectId={card.id} projectName={card.project_name} onClose={close} />
         if (action === 'team')       return <ProjectTeamModal projectId={card.id} projectName={card.project_name} onClose={close} onSaved={close} />
+        if (action === 'chat')       return <ProjectDetailModal card={card} onClose={close} userRole={userRole} initialTab="chat" />
         return null
       })()}
 
