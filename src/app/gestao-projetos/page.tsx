@@ -20,6 +20,9 @@ interface ProjectWithTeam extends Project {
   consultants?: { id: number; name: string; email: string }[]
   coordinators?: { id: number; name: string; email: string }[]
   child_projects?: ProjectWithTeam[]
+  service_type?: { id: number; name: string } | null
+  contract_type?: { id: number; name: string } | null
+  contract_type_display?: string
 }
 
 interface ProjectFull extends ProjectWithTeam {
@@ -374,6 +377,16 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, canEdit, canCha
           {project.customer?.name ?? '—'}
         </td>
 
+        {/* Tipo de Contrato */}
+        <td className="py-3 pr-4 text-xs" style={{ color: 'var(--brand-subtle)' }}>
+          {project.contract_type_display ?? project.contract_type?.name ?? '—'}
+        </td>
+
+        {/* Tipo de Serviço */}
+        <td className="py-3 pr-4 text-xs" style={{ color: 'var(--brand-subtle)' }}>
+          {project.service_type?.name ?? '—'}
+        </td>
+
         {/* HS Vendidas */}
         <td className="py-3 px-4 text-sm text-center tabular-nums" style={{ color: 'var(--brand-muted)' }}>
           {fmt(project.sold_hours)}
@@ -438,7 +451,7 @@ function ProjectRow({ project, expanded, onToggle, onMenuAction, canEdit, canCha
       {expanded && teamCount > 0 && (
         <tr style={{ background: 'rgba(0,0,0,0.2)' }}>
           <td /><td />
-          <td colSpan={7} className="py-3 px-4">
+          <td colSpan={9} className="py-3 px-4">
             <div className="flex flex-wrap gap-4">
               {(project.coordinators ?? []).length > 0 && (
                 <div>
@@ -1383,6 +1396,8 @@ export default function GestaoProjetosPage() {
                   <th className="w-1" />
                   <th className="py-3 pr-4 pl-2 text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Projeto</th>
                   <th className="py-3 pr-4 text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Cliente</th>
+                  <th className="py-3 pr-4 text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Tipo Contrato</th>
+                  <th className="py-3 pr-4 text-xs font-semibold" style={{ color: 'var(--brand-muted)' }}>Tipo Serviço</th>
                   <th className="py-3 px-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>HS Vendidas</th>
                   <th className="py-3 px-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>HS Consumidas</th>
                   <th className="py-3 px-4 text-xs font-semibold text-center" style={{ color: 'var(--brand-muted)' }}>Saldo</th>
