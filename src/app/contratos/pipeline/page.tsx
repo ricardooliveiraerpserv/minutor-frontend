@@ -2,7 +2,7 @@
 
 import { AppLayout } from '@/components/layout/app-layout'
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
@@ -3618,6 +3618,15 @@ function KanbanContent() {
 
   const isConsultor = userRole === 'consultor'
   const isCliente   = userRole === 'cliente'
+
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    const contractIdParam = searchParams.get('chat_contract_id')
+    if (!contractIdParam || projectCards.length === 0) return
+    const contractId = Number(contractIdParam)
+    const card = projectCards.find(p => p.contract_id === contractId)
+    if (card) setProjectAction({ card, action: 'chat' })
+  }, [searchParams, projectCards])
 
   const colIsClientVisible = (colId: string): boolean =>
     DEMAND_COLS.find(c => c.id === colId)?.clientVisible ?? false

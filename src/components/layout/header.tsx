@@ -144,25 +144,32 @@ export function Header({ title, actions }: HeaderProps) {
                     </div>
                   ) : (
                     <>
-                      {notifications.map(n => (
-                        <div
-                          key={n.id}
-                          onClick={() => setBellOpen(false)}
-                          className="flex flex-col px-4 py-3 hover:bg-white/5 transition-colors border-b gap-0.5 cursor-pointer"
-                          style={{ borderColor: 'var(--brand-border)' }}
-                        >
-                          <div className="flex items-center justify-between w-full">
-                            <span className="text-[10px] font-mono" style={{ color: '#00F5FF' }}>
-                              {n.project_code ?? n.customer_name ?? ''}
-                            </span>
-                            <span className="text-[9px]" style={{ color: 'var(--brand-muted)' }}>
-                              {new Date(n.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
+                      {notifications.map(n => {
+                        const href = n.contract_id
+                          ? `/contratos/pipeline?chat_contract_id=${n.contract_id}`
+                          : n.project_id
+                          ? `/gestao-projetos?messages=${n.project_id}`
+                          : undefined
+                        return (
+                          <div
+                            key={n.id}
+                            onClick={() => { setBellOpen(false); if (href) router.push(href) }}
+                            className="flex flex-col px-4 py-3 hover:bg-white/5 transition-colors border-b gap-0.5 cursor-pointer"
+                            style={{ borderColor: 'var(--brand-border)' }}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span className="text-[10px] font-mono" style={{ color: '#00F5FF' }}>
+                                {n.project_code ?? n.customer_name ?? ''}
+                              </span>
+                              <span className="text-[9px]" style={{ color: 'var(--brand-muted)' }}>
+                                {new Date(n.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className="text-[10px] font-semibold truncate" style={{ color: '#71717A' }}>{n.author_name} · {n.project_name}</p>
+                            <p className="text-xs truncate" style={{ color: '#FAFAFA' }}>{n.preview}</p>
                           </div>
-                          <p className="text-[10px] font-semibold truncate" style={{ color: '#71717A' }}>{n.author_name} · {n.project_name}</p>
-                          <p className="text-xs truncate" style={{ color: '#FAFAFA' }}>{n.preview}</p>
-                        </div>
-                      ))}
+                        )
+                      })}
                       <a
                         href="/gestao-projetos"
                         onClick={() => setBellOpen(false)}
