@@ -124,6 +124,7 @@ export default function ContratosPage() {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterCustomer, setFilterCustomer] = useState('')
   const [search, setSearch]       = useState('')
+  const [listTab, setListTab]     = useState<'contratos' | 'projetos'>('contratos')
 
   // Master data (apenas customers para filtro)
   const [customers, setCustomers] = useState<SelectOption[]>([])
@@ -167,7 +168,7 @@ export default function ContratosPage() {
   const loadContracts = useCallback(async () => {
     setLoading(true)
     try {
-      const qp = new URLSearchParams({ page: String(page), per_page: '20' })
+      const qp = new URLSearchParams({ page: String(page), per_page: '200' })
       if (filterStatus) qp.set('status', filterStatus)
       if (filterCustomer) qp.set('customer_id', filterCustomer)
       if (search) qp.set('search', search)
@@ -272,7 +273,9 @@ export default function ContratosPage() {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
-  const totalPages = Math.ceil(total / 20)
+  const tabContratos = contracts.filter(c => !c.project_id)
+  const tabProjetos  = contracts.filter(c => !!c.project_id)
+  const visibleContracts = listTab === 'projetos' ? tabProjetos : tabContratos
 
   const inputCls   = 'w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none focus:ring-1 focus:ring-cyan-500/40'
   const inputStyle = { border: '1px solid var(--brand-border)', color: 'var(--brand-text)' }
@@ -318,6 +321,28 @@ export default function ContratosPage() {
         </select>
       </div>
 
+      {/* ── Tabs ── */}
+      <div className="flex gap-1 p-1 rounded-xl w-fit mb-4" style={{ background: 'var(--brand-surface)', border: '1px solid var(--brand-border)' }}>
+        {([
+          { id: 'contratos', label: 'Contratos', count: tabContratos.length },
+          { id: 'projetos',  label: 'Projetos',  count: tabProjetos.length  },
+        ] as const).map(tab => (
+          <button key={tab.id} onClick={() => setListTab(tab.id)}
+            className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
+            style={listTab === tab.id
+              ? { background: 'rgba(0,245,255,0.1)', color: 'var(--brand-primary)', border: '1px solid rgba(0,245,255,0.2)' }
+              : { color: 'var(--brand-muted)', border: '1px solid transparent' }
+            }>
+            {tab.label}
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
+              style={listTab === tab.id
+                ? { background: 'rgba(0,245,255,0.15)', color: 'var(--brand-primary)' }
+                : { background: 'rgba(255,255,255,0.06)', color: 'var(--brand-muted)' }
+              }>{tab.count}</span>
+          </button>
+        ))}
+      </div>
+
       {/* ── Table ── */}
       <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--brand-border)' }}>
         <table className="w-full text-sm">
@@ -337,10 +362,10 @@ export default function ContratosPage() {
             {loading && (
               <tr><td colSpan={8} className="px-4 py-8 text-center text-zinc-500 text-xs">Carregando...</td></tr>
             )}
-            {!loading && contracts.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-zinc-600 text-xs">Nenhum contrato encontrado.</td></tr>
+            {!loading && visibleContracts.length === 0 && (
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-zinc-600 text-xs">Nenhum item encontrado.</td></tr>
             )}
-            {!loading && contracts.map((c, i) => (
+            {!loading && visibleContracts.map((c, i) => (
               <tr key={c.id} style={{ borderTop: i > 0 ? '1px solid var(--brand-border)' : undefined, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
                 <td className="w-10 px-2 py-3 text-center relative">
                   <button
@@ -385,14 +410,14 @@ export default function ContratosPage() {
       </div>
 
       {/* ── Pagination ── */}
-      {totalPages > 1 && (
+      {total > 200 && (
         <div className="flex items-center justify-between mt-4 text-xs text-zinc-500">
           <span>{total} contratos</span>
           <div className="flex items-center gap-2">
             <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
               className="p-1 rounded disabled:opacity-30"><ChevronLeft size={14} /></button>
-            <span>{page} / {totalPages}</span>
-            <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)}
+            <span>Pág. {page}</span>
+            <button disabled={contracts.length < 200} onClick={() => setPage(p => p + 1)}
               className="p-1 rounded disabled:opacity-30"><ChevronRight size={14} /></button>
           </div>
         </div>
