@@ -4101,7 +4101,7 @@ function KanbanContent() {
                         const isClosed  = p.status === 'finished' || p.status === 'cancelled'
                         const hideHours = isCliente && isClosed
                         return (
-                          <tr key={`p-${p.id}`} onClick={() => setSelectedProject(p)} className="cursor-pointer hover:bg-zinc-800/40 transition-colors"
+                          <tr key={`p-${p.id}`} onClick={() => setSelectedProject(p)} className="cursor-pointer hover:bg-zinc-800/40 transition-colors group/row"
                             style={{ borderTop: '1px solid var(--brand-border)' }}>
                             <td className="px-4 py-3 text-white font-medium">{p.customer_name}</td>
                             <td className="px-4 py-3 text-zinc-300 text-xs">
